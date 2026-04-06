@@ -1,0 +1,717 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Каталог продуктов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:       #ffffff;
+    --off-white:   #f7f9f5;
+    --light:       #eef4ea;
+    --green-light: #c8e6b0;
+    --green:       #5aaa3c;
+    --green-mid:   #3d8a26;
+    --green-dark:  #1e4d14;
+    --text:        #1a2e12;
+    --text-mid:    #3d5c30;
+    --muted:       #7a9668;
+    --border:      #d6e8cc;
+    --border-soft: #e8f2e0;
+    --danger:      #d64b2a;
+    --amber:       #8a6200;
+    --amber-bg:    #fdf4d0;
+    --radius:      14px;
+    --font:        'Manrope', sans-serif;
+    --shadow:      0 2px 16px rgba(30,77,20,.07);
+    --shadow-md:   0 4px 32px rgba(30,77,20,.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--off-white); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    background: var(--white);
+    border-bottom: 1.5px solid var(--border);
+    padding: 0 28px;
+    height: 64px;
+    display: flex; align-items: center; gap: 20px;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: var(--green-dark); border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
+  .logo-text em { color: var(--green); font-style: normal; }
+  .logo-sub { font-size: 11px; color: var(--muted); font-weight: 500; border-left: 1.5px solid var(--border); padding-left: 12px; }
+
+  .topbar-search { flex: 1; max-width: 480px; position: relative; }
+  .topbar-search input {
+    width: 100%; background: var(--off-white); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 10px 16px 10px 42px;
+    color: var(--text); font-family: var(--font); font-size: 14px;
+    outline: none; transition: border-color .2s, box-shadow .2s; font-weight: 500;
+  }
+  .topbar-search input::placeholder { color: var(--muted); font-weight: 400; }
+  .topbar-search input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(90,170,60,.12); background: var(--white); }
+  .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+  .count-badge {
+    margin-left: auto;
+    background: var(--light); border: 1.5px solid var(--border);
+    border-radius: 20px; padding: 6px 16px;
+    font-size: 13px; color: var(--text-mid); font-weight: 600; white-space: nowrap; flex-shrink: 0;
+  }
+  .count-badge strong { color: var(--green-mid); }
+
+  .reset-btn {
+    background: transparent; border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 9px; padding: 8px 14px; font-family: var(--font);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+    white-space: nowrap; text-decoration: none; display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  }
+  .reset-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(214,75,42,.05); }
+
+  /* ── LAYOUT ── */
+  .layout { display: flex; height: calc(100vh - 64px); overflow: hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    background: var(--white); border-right: 1.5px solid var(--border);
+    overflow-y: auto; padding: 20px 16px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .filter-group { display: flex; flex-direction: column; gap: 8px; }
+  .filter-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.8px;
+    text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .filter-title::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+
+  /* Category list */
+  .cat-list { display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; padding-right: 2px; }
+  .cat-list::-webkit-scrollbar { width: 3px; }
+  .cat-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .cat-item {
+    display: flex; align-items: center; gap: 9px; padding: 6px 10px;
+    border-radius: 9px; cursor: pointer; transition: background .15s;
+    border: 1.5px solid transparent;
+  }
+  .cat-item:hover { background: var(--off-white); }
+  .cat-item input[type="checkbox"] { display: none; }
+  .cat-item.checked { background: var(--light); border-color: var(--green-light); }
+  .cat-cb {
+    width: 16px; height: 16px; border: 2px solid var(--border); border-radius: 4px;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all .15s; background: var(--white);
+  }
+  .cat-item.checked .cat-cb { background: var(--green); border-color: var(--green); }
+  .cat-item.checked .cat-cb::after {
+    content: ''; width: 8px; height: 4px;
+    border-left: 2px solid #fff; border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translateY(-1px); display: block;
+  }
+  .cat-name { font-size: 13px; color: var(--text); font-weight: 500; flex: 1; line-height: 1.3; }
+
+  /* Range inputs */
+  .range-row { display: flex; gap: 6px; align-items: center; }
+  .range-input {
+    flex: 1; background: var(--off-white); border: 1.5px solid var(--border);
+    border-radius: 8px; padding: 7px 8px; color: var(--text);
+    font-family: var(--font); font-size: 13px; font-weight: 500;
+    width: 0; outline: none; transition: border-color .2s, box-shadow .2s;
+  }
+  .range-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(90,170,60,.1); background: var(--white); }
+  .range-input::placeholder { color: var(--muted); font-weight: 400; font-size: 12px; }
+  .range-sep { color: var(--muted); font-size: 12px; flex-shrink: 0; font-weight: 600; }
+
+  /* Packing select */
+  .filter-select {
+    background: var(--off-white); border: 1.5px solid var(--border); border-radius: 9px;
+    padding: 8px 32px 8px 11px; color: var(--text); font-family: var(--font);
+    font-size: 13px; font-weight: 500; width: 100%; outline: none; cursor: pointer;
+    transition: border-color .2s; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a9668' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center;
+  }
+  .filter-select:focus { border-color: var(--green); background-color: var(--white); }
+
+  /* Filter tab switcher — На 100г / На порцию */
+  .filter-tabs {
+    display: flex; gap: 0;
+    background: var(--off-white);
+    border: 1.5px solid var(--border);
+    border-radius: 9px; padding: 3px; overflow: hidden;
+  }
+  .ftab {
+    flex: 1; padding: 6px 8px; text-align: center;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    border-radius: 7px; border: none; background: transparent;
+    color: var(--muted); font-family: var(--font);
+    transition: all .18s;
+  }
+  .ftab.active { background: var(--white); color: var(--text); box-shadow: 0 1px 4px rgba(30,77,20,.1); }
+  .ftab.active.t100 { color: var(--green-mid); }
+  .ftab.active.tserv { color: var(--amber); }
+
+  .filter-panel { display: flex; flex-direction: column; gap: 10px; }
+  .filter-panel.hidden { display: none; }
+
+  /* Section label inside panel */
+  .panel-sublabel {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.4px;
+    text-transform: uppercase; color: var(--muted); margin-top: 2px;
+  }
+  .panel-sublabel.green { color: var(--green-mid); }
+  .panel-sublabel.amber { color: var(--amber); }
+
+  .apply-btn {
+    width: 100%; background: var(--green-dark); color: #fff; border: none;
+    border-radius: 11px; padding: 12px; font-family: var(--font);
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: background .2s, transform .1s, box-shadow .2s;
+    box-shadow: 0 2px 8px rgba(30,77,20,.2); margin-top: 2px;
+  }
+  .apply-btn:hover { background: var(--green-mid); box-shadow: 0 4px 16px rgba(30,77,20,.25); }
+  .apply-btn:active { transform: scale(.98); }
+
+  .sidebar-divider { height: 1px; background: var(--border-soft); flex-shrink: 0; }
+
+  /* ── MAIN ── */
+  .main { flex: 1; overflow: auto; padding: 18px 22px; }
+  .main::-webkit-scrollbar { width: 6px; height: 6px; }
+  .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .chips-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .chip {
+    background: var(--light); border: 1.5px solid var(--green-light);
+    color: var(--green-mid); border-radius: 20px; padding: 3px 11px;
+    font-size: 12px; font-weight: 600;
+  }
+  .chip.amber { background: var(--amber-bg); border-color: #e8c96a; color: var(--amber); }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    border-radius: var(--radius); border: 1.5px solid var(--border);
+    overflow: hidden; box-shadow: var(--shadow); min-width: 860px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--white); }
+
+  .thead-groups th {
+    padding: 9px 13px 7px; font-size: 10px; font-weight: 700;
+    letter-spacing: 1.6px; text-transform: uppercase;
+    background: var(--green-dark); color: rgba(255,255,255,.65); text-align: center;
+  }
+  .thead-groups .g-base { text-align: left; color: rgba(255,255,255,.9); }
+  .thead-groups .g-100 { color: #a8e68a; }
+  .thead-groups .g-serv { color: #f9d878; }
+  .grp-border { border-left: 2px solid rgba(255,255,255,.15); }
+
+  .thead-cols { background: var(--light); }
+  .thead-cols th {
+    padding: 9px 12px; font-size: 11px; font-weight: 700;
+    color: var(--text-mid); white-space: nowrap;
+    border-bottom: 1.5px solid var(--border);
+    user-select: none; text-align: left;
+  }
+  .thead-cols th.sortable { cursor: pointer; transition: color .15s; }
+  .thead-cols th.sortable:hover { color: var(--green); }
+  .thead-cols th.sort-active { color: var(--green); }
+  .sort-arr { margin-left: 3px; opacity: .5; }
+  .sort-active .sort-arr { opacity: 1; }
+  .col-right { text-align: right; }
+  .col-border { border-left: 2px solid var(--border); }
+
+  tbody tr { border-bottom: 1px solid var(--border-soft); transition: background .12s; cursor: pointer; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--off-white); }
+
+  td { padding: 10px 12px; vertical-align: middle; }
+  .td-cat { width: 110px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-weight: 500; font-size: 12px; }
+  /* Наименование — растягивается, перенос разрешён */
+  .td-name { font-weight: 600; color: var(--text); white-space: normal; word-break: break-word; min-width: 180px; max-width: 300px; line-height: 1.35; }
+  /* Кратность / Масса — компактная фиксированная ширина */
+  .td-pack { width: 90px; max-width: 90px; font-size: 12px; color: var(--text-mid); font-weight: 500; white-space: nowrap; }
+  .td-pack .pack-main { font-weight: 600; color: var(--text); }
+  .td-pack .pack-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
+  .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-mid); font-weight: 500; }
+  .td-num.strong { color: var(--text); font-weight: 600; }
+
+  .kpill { display: inline-flex; padding: 3px 8px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .kpill-low   { background: #e8f7e0; color: #2d7a1a; }
+  .kpill-mid   { background: #fdf4d0; color: #8a6200; }
+  .kpill-high  { background: #fde8d0; color: #8a3800; }
+  .kpill-vhigh { background: #fde0dc; color: #8a1800; }
+
+  .empty { padding: 80px 20px; text-align: center; color: var(--muted); }
+  .empty-icon { width: 64px; height: 64px; background: var(--light); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 30px; }
+  .empty h3 { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .empty a { color: var(--green); font-weight: 600; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,77,20,.35); z-index: 200;
+    backdrop-filter: blur(6px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+  .modal {
+    background: var(--white); border: 1.5px solid var(--border);
+    border-radius: 20px; width: 100%; max-width: 620px;
+    max-height: 88vh; overflow-y: auto;
+    box-shadow: var(--shadow-md); animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .modal::-webkit-scrollbar { width: 4px; }
+  .modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .modal-header { background: var(--green-dark); padding: 24px 24px 20px; border-radius: 18px 18px 0 0; position: relative; }
+  .modal-close {
+    position: absolute; top: 16px; right: 16px;
+    background: rgba(255,255,255,.15); border: none; border-radius: 8px;
+    width: 32px; height: 32px; color: #fff; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+  }
+  .modal-close:hover { background: rgba(255,255,255,.25); }
+  .modal-cat-tag {
+    display: inline-block; background: rgba(255,255,255,.15); color: rgba(255,255,255,.8);
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 20px; margin-bottom: 10px;
+  }
+  .modal-title { font-size: 20px; font-weight: 800; color: #fff; line-height: 1.25; padding-right: 40px; }
+
+  .modal-body { padding: 24px; }
+  .modal-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+  .meta-card { background: var(--off-white); border: 1.5px solid var(--border-soft); border-radius: 11px; padding: 12px 14px; }
+  .meta-label { font-size: 11px; color: var(--muted); font-weight: 500; margin-bottom: 3px; }
+  .meta-val { font-size: 15px; font-weight: 700; color: var(--text); }
+
+  .modal-section { margin-bottom: 20px; }
+  .modal-section-title {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .modal-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+
+  .composition-box {
+    background: var(--off-white); border: 1.5px solid var(--border-soft);
+    border-radius: 11px; padding: 14px 16px;
+    font-size: 13px; line-height: 1.65; color: var(--text-mid); font-weight: 500;
+  }
+
+  .nutr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .nutr-block { background: var(--off-white); border: 1.5px solid var(--border-soft); border-radius: 11px; overflow: hidden; }
+  .nutr-block-header { padding: 8px 14px; font-size: 10px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; border-bottom: 1px solid var(--border-soft); }
+  .nutr-block-header.h100 { color: var(--green-mid); background: var(--light); }
+  .nutr-block-header.hserv { color: var(--amber); background: var(--amber-bg); }
+  .nutr-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  .nutr-row:last-child { border-bottom: none; }
+  .nutr-name { color: var(--text-mid); font-weight: 500; }
+  .nutr-val { font-weight: 700; }
+  .nutr-val.green { color: var(--green-mid); }
+  .nutr-val.amber { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<form method="get" id="filter-form">
+<!-- TOP BAR -->
+<div class="topbar">
+  
+    <span class="logo-text">O-<em>Live</em></span>
+    <span class="logo-sub">Каталог продуктов</span>
+  </a>
+
+  <div class="topbar-search">
+    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <input type="text" name="search" value="{{ filters.search }}"
+           placeholder="Поиск по наименованию или составу…"
+           oninput="scheduleSearch()">
+  </div>
+
+  <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
+  <a href="?" class="reset-btn">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+    Сбросить
+  </a>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <!-- Категория -->
+    <div class="filter-group">
+      <div class="filter-title">Категория</div>
+      <div class="cat-list">
+        {% for cat in categories %}
+        <label class="cat-item {% if cat in selected_categories %}checked{% endif %}">
+          <input type="checkbox" name="category" value="{{ cat }}"
+            {% if cat in selected_categories %}checked{% endif %}
+            onchange="toggleCat(this); submitForm()">
+          <span class="cat-cb"></span>
+          <span class="cat-name">{{ cat }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Фасовка -->
+    <div class="filter-group">
+      <div class="filter-title">Кратность</div>
+      <select name="packing" class="filter-select" onchange="submitForm()">
+        <option value="">Все варианты</option>
+        {% for p in packings %}
+        <option value="{{ p }}" {% if filters.packing == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Нутриенты — табы На 100г / На порцию -->
+    <div class="filter-group">
+      <div class="filter-title">Пищевая ценность</div>
+
+      <!-- Tab buttons -->
+      <div class="filter-tabs">
+        <button type="button" class="ftab t100 active" id="tab-100" onclick="switchTab('100')">На 100 г</button>
+        <button type="button" class="ftab tserv" id="tab-serv" onclick="switchTab('serv')">На порцию</button>
+      </div>
+
+      <!-- Panel: На 100г -->
+      <div class="filter-panel" id="panel-100">
+        <div class="panel-sublabel green">Ккал</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="kcal_min" value="{{ filters.kcal_min }}" placeholder="от" min="0" step="1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="kcal_max" value="{{ filters.kcal_max }}" placeholder="до" min="0" step="1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel green">Белки (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="protein_min" value="{{ filters.protein_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="protein_max" value="{{ filters.protein_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel green">Жиры (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="fat_min" value="{{ filters.fat_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="fat_max" value="{{ filters.fat_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel green">Углеводы (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="carbs_min" value="{{ filters.carbs_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="carbs_max" value="{{ filters.carbs_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+      </div>
+
+      <!-- Panel: На порцию -->
+      <div class="filter-panel hidden" id="panel-serv">
+        <div class="panel-sublabel amber">Ккал</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="kcal_s_min" value="{{ filters.kcal_s_min }}" placeholder="от" min="0" step="1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="kcal_s_max" value="{{ filters.kcal_s_max }}" placeholder="до" min="0" step="1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel amber">Белки (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="protein_s_min" value="{{ filters.protein_s_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="protein_s_max" value="{{ filters.protein_s_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel amber">Жиры (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="fat_s_min" value="{{ filters.fat_s_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="fat_s_max" value="{{ filters.fat_s_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+        <div class="panel-sublabel amber">Углеводы (г)</div>
+        <div class="range-row">
+          <input class="range-input" type="number" name="carbs_s_min" value="{{ filters.carbs_s_min }}" placeholder="от" min="0" step="0.1" onchange="submitForm()">
+          <span class="range-sep">—</span>
+          <input class="range-input" type="number" name="carbs_s_max" value="{{ filters.carbs_s_max }}" placeholder="до" min="0" step="0.1" onchange="submitForm()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden: sort fields -->
+    <input type="hidden" name="sort" value="{{ filters.sort }}">
+    <input type="hidden" name="dir" value="{{ filters.dir }}">
+
+    <button type="submit" class="apply-btn">Применить фильтры</button>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- Active chips -->
+    {% with f=filters %}
+    {% if f.search or selected_categories or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing %}
+    <div class="chips-row">
+      {% if f.search %}<div class="chip">🔍 «{{ f.search }}»</div>{% endif %}
+      {% for cat in selected_categories %}<div class="chip">📁 {{ cat }}</div>{% endfor %}
+      {% if f.packing %}<div class="chip">📦 {{ f.packing }}</div>{% endif %}
+      {% if f.kcal_min or f.kcal_max %}<div class="chip">⚡ Ккал/100г: {{ f.kcal_min|default:"0" }} — {{ f.kcal_max|default:"∞" }}</div>{% endif %}
+      {% if f.protein_min or f.protein_max %}<div class="chip">💪 Б/100г: {{ f.protein_min|default:"0" }} — {{ f.protein_max|default:"∞" }} г</div>{% endif %}
+      {% if f.fat_min or f.fat_max %}<div class="chip">🫙 Ж/100г: {{ f.fat_min|default:"0" }} — {{ f.fat_max|default:"∞" }} г</div>{% endif %}
+      {% if f.carbs_min or f.carbs_max %}<div class="chip">🌾 У/100г: {{ f.carbs_min|default:"0" }} — {{ f.carbs_max|default:"∞" }} г</div>{% endif %}
+      {% if f.kcal_s_min or f.kcal_s_max %}<div class="chip amber">⚡ Ккал/порц: {{ f.kcal_s_min|default:"0" }} — {{ f.kcal_s_max|default:"∞" }}</div>{% endif %}
+      {% if f.protein_s_min or f.protein_s_max %}<div class="chip amber">💪 Б/порц: {{ f.protein_s_min|default:"0" }} — {{ f.protein_s_max|default:"∞" }} г</div>{% endif %}
+      {% if f.fat_s_min or f.fat_s_max %}<div class="chip amber">🫙 Ж/порц: {{ f.fat_s_min|default:"0" }} — {{ f.fat_s_max|default:"∞" }} г</div>{% endif %}
+      {% if f.carbs_s_min or f.carbs_s_max %}<div class="chip amber">🌾 У/порц: {{ f.carbs_s_min|default:"0" }} — {{ f.carbs_s_max|default:"∞" }} г</div>{% endif %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    {% if products %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr class="thead-groups">
+            <!-- Основное: Категория + Наименование + Фасовка/Кратность = 3 col -->
+            <th colspan="3" class="g-base">Основная информация</th>
+            <!-- На 100г: Белки Жиры Угл Ккал КДж = 5 col -->
+            <th colspan="5" class="g-100 grp-border">На 100 г</th>
+            <!-- На порцию: Белки Жиры Угл Ккал КДж = 5 col -->
+            <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
+          </tr>
+          <tr class="thead-cols">
+            {% with s=filters.sort d=filters.dir %}
+            <th class="sortable {% if s == 'category' %}sort-active{% endif %}" onclick="sortBy('category')">
+              Категория <span class="sort-arr">{% if s == 'category' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="sortable {% if s == 'name' %}sort-active{% endif %}" onclick="sortBy('name')">
+              Наименование <span class="sort-arr">{% if s == 'name' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <!-- Объединённая колонка Кратность + Масса -->
+            <th style="width:90px">Кратность | Масса</th>
+
+            <!-- На 100г -->
+            <th class="col-right col-border sortable {% if s == 'protein' %}sort-active{% endif %}" onclick="sortBy('protein')">
+              Белки <span class="sort-arr">{% if s == 'protein' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'fat' %}sort-active{% endif %}" onclick="sortBy('fat')">
+              Жиры <span class="sort-arr">{% if s == 'fat' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'carbs' %}sort-active{% endif %}" onclick="sortBy('carbs')">
+              Угл. <span class="sort-arr">{% if s == 'carbs' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'kcal' %}sort-active{% endif %}" onclick="sortBy('kcal')">
+              Ккал <span class="sort-arr">{% if s == 'kcal' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right">КДж</th>
+
+            <!-- На порцию -->
+            <th class="col-right col-border sortable {% if s == 'protein_s' %}sort-active{% endif %}" onclick="sortBy('protein_s')">
+              Белки <span class="sort-arr">{% if s == 'protein_s' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'fat_s' %}sort-active{% endif %}" onclick="sortBy('fat_s')">
+              Жиры <span class="sort-arr">{% if s == 'fat_s' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'carbs_s' %}sort-active{% endif %}" onclick="sortBy('carbs_s')">
+              Угл. <span class="sort-arr">{% if s == 'carbs_s' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right sortable {% if s == 'kcal_s' %}sort-active{% endif %}" onclick="sortBy('kcal_s')">
+              Ккал <span class="sort-arr">{% if s == 'kcal_s' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <th class="col-right">КДж</th>
+            {% endwith %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr onclick="showDetail({{ p.pk }})">
+            <td class="td-cat">{{ p.category }}</td>
+            <td class="td-name">{{ p.name }}</td>
+            <!-- Объединённая ячейка: Кратность / Масса -->
+            <td class="td-pack">
+              <div class="pack-main">{{ p.packing|default:"—" }}</div>
+              {% if p.net_weight %}<div class="pack-sub">{{ p.net_weight }} г</div>{% endif %}
+            </td>
+            <!-- На 100г -->
+            <td class="td-num strong col-border">{{ p.protein|smart_num }}</td>
+            <td class="td-num strong">{{ p.fat|smart_num }}</td>
+            <td class="td-num strong">{{ p.carbs|smart_num }}</td>
+            <td class="td-num">
+              {% if p.kcal_per_100 %}
+                {% if p.kcal_per_100 <= 100 %}<span class="kpill kpill-low">{{ p.kcal_per_100|smart_num }}</span>
+                {% elif p.kcal_per_100 <= 200 %}<span class="kpill kpill-mid">{{ p.kcal_per_100|smart_num }}</span>
+                {% elif p.kcal_per_100 <= 350 %}<span class="kpill kpill-high">{{ p.kcal_per_100|smart_num }}</span>
+                {% else %}<span class="kpill kpill-vhigh">{{ p.kcal_per_100|smart_num }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="td-num">{{ p.kj_per_100|smart_num }}</td>
+            <!-- На порцию -->
+            <td class="td-num col-border">{{ p.protein_per_serving|smart_num }}</td>
+            <td class="td-num">{{ p.fat_per_serving|smart_num }}</td>
+            <td class="td-num">{{ p.carbs_per_serving|smart_num }}</td>
+            <td class="td-num">
+              {% if p.kcal_per_serving %}
+                {% if p.kcal_per_serving <= 100 %}<span class="kpill kpill-low">{{ p.kcal_per_serving|smart_num }}</span>
+                {% elif p.kcal_per_serving <= 200 %}<span class="kpill kpill-mid">{{ p.kcal_per_serving|smart_num }}</span>
+                {% elif p.kcal_per_serving <= 350 %}<span class="kpill kpill-high">{{ p.kcal_per_serving|smart_num }}</span>
+                {% else %}<span class="kpill kpill-vhigh">{{ p.kcal_per_serving|smart_num }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="td-num">{{ p.kj_per_serving|smart_num }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <div class="empty">
+      <div class="empty-icon">🌿</div>
+      <h3>Продукты не найдены</h3>
+      <p>Попробуйте изменить фильтры или <a href="?">сбросить всё</a></p>
+    </div>
+    {% endif %}
+  </main>
+</div>
+</form>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+      <div class="modal-cat-tag" id="m-cat"></div>
+      <div class="modal-title" id="m-name"></div>
+    </div>
+    <div class="modal-body" id="m-body"></div>
+  </div>
+</div>
+
+<script>
+// ── Product data ──
+const PD = {
+  {% for p in products %}
+  {{ p.pk }}: {
+    name: "{{ p.name|escapejs }}",
+    cat:  "{{ p.category|escapejs }}",
+    weight: "{{ p.net_weight|default:'' }}",
+    pack:   "{{ p.packing|default:'' }}",
+    comp:   "{{ p.composition|escapejs|default:'' }}",
+    p:    "{{ p.protein|smart_num }}",
+    f:    "{{ p.fat|smart_num }}",
+    c:    "{{ p.carbs|smart_num }}",
+    k100: "{{ p.kcal_per_100|smart_num }}",
+    kj100:"{{ p.kj_per_100|smart_num }}",
+    ps:   "{{ p.protein_per_serving|smart_num }}",
+    fs:   "{{ p.fat_per_serving|smart_num }}",
+    cs:   "{{ p.carbs_per_serving|smart_num }}",
+    ks:   "{{ p.kcal_per_serving|smart_num }}",
+    kjs:  "{{ p.kj_per_serving|smart_num }}",
+  },
+  {% endfor %}
+};
+
+function v(x) { return x || '—'; }
+
+function showDetail(pk) {
+  const d = PD[pk]; if (!d) return;
+  document.getElementById('m-cat').textContent = d.cat;
+  document.getElementById('m-name').textContent = d.name;
+  document.getElementById('m-body').innerHTML = `
+    <div class="modal-meta">
+      <div class="meta-card"><div class="meta-label">Масса нетто</div><div class="meta-val">${d.weight !== '—' ? d.weight + ' г' : '—'}</div></div>
+      <div class="meta-card" style="grid-column: span 2"><div class="meta-label">Кратность / Фасовка</div><div class="meta-val">${v(d.pack)}</div></div>
+    </div>
+    ${d.comp ? `<div class="modal-section"><div class="modal-section-title">Состав</div><div class="composition-box">${d.comp}</div></div>` : ''}
+    <div class="modal-section">
+      <div class="modal-section-title">Пищевая ценность</div>
+      <div class="nutr-grid">
+        <div class="nutr-block">
+          <div class="nutr-block-header h100">На 100 г</div>
+          <div class="nutr-row"><span class="nutr-name">Белки</span><span class="nutr-val green">${v(d.p)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Жиры</span><span class="nutr-val green">${v(d.f)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Углеводы</span><span class="nutr-val green">${v(d.c)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Ккал</span><span class="nutr-val green">${v(d.k100)}</span></div>
+          <div class="nutr-row"><span class="nutr-name">КДж</span><span class="nutr-val green">${v(d.kj100)}</span></div>
+        </div>
+        <div class="nutr-block">
+          <div class="nutr-block-header hserv">На 1 порцию</div>
+          <div class="nutr-row"><span class="nutr-name">Белки</span><span class="nutr-val amber">${v(d.ps)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Жиры</span><span class="nutr-val amber">${v(d.fs)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Углеводы</span><span class="nutr-val amber">${v(d.cs)} г</span></div>
+          <div class="nutr-row"><span class="nutr-name">Ккал</span><span class="nutr-val amber">${v(d.ks)}</span></div>
+          <div class="nutr-row"><span class="nutr-name">КДж</span><span class="nutr-val amber">${v(d.kjs)}</span></div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(e) { if (e.target === document.getElementById('modal')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modal').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+
+// ── Filter tabs ──
+function switchTab(tab) {
+  const is100 = tab === '100';
+  document.getElementById('panel-100').classList.toggle('hidden', !is100);
+  document.getElementById('panel-serv').classList.toggle('hidden', is100);
+  document.getElementById('tab-100').classList.toggle('active', is100);
+  document.getElementById('tab-serv').classList.toggle('active', !is100);
+}
+
+// Auto-open correct tab if serving filters are set
+(function() {
+  const servFields = ['kcal_s_min','kcal_s_max','protein_s_min','protein_s_max','fat_s_min','fat_s_max','carbs_s_min','carbs_s_max'];
+  const params = new URLSearchParams(window.location.search);
+  const hasServ = servFields.some(k => params.get(k));
+  if (hasServ) switchTab('serv');
+})();
+
+// ── Category checkbox highlight ──
+function toggleCat(inp) { inp.closest('.cat-item').classList.toggle('checked', inp.checked); }
+
+// ── Sorting ──
+function sortBy(field) {
+  const f = document.getElementById('filter-form');
+  const cur = f.querySelector('[name=sort]').value;
+  const dir = f.querySelector('[name=dir]').value;
+  f.querySelector('[name=sort]').value = field;
+  f.querySelector('[name=dir]').value = (cur === field && dir === 'asc') ? 'desc' : 'asc';
+  f.submit();
+}
+
+// ── Auto-submit ──
+function submitForm() {
+  clearTimeout(window._st);
+  window._st = setTimeout(() => document.getElementById('filter-form').submit(), 300);
+}
+function scheduleSearch() {
+  clearTimeout(window._ss);
+  window._ss = setTimeout(() => document.getElementById('filter-form').submit(), 600);
+}
+</script>
+</body>
+</html>
