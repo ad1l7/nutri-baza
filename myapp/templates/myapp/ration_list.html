@@ -1,0 +1,473 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Рационы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:       #ffffff;
+    --off-white:   #f7f9f5;
+    --light:       #eef4ea;
+    --green-light: #c8e6b0;
+    --green:       #5aaa3c;
+    --green-mid:   #3d8a26;
+    --green-dark:  #1e4d14;
+    --text:        #1a2e12;
+    --text-mid:    #3d5c30;
+    --muted:       #7a9668;
+    --border:      #d6e8cc;
+    --border-soft: #e8f2e0;
+    --danger:      #d64b2a;
+    --amber:       #8a6200;
+    --amber-bg:    #fdf4d0;
+    --radius:      14px;
+    --font:        'Manrope', sans-serif;
+    --shadow:      0 2px 16px rgba(30,77,20,.07);
+    --shadow-md:   0 4px 32px rgba(30,77,20,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--off-white); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+
+  /* TOP BAR */
+  .topbar {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 28px; height: 64px;
+    display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+  }
+  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; flex-shrink: 0; }
+  .logo-text em { color: var(--green); font-style: normal; }
+
+  /* Вкладки */
+  .nav-tabs { display: flex; gap: 4px; margin-left: 16px; }
+  .nav-tab {
+    padding: 8px 18px; border-radius: 9px; font-size: 13px; font-weight: 700;
+    text-decoration: none; color: var(--muted); transition: all .18s;
+    border: 1.5px solid transparent;
+  }
+  .nav-tab:hover { background: var(--light); color: var(--text-mid); }
+  .nav-tab.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+  .topbar-search { position: relative; }
+  .topbar-search input {
+    background: var(--off-white); border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 9px 14px 9px 38px;
+    color: var(--text); font-family: var(--font); font-size: 13px;
+    outline: none; transition: border-color .2s; font-weight: 500; width: 220px;
+  }
+  .topbar-search input:focus { border-color: var(--green); background: var(--white); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+  /* Фильтр по ккал */
+  .kcal-filters { display: flex; gap: 6px; }
+  .kcal-btn {
+    padding: 7px 13px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    cursor: pointer; border: 1.5px solid var(--border); background: var(--white);
+    color: var(--muted); text-decoration: none; transition: all .18s;
+  }
+  .kcal-btn:hover { border-color: var(--green); color: var(--green-mid); }
+  .kcal-btn.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+
+  /* Кнопка создать */
+  .create-btn {
+    background: var(--green); color: #fff; border: none;
+    border-radius: 10px; padding: 10px 18px; font-family: var(--font);
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; gap: 7px;
+    transition: background .2s, box-shadow .2s;
+    box-shadow: 0 2px 8px rgba(90,170,60,.3);
+  }
+  .create-btn:hover { background: var(--green-mid); }
+
+  /* MAIN */
+  .main { max-width: 1100px; margin: 0 auto; padding: 28px 22px; }
+
+  /* Пустое состояние */
+  .empty-state {
+    text-align: center; padding: 80px 20px; color: var(--muted);
+  }
+  .empty-state .icon { font-size: 56px; margin-bottom: 16px; }
+  .empty-state h2 { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; margin-bottom: 24px; }
+
+  /* Сетка рационов */
+  .rations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 18px;
+  }
+
+  .ration-card {
+    background: var(--white); border: 1.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+    box-shadow: var(--shadow); transition: box-shadow .2s, transform .15s;
+  }
+  .ration-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+
+  .card-header {
+    padding: 16px 18px 14px;
+    background: var(--green-dark);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .card-kcal-badge {
+    background: rgba(255,255,255,.15); color: #fff;
+    font-size: 11px; font-weight: 800; letter-spacing: 1px;
+    padding: 3px 10px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+  }
+  .card-title-wrap { flex: 1; min-width: 0; }
+  .card-title { font-size: 16px; font-weight: 800; color: #fff; line-height: 1.25; }
+  .card-date { font-size: 11px; color: rgba(255,255,255,.65); font-weight: 500; margin-top: 3px; }
+
+  .card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .card-action-btn {
+    background: rgba(255,255,255,.15); border: none; border-radius: 7px;
+    width: 28px; height: 28px; color: #fff; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+    text-decoration: none;
+  }
+  .card-action-btn:hover { background: rgba(255,255,255,.28); }
+  .card-action-btn.danger:hover { background: rgba(214,75,42,.6); }
+
+  /* КБЖУ строка */
+  .card-nutr {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .nutr-cell { padding: 10px 12px; text-align: center; }
+  .nutr-cell + .nutr-cell { border-left: 1px solid var(--border-soft); }
+  .nutr-val { font-size: 16px; font-weight: 800; color: var(--text); }
+  .nutr-val.kcal { color: var(--green-mid); }
+  .nutr-lbl { font-size: 10px; color: var(--muted); font-weight: 600; letter-spacing: .8px; text-transform: uppercase; margin-top: 1px; }
+
+  /* Слоты */
+  .card-slots { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .slot-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 8px;
+    background: var(--off-white); border: 1px solid var(--border-soft);
+  }
+  .slot-icon { font-size: 15px; flex-shrink: 0; }
+  .slot-info { flex: 1; min-width: 0; }
+  .slot-type-name { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+  .slot-product-name { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot-product-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+  .slot-kcal { font-size: 12px; font-weight: 700; color: var(--green-mid); white-space: nowrap; flex-shrink: 0; }
+
+  .card-footer { padding: 10px 14px; border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; }
+  .card-slots-count { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .edit-link {
+    font-size: 12px; font-weight: 700; color: var(--green-mid);
+    text-decoration: none; display: flex; align-items: center; gap: 5px;
+  }
+  .edit-link:hover { color: var(--green); }
+
+  /* МОДАЛ создания */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,77,20,.35); z-index: 200;
+    backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+  .modal {
+    background: var(--white); border: 1.5px solid var(--border);
+    border-radius: 20px; width: 100%; max-width: 480px;
+    box-shadow: var(--shadow-md); animation: slideUp .25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }
+
+  .modal-header {
+    background: var(--green-dark); padding: 22px 24px 18px;
+    border-radius: 18px 18px 0 0; position: relative;
+  }
+  .modal-title { font-size: 18px; font-weight: 800; color: #fff; }
+  .modal-sub { font-size: 12px; color: rgba(255,255,255,.65); margin-top: 3px; }
+  .modal-close {
+    position: absolute; top: 14px; right: 14px;
+    background: rgba(255,255,255,.15); border: none; border-radius: 8px;
+    width: 30px; height: 30px; color: #fff; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: rgba(255,255,255,.25); }
+
+  .modal-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .form-field { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .form-input {
+    background: var(--off-white); border: 1.5px solid var(--border);
+    border-radius: 9px; padding: 10px 12px; color: var(--text);
+    font-family: var(--font); font-size: 14px; font-weight: 500;
+    outline: none; transition: border-color .2s;
+  }
+  .form-input:focus { border-color: var(--green); background: var(--white); }
+
+  .kcal-select-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kcal-option {
+    padding: 10px 6px; text-align: center; border-radius: 10px;
+    border: 2px solid var(--border); background: var(--off-white);
+    cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted);
+    transition: all .15s;
+  }
+  .kcal-option:hover { border-color: var(--green-light); color: var(--green-mid); }
+  .kcal-option.selected { border-color: var(--green); background: var(--light); color: var(--green-mid); }
+  .kcal-option input { display: none; }
+
+  .form-submit {
+    background: var(--green-dark); color: #fff; border: none;
+    border-radius: 11px; padding: 13px; font-family: var(--font);
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: background .2s; box-shadow: 0 2px 8px rgba(30,77,20,.2);
+    margin-top: 4px;
+  }
+  .form-submit:hover { background: var(--green-mid); }
+
+  /* Удаление */
+  .delete-confirm {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,77,20,.35); z-index: 300;
+    backdrop-filter: blur(4px); align-items: center; justify-content: center; padding: 20px;
+  }
+  .delete-confirm.open { display: flex; }
+  .delete-box {
+    background: var(--white); border-radius: 16px; padding: 28px;
+    max-width: 360px; width: 100%; text-align: center; box-shadow: var(--shadow-md);
+  }
+  .delete-box h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .delete-box p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .delete-btns { display: flex; gap: 10px; }
+  .btn-cancel {
+    flex: 1; padding: 11px; border-radius: 10px; border: 1.5px solid var(--border);
+    background: transparent; color: var(--text-mid); font-family: var(--font);
+    font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .btn-cancel:hover { background: var(--off-white); }
+  .btn-delete {
+    flex: 1; padding: 11px; border-radius: 10px; border: none;
+    background: var(--danger); color: #fff; font-family: var(--font);
+    font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .btn-delete:hover { opacity: .88; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+
+  <nav class="nav-tabs">
+    <a href="{% url 'product_list' %}" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'ration_list' %}" class="nav-tab active">🥗 Рационы</a>
+  </nav>
+
+  <div class="topbar-right">
+    <!-- Поиск -->
+    <div class="topbar-search">
+      <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <form method="get" style="display:inline">
+        {% if kcal_filter %}<input type="hidden" name="kcal" value="{{ kcal_filter }}">{% endif %}
+        <input type="text" name="search" value="{{ search }}" placeholder="Поиск рациона…" onchange="this.form.submit()">
+      </form>
+    </div>
+
+    <!-- Фильтр ккал -->
+    <div class="kcal-filters">
+      <a href="{% url 'ration_list' %}{% if search %}?search={{ search }}{% endif %}" class="kcal-btn {% if not kcal_filter %}active{% endif %}">Все</a>
+      {% for val, label in kcal_categories %}
+      <a href="?kcal={{ val }}{% if search %}&search={{ search }}{% endif %}" class="kcal-btn {% if kcal_filter == val|stringformat:'s' %}active{% endif %}">{{ val }}</a>
+      {% endfor %}
+    </div>
+
+    <button class="create-btn" onclick="openCreate()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Новый рацион
+    </button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  {% if rations_data %}
+  <div class="rations-grid">
+    {% for rd in rations_data %}
+    {% with r=rd.ration %}
+    <div class="ration-card">
+      <div class="card-header">
+        <div class="card-kcal-badge">{{ r.kcal_category }} ккал</div>
+        <div class="card-title-wrap">
+          <div class="card-title">{{ r.name }}</div>
+          <div class="card-date">{{ r.date|date:"d E Y" }}</div>
+        </div>
+        <div class="card-actions">
+          <a href="{% url 'ration_edit' r.pk %}" class="card-action-btn" title="Редактировать">✏️</a>
+          <button class="card-action-btn danger" onclick="confirmDelete({{ r.pk }}, '{{ r.name|escapejs }}')" title="Удалить">🗑️</button>
+        </div>
+      </div>
+
+      <!-- КБЖУ -->
+      <div class="card-nutr">
+        <div class="nutr-cell">
+          <div class="nutr-val kcal">{{ rd.total_kcal|floatformat:0 }}</div>
+          <div class="nutr-lbl">Ккал</div>
+        </div>
+        <div class="nutr-cell">
+          <div class="nutr-val">{{ rd.total_protein|floatformat:1 }}</div>
+          <div class="nutr-lbl">Белки</div>
+        </div>
+        <div class="nutr-cell">
+          <div class="nutr-val">{{ rd.total_fat|floatformat:1 }}</div>
+          <div class="nutr-lbl">Жиры</div>
+        </div>
+        <div class="nutr-cell">
+          <div class="nutr-val">{{ rd.total_carbs|floatformat:1 }}</div>
+          <div class="nutr-lbl">Углеводы</div>
+        </div>
+      </div>
+
+      <!-- Слоты -->
+      <div class="card-slots">
+        {% for slot in rd.slots %}
+        <div class="slot-row">
+          <span class="slot-icon">{{ slot_icons|get_item:slot.slot_type }}</span>
+          <div class="slot-info">
+            <div class="slot-type-name">{{ slot.get_slot_type_display }}</div>
+            {% if slot.product %}
+              <div class="slot-product-name">{{ slot.product.name }}</div>
+            {% else %}
+              <div class="slot-product-empty">— не выбрано —</div>
+            {% endif %}
+          </div>
+          {% if slot.product and slot.product.kcal_per_serving %}
+            <div class="slot-kcal">{{ slot.product.kcal_per_serving|floatformat:0 }} кк</div>
+          {% endif %}
+        </div>
+        {% empty %}
+        <div style="text-align:center; color:var(--muted); font-size:13px; padding:12px 0;">
+          Слоты не добавлены
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card-footer">
+        <span class="card-slots-count">{{ rd.filled_count }} из {{ rd.slots_count }} блюд</span>
+        <a href="{% url 'ration_edit' r.pk %}" class="edit-link">
+          Редактировать →
+        </a>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🥗</div>
+    <h2>Рационов пока нет</h2>
+    <p>Создайте первый рацион — выберите категорию калорийности и добавьте блюда из каталога</p>
+    <button class="create-btn" onclick="openCreate()" style="margin:0 auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Создать рацион
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- МОДАЛ СОЗДАНИЯ -->
+<div class="modal-overlay" id="create-modal" onclick="closeCreateOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <button class="modal-close" onclick="closeCreate()">✕</button>
+      <div class="modal-title">Новый рацион</div>
+      <div class="modal-sub">Заполните основные параметры</div>
+    </div>
+    <form method="post" action="{% url 'ration_create' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-field">
+          <label class="form-label">Название рациона</label>
+          <input class="form-input" type="text" name="name" placeholder="Например: Рацион на понедельник" required>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Дата</label>
+          <input class="form-input" type="date" name="date" required id="create-date">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Категория калорийности</label>
+          <div class="kcal-select-grid">
+            {% for val, label in kcal_categories %}
+            <label class="kcal-option" id="kcal-opt-{{ val }}">
+              <input type="radio" name="kcal_category" value="{{ val }}" required onchange="selectKcal({{ val }})">
+              {{ val }}<br><span style="font-size:10px; font-weight:500; opacity:.7;">ккал</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Примечания (необязательно)</label>
+          <input class="form-input" type="text" name="notes" placeholder="Любые заметки…">
+        </div>
+        <button type="submit" class="form-submit">Создать и перейти к редактору →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- МОДАЛ УДАЛЕНИЯ -->
+<div class="delete-confirm" id="delete-modal">
+  <div class="delete-box">
+    <h3>Удалить рацион?</h3>
+    <p id="delete-modal-name">Это действие нельзя отменить.</p>
+    <div class="delete-btns">
+      <button class="btn-cancel" onclick="closeDelete()">Отмена</button>
+      <form id="delete-form" method="post" style="flex:1">
+        {% csrf_token %}
+        <button type="submit" class="btn-delete" style="width:100%">Удалить</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Установить сегодняшнюю дату по умолчанию
+  document.getElementById('create-date').valueAsDate = new Date();
+
+  function openCreate() {
+    document.getElementById('create-modal').classList.add('open');
+  }
+  function closeCreate() {
+    document.getElementById('create-modal').classList.remove('open');
+  }
+  function closeCreateOutside(e) {
+    if (e.target === document.getElementById('create-modal')) closeCreate();
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeCreate(); closeDelete(); } });
+
+  function selectKcal(val) {
+    document.querySelectorAll('.kcal-option').forEach(el => el.classList.remove('selected'));
+    document.getElementById('kcal-opt-' + val).classList.add('selected');
+  }
+
+  function confirmDelete(pk, name) {
+    document.getElementById('delete-modal-name').textContent = '«' + name + '» — это действие нельзя отменить.';
+    document.getElementById('delete-form').action = '/rations/' + pk + '/delete/';
+    document.getElementById('delete-modal').classList.add('open');
+  }
+  function closeDelete() {
+    document.getElementById('delete-modal').classList.remove('open');
+  }
+</script>
+</body>
+</html>

@@ -33,21 +33,11 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--off-white); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
 
-  /* ── TOP BAR ── */
   .topbar {
-    background: var(--white);
-    border-bottom: 1.5px solid var(--border);
-    padding: 0 28px;
-    height: 64px;
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 28px; height: 64px;
     display: flex; align-items: center; gap: 20px;
-    position: sticky; top: 0; z-index: 100;
-    box-shadow: var(--shadow);
-  }
-  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
-  .logo-mark {
-    width: 36px; height: 36px;
-    background: var(--green-dark); border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
   }
   .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
   .logo-text em { color: var(--green); font-style: normal; }
@@ -65,8 +55,7 @@
   .search-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 
   .count-badge {
-    margin-left: auto;
-    background: var(--light); border: 1.5px solid var(--border);
+    margin-left: auto; background: var(--light); border: 1.5px solid var(--border);
     border-radius: 20px; padding: 6px 16px;
     font-size: 13px; color: var(--text-mid); font-weight: 600; white-space: nowrap; flex-shrink: 0;
   }
@@ -80,15 +69,29 @@
   }
   .reset-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(214,75,42,.05); }
 
-  /* ── LAYOUT ── */
   .layout { display: flex; height: calc(100vh - 64px); overflow: hidden; }
 
-  /* ── SIDEBAR ── */
+  /* Кнопка тоггла сайдбара */
+  .sidebar-toggle {
+    background: transparent; border: 1.5px solid var(--border); color: var(--muted);
+    border-radius: 9px; padding: 8px 10px; font-family: var(--font);
+    cursor: pointer; transition: all .2s; display: flex; align-items: center;
+    gap: 6px; font-size: 13px; font-weight: 600; flex-shrink: 0; white-space: nowrap;
+  }
+  .sidebar-toggle:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
+  .sidebar-toggle svg { transition: transform .3s ease; }
+  .sidebar-hidden .sidebar-toggle svg { transform: scaleX(-1); }
+
   .sidebar {
     width: 280px; flex-shrink: 0;
     background: var(--white); border-right: 1.5px solid var(--border);
-    overflow-y: auto; padding: 20px 16px;
+    overflow-y: auto; overflow-x: hidden; padding: 20px 16px;
     display: flex; flex-direction: column; gap: 16px;
+    transition: width .3s ease, padding .3s ease, opacity .2s ease;
+  }
+  /* Скрытый сайдбар */
+  .sidebar-hidden .sidebar {
+    width: 0; padding: 0; opacity: 0; border-right: none; overflow: hidden;
   }
   .sidebar::-webkit-scrollbar { width: 4px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -101,8 +104,8 @@
   }
   .filter-title::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
 
-  /* Category list */
   .cat-list { display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; padding-right: 2px; }
+  .cat-list.allergen-list { max-height: 160px; }
   .cat-list::-webkit-scrollbar { width: 3px; }
   .cat-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .cat-item {
@@ -126,7 +129,6 @@
   }
   .cat-name { font-size: 13px; color: var(--text); font-weight: 500; flex: 1; line-height: 1.3; }
 
-  /* Range inputs */
   .range-row { display: flex; gap: 6px; align-items: center; }
   .range-input {
     flex: 1; background: var(--off-white); border: 1.5px solid var(--border);
@@ -138,7 +140,6 @@
   .range-input::placeholder { color: var(--muted); font-weight: 400; font-size: 12px; }
   .range-sep { color: var(--muted); font-size: 12px; flex-shrink: 0; font-weight: 600; }
 
-  /* Packing select */
   .filter-select {
     background: var(--off-white); border: 1.5px solid var(--border); border-radius: 9px;
     padding: 8px 32px 8px 11px; color: var(--text); font-family: var(--font);
@@ -149,19 +150,15 @@
   }
   .filter-select:focus { border-color: var(--green); background-color: var(--white); }
 
-  /* Filter tab switcher — На 100г / На порцию */
   .filter-tabs {
-    display: flex; gap: 0;
-    background: var(--off-white);
-    border: 1.5px solid var(--border);
-    border-radius: 9px; padding: 3px; overflow: hidden;
+    display: flex; background: var(--off-white);
+    border: 1.5px solid var(--border); border-radius: 9px; padding: 3px; overflow: hidden;
   }
   .ftab {
     flex: 1; padding: 6px 8px; text-align: center;
     font-size: 11px; font-weight: 700; cursor: pointer;
     border-radius: 7px; border: none; background: transparent;
-    color: var(--muted); font-family: var(--font);
-    transition: all .18s;
+    color: var(--muted); font-family: var(--font); transition: all .18s;
   }
   .ftab.active { background: var(--white); color: var(--text); box-shadow: 0 1px 4px rgba(30,77,20,.1); }
   .ftab.active.t100 { color: var(--green-mid); }
@@ -170,7 +167,6 @@
   .filter-panel { display: flex; flex-direction: column; gap: 10px; }
   .filter-panel.hidden { display: none; }
 
-  /* Section label inside panel */
   .panel-sublabel {
     font-size: 10px; font-weight: 700; letter-spacing: 1.4px;
     text-transform: uppercase; color: var(--muted); margin-top: 2px;
@@ -190,7 +186,6 @@
 
   .sidebar-divider { height: 1px; background: var(--border-soft); flex-shrink: 0; }
 
-  /* ── MAIN ── */
   .main { flex: 1; overflow: auto; padding: 18px 22px; }
   .main::-webkit-scrollbar { width: 6px; height: 6px; }
   .main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -203,10 +198,9 @@
   }
   .chip.amber { background: var(--amber-bg); border-color: #e8c96a; color: var(--amber); }
 
-  /* ── TABLE ── */
   .table-wrap {
     border-radius: var(--radius); border: 1.5px solid var(--border);
-    overflow: hidden; box-shadow: var(--shadow); min-width: 860px;
+    overflow: hidden; box-shadow: var(--shadow); min-width: 1040px;
   }
   table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--white); }
 
@@ -241,12 +235,25 @@
 
   td { padding: 10px 12px; vertical-align: middle; }
   .td-cat { width: 110px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-weight: 500; font-size: 12px; }
-  /* Наименование — растягивается, перенос разрешён */
-  .td-name { font-weight: 600; color: var(--text); white-space: normal; word-break: break-word; min-width: 180px; max-width: 300px; line-height: 1.35; }
-  /* Кратность / Масса — компактная фиксированная ширина */
-  .td-pack { width: 90px; max-width: 90px; font-size: 12px; color: var(--text-mid); font-weight: 500; white-space: nowrap; }
-  .td-pack .pack-main { font-weight: 600; color: var(--text); }
-  .td-pack .pack-sub { color: var(--muted); font-size: 11px; margin-top: 1px; }
+
+  .td-name-cell { display: flex; align-items: center; gap: 10px; min-width: 200px; max-width: 300px; }
+  .td-thumb {
+    width: 40px; height: 40px; border-radius: 8px; object-fit: cover;
+    border: 1.5px solid var(--border); flex-shrink: 0; background: var(--off-white);
+  }
+  .td-thumb-placeholder {
+    width: 40px; height: 40px; border-radius: 8px; flex-shrink: 0;
+    background: var(--light); border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .td-name { font-weight: 600; color: var(--text); white-space: normal; word-break: break-word; line-height: 1.35; }
+
+  /* Кратность и масса — раздельные колонки */
+  .td-pack   { width: 80px; font-size: 12px; color: var(--text); font-weight: 600; white-space: nowrap; }
+  .td-weight { width: 75px; font-size: 12px; color: var(--text-mid); font-weight: 500; white-space: nowrap; text-align: right; }
+  .td-cost   { width: 85px; white-space: nowrap; font-weight: 700; color: var(--text); font-size: 13px; text-align: right; }
+  .td-cost-unit { color: var(--muted); font-weight: 400; font-size: 11px; }
+
   .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-mid); font-weight: 500; }
   .td-num.strong { color: var(--text); font-weight: 600; }
 
@@ -261,27 +268,40 @@
   .empty h3 { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
   .empty a { color: var(--green); font-weight: 600; }
 
-  /* ── MODAL ── */
+  /* MODAL */
   .modal-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(30,77,20,.35); z-index: 200;
-    backdrop-filter: blur(6px);
-    align-items: center; justify-content: center; padding: 20px;
+    backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;
   }
   .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 
   .modal {
     background: var(--white); border: 1.5px solid var(--border);
-    border-radius: 20px; width: 100%; max-width: 620px;
-    max-height: 88vh; overflow-y: auto;
+    border-radius: 20px; width: 100%; max-width: 700px;
+    max-height: 90vh; overflow-y: auto;
     box-shadow: var(--shadow-md); animation: slideUp .25s ease;
   }
   @keyframes slideUp { from { transform: translateY(20px); opacity: 0 } to { transform: none; opacity: 1 } }
   .modal::-webkit-scrollbar { width: 4px; }
   .modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-  .modal-header { background: var(--green-dark); padding: 24px 24px 20px; border-radius: 18px 18px 0 0; position: relative; }
+  .modal-header {
+    background: var(--green-dark); padding: 28px 28px 24px;
+    border-radius: 18px 18px 0 0; position: relative;
+    display: flex; gap: 22px; align-items: flex-start;
+  }
+  .modal-photo {
+    width: 130px; height: 130px; border-radius: 14px; object-fit: cover;
+    border: 2px solid rgba(255,255,255,.25); flex-shrink: 0;
+  }
+  .modal-photo-placeholder {
+    width: 130px; height: 130px; border-radius: 14px; flex-shrink: 0;
+    background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.15);
+    display: flex; align-items: center; justify-content: center; font-size: 52px;
+  }
+  .modal-header-info { flex: 1; min-width: 0; padding-top: 4px; }
   .modal-close {
     position: absolute; top: 16px; right: 16px;
     background: rgba(255,255,255,.15); border: none; border-radius: 8px;
@@ -294,13 +314,14 @@
     font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
     padding: 3px 10px; border-radius: 20px; margin-bottom: 10px;
   }
-  .modal-title { font-size: 20px; font-weight: 800; color: #fff; line-height: 1.25; padding-right: 40px; }
+  .modal-title { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.25; padding-right: 44px; }
 
   .modal-body { padding: 24px; }
   .modal-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
   .meta-card { background: var(--off-white); border: 1.5px solid var(--border-soft); border-radius: 11px; padding: 12px 14px; }
   .meta-label { font-size: 11px; color: var(--muted); font-weight: 500; margin-bottom: 3px; }
   .meta-val { font-size: 15px; font-weight: 700; color: var(--text); }
+  .meta-val.cost-val { color: var(--green-mid); }
 
   .modal-section { margin-bottom: 20px; }
   .modal-section-title {
@@ -314,6 +335,16 @@
     border-radius: 11px; padding: 14px 16px;
     font-size: 13px; line-height: 1.65; color: var(--text-mid); font-weight: 500;
   }
+
+  .modal-allergen-list { display: flex; flex-wrap: wrap; gap: 7px; }
+  .modal-allergen-tag {
+    background: #fff3e0; border: 1.5px solid #f5c06a;
+    color: #7a4500; border-radius: 20px;
+    padding: 4px 12px; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .modal-allergen-tag::before { content: '⚠️'; font-size: 11px; }
+  .no-allergens { font-size: 13px; color: var(--muted); font-style: italic; }
 
   .nutr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .nutr-block { background: var(--off-white); border: 1.5px solid var(--border-soft); border-radius: 11px; overflow: hidden; }
@@ -333,11 +364,12 @@
 <form method="get" id="filter-form">
 <!-- TOP BAR -->
 <div class="topbar">
-  
-    <span class="logo-text">O-<em>Live</em></span>
-    <span class="logo-sub">Каталог продуктов</span>
-  </a>
-
+  <span class="logo-text">O-<em>Live</em></span>
+  <span class="logo-sub">Каталог продуктов</span>
+  <nav style="display:flex; gap:4px; flex-shrink:0;">
+    <a href="/" style="padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; background:var(--green-dark); color:#fff;">📦 Каталог</a>
+    <a href="/rations/" style="padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; color:var(--muted); border:1.5px solid var(--border);">🥗 Рационы</a>
+  </nav>
   <div class="topbar-search">
     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -346,7 +378,12 @@
            placeholder="Поиск по наименованию или составу…"
            oninput="scheduleSearch()">
   </div>
-
+  <button type="button" class="sidebar-toggle" onclick="toggleSidebar()" title="Скрыть/показать фильтры">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>
+    </svg>
+    Фильтры
+  </button>
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
   <a href="?" class="reset-btn">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -356,8 +393,7 @@
   </a>
 </div>
 
-<!-- LAYOUT -->
-<div class="layout">
+<div class="layout" id="layout">
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -380,7 +416,7 @@
 
     <div class="sidebar-divider"></div>
 
-    <!-- Фасовка -->
+    <!-- Кратность -->
     <div class="filter-group">
       <div class="filter-title">Кратность</div>
       <select name="packing" class="filter-select" onchange="submitForm()">
@@ -393,17 +429,45 @@
 
     <div class="sidebar-divider"></div>
 
-    <!-- Нутриенты — табы На 100г / На порцию -->
+    <!-- Себестоимость -->
+    <div class="filter-group">
+      <div class="filter-title">Себестоимость (₸)</div>
+      <div class="range-row">
+        <input class="range-input" type="number" name="cost_min" value="{{ filters.cost_min }}" placeholder="от" min="0" step="1" onchange="submitForm()">
+        <span class="range-sep">—</span>
+        <input class="range-input" type="number" name="cost_max" value="{{ filters.cost_max }}" placeholder="до" min="0" step="1" onchange="submitForm()">
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- Аллергены -->
+    {% if all_allergens %}
+    <div class="filter-group">
+      <div class="filter-title">Аллергены</div>
+      <div class="cat-list allergen-list">
+        {% for allergen in all_allergens %}
+        <label class="cat-item {% if allergen.pk|stringformat:'s' in selected_allergens %}checked{% endif %}">
+          <input type="checkbox" name="allergen" value="{{ allergen.pk }}"
+            {% if allergen.pk|stringformat:'s' in selected_allergens %}checked{% endif %}
+            onchange="toggleCat(this); submitForm()">
+          <span class="cat-cb"></span>
+          <span class="cat-name">{{ allergen.name }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="sidebar-divider"></div>
+    {% endif %}
+
+    <!-- Пищевая ценность -->
     <div class="filter-group">
       <div class="filter-title">Пищевая ценность</div>
-
-      <!-- Tab buttons -->
       <div class="filter-tabs">
         <button type="button" class="ftab t100 active" id="tab-100" onclick="switchTab('100')">На 100 г</button>
         <button type="button" class="ftab tserv" id="tab-serv" onclick="switchTab('serv')">На порцию</button>
       </div>
 
-      <!-- Panel: На 100г -->
       <div class="filter-panel" id="panel-100">
         <div class="panel-sublabel green">Ккал</div>
         <div class="range-row">
@@ -431,7 +495,6 @@
         </div>
       </div>
 
-      <!-- Panel: На порцию -->
       <div class="filter-panel hidden" id="panel-serv">
         <div class="panel-sublabel amber">Ккал</div>
         <div class="range-row">
@@ -460,23 +523,22 @@
       </div>
     </div>
 
-    <!-- Hidden: sort fields -->
     <input type="hidden" name="sort" value="{{ filters.sort }}">
     <input type="hidden" name="dir" value="{{ filters.dir }}">
-
     <button type="submit" class="apply-btn">Применить фильтры</button>
   </aside>
 
   <!-- MAIN -->
   <main class="main">
 
-    <!-- Active chips -->
     {% with f=filters %}
-    {% if f.search or selected_categories or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing %}
+    {% if f.search or selected_categories or selected_allergens or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing %}
     <div class="chips-row">
       {% if f.search %}<div class="chip">🔍 «{{ f.search }}»</div>{% endif %}
       {% for cat in selected_categories %}<div class="chip">📁 {{ cat }}</div>{% endfor %}
       {% if f.packing %}<div class="chip">📦 {{ f.packing }}</div>{% endif %}
+      {% if f.cost_min or f.cost_max %}<div class="chip">💰 Себест: {{ f.cost_min|default:"0" }} — {{ f.cost_max|default:"∞" }} ₸</div>{% endif %}
+      {% for name in selected_allergen_names %}<div class="chip amber">⚠️ {{ name }}</div>{% endfor %}
       {% if f.kcal_min or f.kcal_max %}<div class="chip">⚡ Ккал/100г: {{ f.kcal_min|default:"0" }} — {{ f.kcal_max|default:"∞" }}</div>{% endif %}
       {% if f.protein_min or f.protein_max %}<div class="chip">💪 Б/100г: {{ f.protein_min|default:"0" }} — {{ f.protein_max|default:"∞" }} г</div>{% endif %}
       {% if f.fat_min or f.fat_max %}<div class="chip">🫙 Ж/100г: {{ f.fat_min|default:"0" }} — {{ f.fat_max|default:"∞" }} г</div>{% endif %}
@@ -494,23 +556,29 @@
       <table>
         <thead>
           <tr class="thead-groups">
-            <!-- Основное: Категория + Наименование + Фасовка/Кратность = 3 col -->
-            <th colspan="3" class="g-base">Основная информация</th>
-            <!-- На 100г: Белки Жиры Угл Ккал КДж = 5 col -->
+            <!-- 5 колонок основного: Категория, Наименование, Кратность, Масса, Себестоимость -->
+            <th colspan="5" class="g-base">Основная информация</th>
             <th colspan="5" class="g-100 grp-border">На 100 г</th>
-            <!-- На порцию: Белки Жиры Угл Ккал КДж = 5 col -->
             <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
           </tr>
           <tr class="thead-cols">
             {% with s=filters.sort d=filters.dir %}
-            <th class="sortable {% if s == 'category' %}sort-active{% endif %}" onclick="sortBy('category')">
+            <th class="sortable {% if s == 'category' %}sort-active{% endif %}" onclick="sortBy('category')" style="width:110px">
               Категория <span class="sort-arr">{% if s == 'category' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>
             <th class="sortable {% if s == 'name' %}sort-active{% endif %}" onclick="sortBy('name')">
               Наименование <span class="sort-arr">{% if s == 'name' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>
-            <!-- Объединённая колонка Кратность + Масса -->
-            <th style="width:90px">Кратность | Масса</th>
+            <!-- Кратность — текст, без сортировки -->
+            <th style="width:80px">Кратность</th>
+            <!-- Масса — отдельная сортировка -->
+            <th class="col-right sortable {% if s == 'net_weight' %}sort-active{% endif %}" onclick="sortBy('net_weight')" style="width:75px">
+              Масса (г) <span class="sort-arr">{% if s == 'net_weight' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <!-- Себестоимость — отдельная сортировка -->
+            <th class="col-right sortable {% if s == 'cost' %}sort-active{% endif %}" onclick="sortBy('cost')" style="width:85px">
+              Себест. <span class="sort-arr">{% if s == 'cost' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
 
             <!-- На 100г -->
             <th class="col-right col-border sortable {% if s == 'protein' %}sort-active{% endif %}" onclick="sortBy('protein')">
@@ -548,11 +616,23 @@
           {% for p in products %}
           <tr onclick="showDetail({{ p.pk }})">
             <td class="td-cat">{{ p.category }}</td>
-            <td class="td-name">{{ p.name }}</td>
-            <!-- Объединённая ячейка: Кратность / Масса -->
-            <td class="td-pack">
-              <div class="pack-main">{{ p.packing|default:"—" }}</div>
-              {% if p.net_weight %}<div class="pack-sub">{{ p.net_weight }} г</div>{% endif %}
+            <td>
+              <div class="td-name-cell">
+                {% if p.photo %}
+                  <img src="{{ p.photo.url }}" alt="{{ p.name }}" class="td-thumb">
+                {% else %}
+                  <div class="td-thumb-placeholder">🥗</div>
+                {% endif %}
+                <span class="td-name">{{ p.name }}</span>
+              </div>
+            </td>
+            <!-- Кратность — просто текст -->
+            <td class="td-pack">{{ p.packing|default:"—" }}</td>
+            <!-- Масса — без smart_num, чтобы сохранить нули (напр. 500.000) -->
+            <td class="td-weight">{% if p.net_weight %}{{ p.net_weight }}{% else %}—{% endif %}</td>
+            <!-- Себестоимость -->
+            <td class="td-cost">
+              {% if p.cost %}{{ p.cost|smart_num }} <span class="td-cost-unit">₸</span>{% else %}—{% endif %}
             </td>
             <!-- На 100г -->
             <td class="td-num strong col-border">{{ p.protein|smart_num }}</td>
@@ -600,25 +680,25 @@
 <!-- MODAL -->
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
   <div class="modal">
-    <div class="modal-header">
+    <div class="modal-header" id="m-header">
       <button class="modal-close" onclick="closeModalDirect()">✕</button>
-      <div class="modal-cat-tag" id="m-cat"></div>
-      <div class="modal-title" id="m-name"></div>
     </div>
     <div class="modal-body" id="m-body"></div>
   </div>
 </div>
 
 <script>
-// ── Product data ──
 const PD = {
   {% for p in products %}
   {{ p.pk }}: {
-    name: "{{ p.name|escapejs }}",
-    cat:  "{{ p.category|escapejs }}",
+    name:   "{{ p.name|escapejs }}",
+    cat:    "{{ p.category|escapejs }}",
     weight: "{{ p.net_weight|default:'' }}",
-    pack:   "{{ p.packing|default:'' }}",
-    comp:   "{{ p.composition|escapejs|default:'' }}",
+    pack:   "{{ p.packing|default:''|escapejs }}",
+    cost:   "{{ p.cost|smart_num }}",
+    photo:  "{% if p.photo %}{{ p.photo.url }}{% endif %}",
+    comp:   `{{ p.composition|default:''|escapejs }}`,
+    allergens: [{% for a in p.allergens.all %}"{{ a.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
     p:    "{{ p.protein|smart_num }}",
     f:    "{{ p.fat|smart_num }}",
     c:    "{{ p.carbs|smart_num }}",
@@ -633,18 +713,56 @@ const PD = {
   {% endfor %}
 };
 
-function v(x) { return x || '—'; }
+function v(x) { return (x && x !== '—') ? x : '—'; }
 
 function showDetail(pk) {
   const d = PD[pk]; if (!d) return;
-  document.getElementById('m-cat').textContent = d.cat;
-  document.getElementById('m-name').textContent = d.name;
+
+  const photoHtml = d.photo
+    ? `<img src="${d.photo}" alt="${d.name}" class="modal-photo">`
+    : `<div class="modal-photo-placeholder">🥗</div>`;
+
+  document.getElementById('m-header').innerHTML = `
+    <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    ${photoHtml}
+    <div class="modal-header-info">
+      <div class="modal-cat-tag">${d.cat}</div>
+      <div class="modal-title">${d.name}</div>
+    </div>`;
+
+  const allergenHtml = d.allergens.length
+    ? d.allergens.map(a => `<span class="modal-allergen-tag">${a}</span>`).join('')
+    : `<span class="no-allergens">Не указаны</span>`;
+
+  const weightStr = d.weight ? d.weight + ' г' : '—';
+
   document.getElementById('m-body').innerHTML = `
     <div class="modal-meta">
-      <div class="meta-card"><div class="meta-label">Масса нетто</div><div class="meta-val">${d.weight !== '—' ? d.weight + ' г' : '—'}</div></div>
-      <div class="meta-card" style="grid-column: span 2"><div class="meta-label">Кратность / Фасовка</div><div class="meta-val">${v(d.pack)}</div></div>
+      <div class="meta-card">
+        <div class="meta-label">Масса нетто</div>
+        <div class="meta-val">${weightStr}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-label">Кратность / Фасовка</div>
+        <div class="meta-val">${d.pack || '—'}</div>
+      </div>
+      <div class="meta-card">
+        <div class="meta-label">Себестоимость ФЗ</div>
+        <div class="meta-val cost-val">${v(d.cost) !== '—' ? v(d.cost) + ' ₸' : '—'}</div>
+      </div>
     </div>
-    ${d.comp ? `<div class="modal-section"><div class="modal-section-title">Состав</div><div class="composition-box">${d.comp}</div></div>` : ''}
+
+    ${d.comp ? `
+    <div class="modal-section">
+      <div class="modal-section-title">Состав</div>
+      <div class="composition-box">${d.comp}</div>
+    </div>` : ''}
+
+    <div class="modal-section">
+      <div class="modal-section-title">Аллергены</div>
+      <div class="modal-allergen-list">${allergenHtml}</div>
+    </div>
+
     <div class="modal-section">
       <div class="modal-section-title">Пищевая ценность</div>
       <div class="nutr-grid">
@@ -666,6 +784,7 @@ function showDetail(pk) {
         </div>
       </div>
     </div>`;
+
   document.getElementById('modal').classList.add('open');
 }
 
@@ -673,7 +792,6 @@ function closeModal(e) { if (e.target === document.getElementById('modal')) clos
 function closeModalDirect() { document.getElementById('modal').classList.remove('open'); }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
 
-// ── Filter tabs ──
 function switchTab(tab) {
   const is100 = tab === '100';
   document.getElementById('panel-100').classList.toggle('hidden', !is100);
@@ -682,18 +800,14 @@ function switchTab(tab) {
   document.getElementById('tab-serv').classList.toggle('active', !is100);
 }
 
-// Auto-open correct tab if serving filters are set
 (function() {
   const servFields = ['kcal_s_min','kcal_s_max','protein_s_min','protein_s_max','fat_s_min','fat_s_max','carbs_s_min','carbs_s_max'];
   const params = new URLSearchParams(window.location.search);
-  const hasServ = servFields.some(k => params.get(k));
-  if (hasServ) switchTab('serv');
+  if (servFields.some(k => params.get(k))) switchTab('serv');
 })();
 
-// ── Category checkbox highlight ──
 function toggleCat(inp) { inp.closest('.cat-item').classList.toggle('checked', inp.checked); }
 
-// ── Sorting ──
 function sortBy(field) {
   const f = document.getElementById('filter-form');
   const cur = f.querySelector('[name=sort]').value;
@@ -703,7 +817,6 @@ function sortBy(field) {
   f.submit();
 }
 
-// ── Auto-submit ──
 function submitForm() {
   clearTimeout(window._st);
   window._st = setTimeout(() => document.getElementById('filter-form').submit(), 300);
@@ -712,6 +825,18 @@ function scheduleSearch() {
   clearTimeout(window._ss);
   window._ss = setTimeout(() => document.getElementById('filter-form').submit(), 600);
 }
+
+function toggleSidebar() {
+  const layout = document.getElementById('layout');
+  const hidden = layout.classList.toggle('sidebar-hidden');
+  localStorage.setItem('sidebarHidden', hidden ? '1' : '0');
+}
+// Восстановить состояние при загрузке
+(function() {
+  if (localStorage.getItem('sidebarHidden') === '1') {
+    document.getElementById('layout').classList.add('sidebar-hidden');
+  }
+})();
 </script>
 </body>
 </html>
