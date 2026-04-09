@@ -400,15 +400,15 @@
 
     <!-- Категория -->
     <div class="filter-group">
-      <div class="filter-title">Категория</div>
+      <div class="filter-title">Категория блюда</div>
       <div class="cat-list">
-        {% for cat in categories %}
-        <label class="cat-item {% if cat in selected_categories %}checked{% endif %}">
-          <input type="checkbox" name="category" value="{{ cat }}"
-            {% if cat in selected_categories %}checked{% endif %}
+        {% for mc in all_meal_categories %}
+        <label class="cat-item {% if mc.key in selected_meal_categories %}checked{% endif %}">
+          <input type="checkbox" name="meal_category" value="{{ mc.key }}"
+            {% if mc.key in selected_meal_categories %}checked{% endif %}
             onchange="toggleCat(this); submitForm()">
           <span class="cat-cb"></span>
-          <span class="cat-name">{{ cat }}</span>
+          <span class="cat-name">{{ mc }}</span>
         </label>
         {% endfor %}
       </div>
@@ -535,7 +535,7 @@
     {% if f.search or selected_categories or selected_allergens or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing %}
     <div class="chips-row">
       {% if f.search %}<div class="chip">🔍 «{{ f.search }}»</div>{% endif %}
-      {% for cat in selected_categories %}<div class="chip">📁 {{ cat }}</div>{% endfor %}
+      {% for key in selected_meal_categories %}<div class="chip">🍽️ {{ slot_labels|get_item:key }}</div>{% endfor %}
       {% if f.packing %}<div class="chip">📦 {{ f.packing }}</div>{% endif %}
       {% if f.cost_min or f.cost_max %}<div class="chip">💰 Себест: {{ f.cost_min|default:"0" }} — {{ f.cost_max|default:"∞" }} ₸</div>{% endif %}
       {% for name in selected_allergen_names %}<div class="chip amber">⚠️ {{ name }}</div>{% endfor %}
@@ -557,15 +557,13 @@
         <thead>
           <tr class="thead-groups">
             <!-- 5 колонок основного: Категория, Наименование, Кратность, Масса, Себестоимость -->
-            <th colspan="5" class="g-base">Основная информация</th>
+            <th colspan="4" class="g-base">Основная информация</th>
             <th colspan="5" class="g-100 grp-border">На 100 г</th>
             <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
           </tr>
           <tr class="thead-cols">
             {% with s=filters.sort d=filters.dir %}
-            <th class="sortable {% if s == 'category' %}sort-active{% endif %}" onclick="sortBy('category')" style="width:110px">
-              Категория <span class="sort-arr">{% if s == 'category' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
-            </th>
+
             <th class="sortable {% if s == 'name' %}sort-active{% endif %}" onclick="sortBy('name')">
               Наименование <span class="sort-arr">{% if s == 'name' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>
@@ -615,7 +613,9 @@
         <tbody>
           {% for p in products %}
           <tr onclick="showDetail({{ p.pk }})">
-            <td class="td-cat">{{ p.category }}</td>
+            <td class="td-cat" style="max-width:120px; white-space:normal; font-size:11px; line-height:1.3;">
+              {% for mc in p.meal_categories.all %}{{ mc }}{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}
+            </td>
             <td>
               <div class="td-name-cell">
                 {% if p.photo %}
@@ -692,7 +692,7 @@ const PD = {
   {% for p in products %}
   {{ p.pk }}: {
     name:   "{{ p.name|escapejs }}",
-    cat:    "{{ p.category|escapejs }}",
+    cat: "{% for mc in p.meal_categories.all %}{{ mc }}{% if not forloop.last %}, {% endif %}{% endfor %}",
     weight: "{{ p.net_weight|default:'' }}",
     pack:   "{{ p.packing|default:''|escapejs }}",
     cost:   "{{ p.cost|smart_num }}",

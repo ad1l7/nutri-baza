@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Рационы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white: #ffffff; --off-white: #f7f9f5; --light: #eef4ea;
+    --green-light: #c8e6b0; --green: #5aaa3c; --green-mid: #3d8a26;
+    --green-dark: #1e4d14; --text: #1a2e12; --text-mid: #3d5c30;
+    --muted: #7a9668; --border: #d6e8cc; --border-soft: #e8f2e0;
+    --danger: #d64b2a; --radius: 14px; --font: 'Manrope', sans-serif;
+    --shadow: 0 2px 16px rgba(30,77,20,.07); --shadow-md: 0 4px 32px rgba(30,77,20,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--off-white); color: var(--text); font-family: var(--font); font-size: 14px; }
+
+  .topbar {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 28px; height: 64px; display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+  }
+  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; flex-shrink: 0; }
+  .logo-text em { color: var(--green); font-style: normal; }
+  .nav-tabs { display: flex; gap: 4px; margin-left: 12px; }
+  .nav-tab {
+    padding: 7px 15px; border-radius: 9px; font-size: 13px; font-weight: 700;
+    text-decoration: none; color: var(--muted); border: 1.5px solid var(--border); transition: all .18s;
+  }
+  .nav-tab:hover { background: var(--light); color: var(--text-mid); }
+  .nav-tab.active { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+  .topbar-right { margin-left: auto; }
+
+  .create-btn {
+    background: var(--green); color: #fff; border: none; border-radius: 10px;
+    padding: 10px 18px; font-family: var(--font); font-size: 13px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; gap: 7px;
+    transition: background .2s; box-shadow: 0 2px 8px rgba(90,170,60,.3);
+  }
+  .create-btn:hover { background: var(--green-mid); }
+
+  .main { max-width: 900px; margin: 0 auto; padding: 32px 22px; }
+  .page-title { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 6px; }
+  .page-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
+
+  .groups-list { display: flex; flex-direction: column; gap: 16px; }
+
+  .group-card {
+    background: var(--white); border: 1.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    transition: box-shadow .2s;
+  }
+  .group-card:hover { box-shadow: var(--shadow-md); }
+
+  .group-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 20px; border-bottom: 1.5px solid var(--border-soft);
+    background: var(--green-dark);
+  }
+  .group-icon {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: rgba(255,255,255,.15); display: flex; align-items: center;
+    justify-content: center; font-size: 20px; flex-shrink: 0;
+  }
+  .group-title { font-size: 17px; font-weight: 800; color: #fff; flex: 1; }
+  .group-desc { font-size: 12px; color: rgba(255,255,255,.6); margin-top: 2px; }
+  .group-count {
+    background: rgba(255,255,255,.15); color: rgba(255,255,255,.9);
+    font-size: 12px; font-weight: 700; padding: 4px 12px;
+    border-radius: 20px; flex-shrink: 0;
+  }
+  .group-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .grp-btn {
+    background: rgba(255,255,255,.15); border: none; border-radius: 8px;
+    width: 30px; height: 30px; color: #fff; cursor: pointer; font-size: 13px;
+    display: flex; align-items: center; justify-content: center; transition: background .15s;
+    text-decoration: none;
+  }
+  .grp-btn:hover { background: rgba(255,255,255,.28); }
+  .grp-btn.danger:hover { background: rgba(214,75,42,.6); }
+
+  .group-rations {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px; padding: 14px 16px;
+  }
+  .ration-mini {
+    border: 1.5px solid var(--border-soft); border-radius: 10px;
+    padding: 12px 14px; text-decoration: none; color: var(--text);
+    transition: all .15s; background: var(--off-white);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ration-mini:hover { border-color: var(--green); background: var(--light); }
+  .rm-kcal { font-size: 10px; font-weight: 700; color: var(--green-mid); text-transform: uppercase; letter-spacing: .8px; }
+  .rm-name { font-size: 13px; font-weight: 700; color: var(--text); }
+  .rm-date { font-size: 11px; color: var(--muted); font-weight: 500; }
+
+  .add-ration-btn {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 12px 14px; text-decoration: none; color: var(--muted);
+    transition: all .15s; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .add-ration-btn:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
+
+  .empty-state {
+    text-align: center; padding: 80px 20px; color: var(--muted);
+  }
+  .empty-state .icon { font-size: 56px; margin-bottom: 16px; }
+  .empty-state h2 { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+
+  /* Модалы */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(30,77,20,.35); z-index: 200;
+    backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .modal {
+    background: var(--white); border-radius: 20px; width: 100%; max-width: 460px;
+    box-shadow: var(--shadow-md); animation: slideUp .22s ease; overflow: hidden;
+  }
+  @keyframes slideUp { from { transform: translateY(16px); opacity: 0 } to { transform: none; opacity: 1 } }
+  .modal-head {
+    background: var(--green-dark); padding: 20px 22px 16px; position: relative;
+  }
+  .modal-head-title { font-size: 17px; font-weight: 800; color: #fff; }
+  .modal-head-sub { font-size: 12px; color: rgba(255,255,255,.6); margin-top: 3px; }
+  .modal-close {
+    position: absolute; top: 14px; right: 14px;
+    background: rgba(255,255,255,.15); border: none; border-radius: 8px;
+    width: 30px; height: 30px; color: #fff; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-close:hover { background: rgba(255,255,255,.25); }
+  .modal-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .form-field { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .form-input {
+    background: var(--off-white); border: 1.5px solid var(--border);
+    border-radius: 9px; padding: 10px 12px; color: var(--text);
+    font-family: var(--font); font-size: 14px; font-weight: 500; outline: none;
+    transition: border-color .2s;
+  }
+  .form-input:focus { border-color: var(--green); background: var(--white); }
+  .form-submit {
+    background: var(--green-dark); color: #fff; border: none;
+    border-radius: 11px; padding: 12px; font-family: var(--font);
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s;
+  }
+  .form-submit:hover { background: var(--green-mid); }
+
+  /* Ration create modal — ккал выбор */
+  .kcal-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kcal-opt {
+    padding: 10px 6px; text-align: center; border-radius: 10px;
+    border: 2px solid var(--border); background: var(--off-white);
+    cursor: pointer; font-size: 13px; font-weight: 700; color: var(--muted); transition: all .15s;
+  }
+  .kcal-opt:hover { border-color: var(--green-light); color: var(--green-mid); }
+  .kcal-opt.sel { border-color: var(--green); background: var(--light); color: var(--green-mid); }
+  .kcal-opt input { display: none; }
+
+  /* Удаление */
+  .del-modal {
+    display: none; position: fixed; inset: 0; background: rgba(30,77,20,.35);
+    z-index: 300; backdrop-filter: blur(4px);
+    align-items: center; justify-content: center; padding: 20px;
+  }
+  .del-modal.open { display: flex; }
+  .del-box {
+    background: var(--white); border-radius: 16px; padding: 28px;
+    max-width: 340px; width: 100%; text-align: center; box-shadow: var(--shadow-md);
+  }
+  .del-box h3 { font-size: 18px; font-weight: 800; margin-bottom: 8px; }
+  .del-box p { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .del-btns { display: flex; gap: 10px; }
+  .btn-cancel { flex:1; padding:11px; border-radius:10px; border:1.5px solid var(--border); background:transparent; color:var(--text-mid); font-family:var(--font); font-size:13px; font-weight:700; cursor:pointer; }
+  .btn-cancel:hover { background: var(--off-white); }
+  .btn-del { flex:1; padding:11px; border-radius:10px; border:none; background:var(--danger); color:#fff; font-family:var(--font); font-size:13px; font-weight:700; cursor:pointer; }
+  .btn-del:hover { opacity:.88; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'ration_group_list' %}" class="nav-tab active">🥗 Рационы</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="create-btn" onclick="openGroupModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Новая группа
+    </button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">Рационы</div>
+  <div class="page-sub">Создавайте группы и добавляйте рационы с разбивкой по приёмам пищи</div>
+
+  {% if groups_data %}
+  <div class="groups-list">
+    {% for gd in groups_data %}
+    {% with g=gd.group %}
+    <div class="group-card">
+      <div class="group-header">
+        <div class="group-icon">📋</div>
+        <div style="flex:1; min-width:0;">
+          <div class="group-title">{{ g.name }}</div>
+          {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
+        </div>
+        <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
+        <div class="group-actions">
+          <button class="grp-btn danger" onclick="confirmGroupDelete({{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
+        </div>
+      </div>
+      <div class="group-rations">
+        {% for r in gd.rations %}
+        <a href="{% url 'ration_edit' r.pk %}" class="ration-mini">
+          <div class="rm-kcal">{{ r.kcal_category }} ккал</div>
+          <div class="rm-name">{{ r.name }}</div>
+          <div class="rm-date">{{ r.date|date:"d.m.Y" }}</div>
+        </a>
+        {% endfor %}
+        <button class="add-ration-btn" onclick="openRationModal({{ g.pk }})">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Добавить рацион
+        </button>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📋</div>
+    <h2>Групп пока нет</h2>
+    <p>Создайте группу — например «Неделя 1» или «1200 ккал январь»,<br>и добавьте в неё рационы</p>
+    <br>
+    <button class="create-btn" onclick="openGroupModal()" style="margin:0 auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Создать группу
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- МОДАЛ: создать группу -->
+<div class="modal-overlay" id="group-modal" onclick="if(event.target===this)closeGroupModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <button class="modal-close" onclick="closeGroupModal()">✕</button>
+      <div class="modal-head-title">Новая группа рационов</div>
+      <div class="modal-head-sub">Например: «Неделя 1», «Январь 1200 ккал»</div>
+    </div>
+    <form method="post" action="{% url 'ration_group_create' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-field">
+          <label class="form-label">Название группы</label>
+          <input class="form-input" type="text" name="name" placeholder="Неделя 1" required>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Описание (необязательно)</label>
+          <input class="form-input" type="text" name="description" placeholder="Любые заметки…">
+        </div>
+        <button type="submit" class="form-submit">Создать группу</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- МОДАЛ: создать рацион -->
+<div class="modal-overlay" id="ration-modal" onclick="if(event.target===this)closeRationModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <button class="modal-close" onclick="closeRationModal()">✕</button>
+      <div class="modal-head-title">Новый рацион</div>
+      <div class="modal-head-sub">Заполните параметры рациона</div>
+    </div>
+    <form method="post" id="ration-create-form">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-field">
+          <label class="form-label">Название</label>
+          <input class="form-input" type="text" name="name" placeholder="Понедельник" required>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Дата</label>
+          <input class="form-input" type="date" name="date" id="ration-date" required>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Категория калорийности</label>
+          <div class="kcal-grid">
+            {% for val, label in ration_kcal_choices %}
+            <label class="kcal-opt" id="ko-{{ val }}">
+              <input type="radio" name="kcal_category" value="{{ val }}" required onchange="selKcal({{ val }})">
+              {{ val }}<br><span style="font-size:10px;font-weight:500;opacity:.7;">ккал</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="form-submit">Создать и открыть редактор →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Удаление группы -->
+<div class="del-modal" id="del-modal">
+  <div class="del-box">
+    <h3>Удалить группу?</h3>
+    <p id="del-name">Все рационы внутри тоже удалятся. Это нельзя отменить.</p>
+    <div class="del-btns">
+      <button class="btn-cancel" onclick="closeDel()">Отмена</button>
+      <form id="del-form" method="post" style="flex:1">
+        {% csrf_token %}
+        <button type="submit" class="btn-del" style="width:100%">Удалить</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('ration-date').valueAsDate = new Date();
+
+  // Группа
+  function openGroupModal() { document.getElementById('group-modal').classList.add('open'); }
+  function closeGroupModal() { document.getElementById('group-modal').classList.remove('open'); }
+
+  // Рацион
+  function openRationModal(groupPk) {
+    const form = document.getElementById('ration-create-form');
+    form.action = '/rations/group/' + groupPk + '/create/';
+    document.getElementById('ration-modal').classList.add('open');
+  }
+  function closeRationModal() { document.getElementById('ration-modal').classList.remove('open'); }
+
+  function selKcal(val) {
+    document.querySelectorAll('.kcal-opt').forEach(el => el.classList.remove('sel'));
+    document.getElementById('ko-' + val).classList.add('sel');
+  }
+
+  // Удалить группу
+  function confirmGroupDelete(pk, name) {
+    document.getElementById('del-name').textContent = '«' + name + '» и все её рационы будут удалены.';
+    document.getElementById('del-form').action = '/rations/group/' + pk + '/delete/';
+    document.getElementById('del-modal').classList.add('open');
+  }
+  function closeDel() { document.getElementById('del-modal').classList.remove('open'); }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeGroupModal(); closeRationModal(); closeDel(); }
+  });
+</script>
+</body>
+</html>

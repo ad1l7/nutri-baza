@@ -9,522 +9,373 @@
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --white:       #ffffff;
-    --off-white:   #f7f9f5;
-    --light:       #eef4ea;
-    --green-light: #c8e6b0;
-    --green:       #5aaa3c;
-    --green-mid:   #3d8a26;
-    --green-dark:  #1e4d14;
-    --text:        #1a2e12;
-    --text-mid:    #3d5c30;
-    --muted:       #7a9668;
-    --border:      #d6e8cc;
-    --border-soft: #e8f2e0;
-    --danger:      #d64b2a;
-    --amber:       #8a6200;
-    --amber-bg:    #fdf4d0;
-    --orange:      #c05a00;
-    --orange-bg:   #fff0e0;
-    --blue:        #1a5fa8;
-    --blue-bg:     #e0eeff;
-    --teal:        #1a7a6a;
-    --teal-bg:     #d8f5f0;
-    --pink:        #a0256a;
-    --pink-bg:     #fde8f5;
-    --purple:      #6b30b0;
-    --purple-bg:   #f0e8ff;
-    --radius:      14px;
-    --font:        'Manrope', sans-serif;
-    --shadow:      0 2px 16px rgba(30,77,20,.07);
-    --shadow-md:   0 4px 32px rgba(30,77,20,.12);
+    --white:#ffffff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --amber:#8a6200; --amber-bg:#fdf4d0;
+    --orange:#c05a00; --orange-bg:#fff0e0;
+    --blue:#1a5fa8; --blue-bg:#e0eeff;
+    --teal:#1a7a6a; --teal-bg:#d8f5f0;
+    --pink:#a0256a; --pink-bg:#fde8f5;
+    --purple:#6b30b0; --purple-bg:#f0e8ff;
+    --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--off-white); color: var(--text); font-family: var(--font); font-size: 14px; min-height: 100vh; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--off-white); color:var(--text); font-family:var(--font); font-size:14px; min-height:100vh; }
 
-  /* TOP BAR */
   .topbar {
-    background: var(--white); border-bottom: 1.5px solid var(--border);
-    padding: 0 28px; height: 64px;
-    display: flex; align-items: center; gap: 14px;
-    position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
+    background:var(--white); border-bottom:1.5px solid var(--border);
+    padding:0 24px; height:64px; display:flex; align-items:center; gap:12px;
+    position:sticky; top:0; z-index:100; box-shadow:var(--shadow);
   }
   .back-btn {
-    display: flex; align-items: center; gap: 6px;
-    text-decoration: none; color: var(--muted); font-size: 13px; font-weight: 600;
-    padding: 7px 12px; border-radius: 9px; border: 1.5px solid var(--border);
-    transition: all .18s;
+    display:flex; align-items:center; gap:6px; text-decoration:none;
+    color:var(--muted); font-size:13px; font-weight:600;
+    padding:7px 12px; border-radius:9px; border:1.5px solid var(--border); transition:all .18s;
   }
-  .back-btn:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
-  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
-  .logo-text em { color: var(--green); font-style: normal; }
-  .topbar-title { font-size: 15px; font-weight: 700; color: var(--text-mid); }
+  .back-btn:hover { border-color:var(--green); color:var(--green-mid); background:var(--light); }
+  .topbar-name { font-size:15px; font-weight:700; color:var(--text-mid); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar-nutr { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .tpill {
+    background:var(--light); border:1.5px solid var(--border);
+    border-radius:20px; padding:5px 12px; font-size:12px; font-weight:700; color:var(--text-mid);
+    display:flex; align-items:center; gap:4px; white-space:nowrap;
+  }
+  .tpill.kcal { color:var(--green-mid); background:#e8f7e0; border-color:var(--green-light); }
+  .tpill strong { font-size:14px; font-weight:800; }
 
-  /* Итог в топбаре */
-  .topbar-nutr {
-    margin-left: auto; display: flex; align-items: center; gap: 6px;
-  }
-  .tnutr-pill {
-    background: var(--light); border: 1.5px solid var(--border);
-    border-radius: 20px; padding: 5px 12px;
-    font-size: 12px; font-weight: 700; color: var(--text-mid);
-    display: flex; align-items: center; gap: 5px;
-  }
-  .tnutr-pill.kcal { color: var(--green-mid); background: #e8f7e0; border-color: var(--green-light); }
-  .tnutr-val { font-size: 14px; font-weight: 800; }
+  .layout { display:flex; height:calc(100vh - 64px); }
 
-  .save-meta-btn {
-    background: var(--green-dark); color: #fff; border: none;
-    border-radius: 9px; padding: 9px 16px; font-family: var(--font);
-    font-size: 13px; font-weight: 700; cursor: pointer; transition: background .2s;
-  }
-  .save-meta-btn:hover { background: var(--green-mid); }
+  /* LEFT */
+  .left { width:460px; flex-shrink:0; background:var(--white); border-right:1.5px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
+  .left::-webkit-scrollbar { width:4px; }
+  .left::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
 
-  /* LAYOUT */
-  .layout { display: flex; height: calc(100vh - 64px); }
-
-  /* LEFT PANEL — информация и слоты */
-  .left-panel {
-    width: 480px; flex-shrink: 0;
-    background: var(--white); border-right: 1.5px solid var(--border);
-    overflow-y: auto; display: flex; flex-direction: column;
+  /* Мета */
+  .meta-form { background:var(--green-dark); padding:18px 20px; }
+  .meta-row { display:flex; gap:10px; margin-bottom:10px; }
+  .meta-row:last-child { margin-bottom:0; }
+  .mf { display:flex; flex-direction:column; gap:4px; flex:1; }
+  .ml { font-size:10px; font-weight:700; color:rgba(255,255,255,.6); text-transform:uppercase; letter-spacing:1px; }
+  .mi {
+    background:rgba(255,255,255,.12); border:1.5px solid rgba(255,255,255,.2);
+    border-radius:9px; padding:8px 11px; color:#fff;
+    font-family:var(--font); font-size:13px; font-weight:600; outline:none; transition:border-color .2s;
   }
-  .left-panel::-webkit-scrollbar { width: 4px; }
-  .left-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-
-  /* Мета-секция */
-  .meta-section {
-    background: var(--green-dark); padding: 20px 22px;
+  .mi:focus { border-color:rgba(255,255,255,.5); }
+  .mi option { color:var(--text); background:var(--white); }
+  .save-btn {
+    background:rgba(255,255,255,.18); border:1.5px solid rgba(255,255,255,.3);
+    border-radius:9px; padding:8px 16px; color:#fff; font-family:var(--font);
+    font-size:12px; font-weight:700; cursor:pointer; transition:background .2s; white-space:nowrap;
   }
-  .meta-row { display: flex; gap: 10px; margin-bottom: 10px; }
-  .meta-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-  .meta-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: 1px; }
-  .meta-input {
-    background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.2);
-    border-radius: 9px; padding: 8px 11px; color: #fff;
-    font-family: var(--font); font-size: 13px; font-weight: 600;
-    outline: none; transition: border-color .2s;
-  }
-  .meta-input:focus { border-color: rgba(255,255,255,.5); background: rgba(255,255,255,.18); }
-  .meta-input option { color: var(--text); background: var(--white); }
+  .save-btn:hover { background:rgba(255,255,255,.28); }
 
-  /* КБЖУ итог */
-  .nutr-summary {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    border-bottom: 1.5px solid var(--border);
-  }
-  .ns-cell { padding: 12px; text-align: center; }
-  .ns-cell + .ns-cell { border-left: 1px solid var(--border-soft); }
-  .ns-val { font-size: 18px; font-weight: 800; color: var(--text); }
-  .ns-val.kcal { color: var(--green-mid); }
-  .ns-lbl { font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px; margin-top: 2px; }
-  .ns-target { font-size: 10px; color: var(--muted); font-weight: 500; margin-top: 1px; }
+  /* Итог КБЖУ */
+  .nutr-sum { display:grid; grid-template-columns:repeat(4,1fr); border-bottom:1.5px solid var(--border); }
+  .ns { padding:12px 8px; text-align:center; }
+  .ns+.ns { border-left:1px solid var(--border-soft); }
+  .ns-v { font-size:17px; font-weight:800; color:var(--text); }
+  .ns-v.k { color:var(--green-mid); }
+  .ns-l { font-size:10px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.8px; margin-top:2px; }
+  .ns-t { font-size:10px; color:var(--muted); font-weight:500; margin-top:1px; }
 
-  /* Прогресс-бар калорий */
-  .kcal-progress { padding: 10px 16px; border-bottom: 1px solid var(--border-soft); }
-  .progress-bar-wrap { height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; }
-  .progress-bar { height: 100%; border-radius: 4px; transition: width .4s ease; background: var(--green); }
-  .progress-bar.over { background: var(--danger); }
-  .progress-text { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 5px; display: flex; justify-content: space-between; }
+  /* Прогресс */
+  .prog-wrap { padding:10px 16px; border-bottom:1px solid var(--border-soft); }
+  .prog-bar-bg { height:6px; background:var(--border); border-radius:4px; overflow:hidden; }
+  .prog-bar { height:100%; border-radius:4px; background:var(--green); transition:width .4s; }
+  .prog-bar.over { background:var(--danger); }
+  .prog-txt { font-size:11px; color:var(--muted); font-weight:600; margin-top:5px; display:flex; justify-content:space-between; }
 
   /* Слоты */
-  .slots-section { flex: 1; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-  .slots-title {
-    font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px;
-    display: flex; align-items: center; gap: 8px; margin-bottom: 4px;
+  .slots-wrap { flex:1; padding:12px 14px; display:flex; flex-direction:column; gap:8px; }
+  .sec-title {
+    font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase;
+    letter-spacing:1.5px; display:flex; align-items:center; gap:8px; margin-bottom:2px;
   }
-  .slots-title::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+  .sec-title::after { content:''; flex:1; height:1px; background:var(--border-soft); }
 
-  .slot-card {
-    border: 1.5px solid var(--border-soft); border-radius: 11px;
-    overflow: hidden; transition: box-shadow .15s;
-  }
-  .slot-card:hover { box-shadow: 0 2px 12px rgba(30,77,20,.08); }
+  .slot-card { border:1.5px solid var(--border-soft); border-radius:11px; overflow:hidden; transition:box-shadow .15s; }
+  .slot-card.active-slot { outline:2px solid var(--green); }
+  .slot-card:hover { box-shadow:0 2px 12px rgba(30,77,20,.08); }
 
-  .slot-head {
-    display: flex; align-items: center; gap: 9px;
-    padding: 9px 12px; cursor: pointer;
-  }
-  .slot-icon { font-size: 16px; flex-shrink: 0; }
-  .slot-type-label { font-size: 11px; font-weight: 700; flex: 1; }
-  .slot-kcal-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px; flex-shrink: 0; }
-  .slot-del-btn {
-    background: none; border: none; cursor: pointer; font-size: 14px; opacity: .5;
-    padding: 2px 4px; border-radius: 5px; transition: opacity .15s; flex-shrink: 0;
-  }
-  .slot-del-btn:hover { opacity: 1; }
+  .slot-head { display:flex; align-items:center; gap:8px; padding:9px 12px; cursor:pointer; }
+  .si { font-size:16px; flex-shrink:0; }
+  .sl { font-size:11px; font-weight:700; flex:1; }
+  .sk { font-size:11px; font-weight:700; padding:2px 8px; border-radius:12px; flex-shrink:0; }
+  .sdel { background:none; border:none; cursor:pointer; font-size:13px; opacity:.45; padding:2px 4px; border-radius:5px; transition:opacity .15s; flex-shrink:0; }
+  .sdel:hover { opacity:1; }
 
-  .slot-product-row {
-    padding: 8px 12px 10px; border-top: 1px solid var(--border-soft);
-    display: flex; align-items: center; gap: 10px;
+  .slot-body { padding:8px 12px 10px; border-top:1px solid var(--border-soft); display:flex; align-items:center; gap:10px; }
+  .sthumb { width:36px; height:36px; border-radius:8px; object-fit:cover; border:1.5px solid var(--border); flex-shrink:0; }
+  .sph { width:36px; height:36px; border-radius:8px; flex-shrink:0; background:var(--light); border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .spi { flex:1; min-width:0; }
+  .spn { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .spp { font-size:11px; color:var(--muted); font-weight:500; margin-top:2px; }
+  .schg {
+    background:var(--off-white); border:1.5px solid var(--border); border-radius:8px;
+    padding:6px 10px; font-family:var(--font); font-size:11px; font-weight:700;
+    color:var(--text-mid); cursor:pointer; transition:all .15s; white-space:nowrap; flex-shrink:0;
   }
-  .slot-product-thumb {
-    width: 36px; height: 36px; border-radius: 8px; object-fit: cover;
-    border: 1.5px solid var(--border); flex-shrink: 0;
-  }
-  .slot-product-placeholder {
-    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
-    background: var(--light); border: 1.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center; font-size: 14px;
-  }
-  .slot-product-info { flex: 1; min-width: 0; }
-  .slot-product-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .slot-product-nutr { font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 2px; }
-  .slot-change-btn {
-    background: var(--off-white); border: 1.5px solid var(--border);
-    border-radius: 8px; padding: 6px 10px; font-family: var(--font);
-    font-size: 11px; font-weight: 700; color: var(--text-mid);
-    cursor: pointer; transition: all .15s; white-space: nowrap; flex-shrink: 0;
-  }
-  .slot-change-btn:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
+  .schg:hover { border-color:var(--green); color:var(--green-mid); background:var(--light); }
 
   /* Цвета слотов */
-  .slot-orange .slot-head { background: var(--orange-bg); }
-  .slot-orange .slot-type-label { color: var(--orange); }
-  .slot-orange .slot-kcal-badge { background: var(--orange-bg); color: var(--orange); border: 1px solid #f5c06a; }
+  .c-orange .slot-head { background:var(--orange-bg); } .c-orange .sl { color:var(--orange); } .c-orange .sk { background:var(--orange-bg); color:var(--orange); border:1px solid #f5c06a; }
+  .c-green .slot-head { background:var(--light); } .c-green .sl { color:var(--green-mid); } .c-green .sk { background:var(--light); color:var(--green-mid); border:1px solid var(--green-light); }
+  .c-blue .slot-head { background:var(--blue-bg); } .c-blue .sl { color:var(--blue); } .c-blue .sk { background:var(--blue-bg); color:var(--blue); border:1px solid #90bef0; }
+  .c-teal .slot-head { background:var(--teal-bg); } .c-teal .sl { color:var(--teal); } .c-teal .sk { background:var(--teal-bg); color:var(--teal); border:1px solid #80d5c8; }
+  .c-pink .slot-head { background:var(--pink-bg); } .c-pink .sl { color:var(--pink); } .c-pink .sk { background:var(--pink-bg); color:var(--pink); border:1px solid #e8a0d0; }
+  .c-purple .slot-head { background:var(--purple-bg); } .c-purple .sl { color:var(--purple); } .c-purple .sk { background:var(--purple-bg); color:var(--purple); border:1px solid #c0a0e8; }
+  .c-amber .slot-head { background:var(--amber-bg); } .c-amber .sl { color:var(--amber); } .c-amber .sk { background:var(--amber-bg); color:var(--amber); border:1px solid #e8c06a; }
 
-  .slot-green .slot-head { background: var(--light); }
-  .slot-green .slot-type-label { color: var(--green-mid); }
-  .slot-green .slot-kcal-badge { background: var(--light); color: var(--green-mid); border: 1px solid var(--green-light); }
-
-  .slot-blue .slot-head { background: var(--blue-bg); }
-  .slot-blue .slot-type-label { color: var(--blue); }
-  .slot-blue .slot-kcal-badge { background: var(--blue-bg); color: var(--blue); border: 1px solid #90bef0; }
-
-  .slot-teal .slot-head { background: var(--teal-bg); }
-  .slot-teal .slot-type-label { color: var(--teal); }
-  .slot-teal .slot-kcal-badge { background: var(--teal-bg); color: var(--teal); border: 1px solid #80d5c8; }
-
-  .slot-pink .slot-head { background: var(--pink-bg); }
-  .slot-pink .slot-type-label { color: var(--pink); }
-  .slot-pink .slot-kcal-badge { background: var(--pink-bg); color: var(--pink); border: 1px solid #e8a0d0; }
-
-  .slot-purple .slot-head { background: var(--purple-bg); }
-  .slot-purple .slot-type-label { color: var(--purple); }
-  .slot-purple .slot-kcal-badge { background: var(--purple-bg); color: var(--purple); border: 1px solid #c0a0e8; }
-
-  .slot-amber .slot-head { background: var(--amber-bg); }
-  .slot-amber .slot-type-label { color: var(--amber); }
-  .slot-amber .slot-kcal-badge { background: var(--amber-bg); color: var(--amber); border: 1px solid #e8c06a; }
-
-  /* Кнопка добавить слот */
   .add-slot-btn {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px; border-radius: 11px; border: 2px dashed var(--border);
-    background: transparent; color: var(--muted); font-family: var(--font);
-    font-size: 13px; font-weight: 700; cursor: pointer; transition: all .18s;
-    margin-top: 4px;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    padding:11px; border-radius:11px; border:2px dashed var(--border);
+    background:transparent; color:var(--muted); font-family:var(--font);
+    font-size:13px; font-weight:700; cursor:pointer; transition:all .18s; margin-top:2px;
   }
-  .add-slot-btn:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
+  .add-slot-btn:hover { border-color:var(--green); color:var(--green-mid); background:var(--light); }
 
-  /* RIGHT PANEL — выбор блюда */
-  .right-panel {
-    flex: 1; overflow-y: auto; padding: 18px 20px;
-    display: flex; flex-direction: column; gap: 14px;
-  }
-  .right-panel::-webkit-scrollbar { width: 5px; }
-  .right-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* RIGHT — пикер */
+  .right { flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+  .right::-webkit-scrollbar { width:5px; }
+  .right::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
 
-  .picker-header {
-    background: var(--white); border: 1.5px solid var(--border);
-    border-radius: var(--radius); padding: 14px 16px;
-    display: flex; flex-direction: column; gap: 10px;
-    position: sticky; top: 0; z-index: 10; box-shadow: var(--shadow);
+  .picker-top {
+    background:var(--white); border:1.5px solid var(--border); border-radius:var(--radius);
+    padding:14px 16px; display:flex; flex-direction:column; gap:10px;
+    position:sticky; top:0; z-index:10; box-shadow:var(--shadow);
   }
-  .picker-title { font-size: 13px; font-weight: 800; color: var(--text); }
-  .picker-slot-hint { font-size: 12px; color: var(--muted); font-weight: 500; }
-  .picker-slot-hint strong { color: var(--green-mid); }
-  .picker-search { position: relative; }
-  .picker-search input {
-    width: 100%; background: var(--off-white); border: 1.5px solid var(--border);
-    border-radius: 9px; padding: 9px 14px 9px 36px;
-    color: var(--text); font-family: var(--font); font-size: 13px; font-weight: 500;
-    outline: none; transition: border-color .2s;
-  }
-  .picker-search input:focus { border-color: var(--green); background: var(--white); }
-  .picker-search .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .picker-title { font-size:13px; font-weight:800; color:var(--text); }
+  .picker-hint { font-size:12px; color:var(--muted); }
+  .picker-hint strong { color:var(--green-mid); }
+  .picker-hint .warn { color:#b05000; font-weight:600; }
 
-  /* Категории продуктов в пикере */
-  .product-category-group { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-  .cat-header {
-    padding: 10px 14px; background: var(--light);
-    font-size: 11px; font-weight: 800; color: var(--text-mid);
-    text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-soft);
+  .psearch { position:relative; }
+  .psearch input {
+    width:100%; background:var(--off-white); border:1.5px solid var(--border);
+    border-radius:9px; padding:9px 14px 9px 36px; color:var(--text);
+    font-family:var(--font); font-size:13px; font-weight:500; outline:none; transition:border-color .2s;
   }
-  .product-pick-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; cursor: pointer; transition: background .12s;
-    border-bottom: 1px solid var(--border-soft);
-  }
-  .product-pick-item:last-child { border-bottom: none; }
-  .product-pick-item:hover { background: var(--off-white); }
-  .product-pick-item.selected-item { background: var(--light); }
-  .pick-thumb {
-    width: 38px; height: 38px; border-radius: 8px; object-fit: cover;
-    border: 1.5px solid var(--border); flex-shrink: 0;
-  }
-  .pick-placeholder {
-    width: 38px; height: 38px; border-radius: 8px; flex-shrink: 0;
-    background: var(--light); border: 1.5px solid var(--border);
-    display: flex; align-items: center; justify-content: center; font-size: 14px;
-  }
-  .pick-info { flex: 1; min-width: 0; }
-  .pick-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pick-nutr { font-size: 11px; color: var(--muted); font-weight: 500; margin-top: 2px; }
-  .pick-select-btn {
-    background: var(--green-dark); color: #fff; border: none;
-    border-radius: 8px; padding: 7px 12px; font-family: var(--font);
-    font-size: 11px; font-weight: 700; cursor: pointer; flex-shrink: 0;
-    transition: background .15s;
-  }
-  .pick-select-btn:hover { background: var(--green-mid); }
-  .pick-select-btn.current { background: var(--light); color: var(--green-mid); border: 1.5px solid var(--green-light); }
+  .psearch input:focus { border-color:var(--green); background:var(--white); }
+  .psearch .si2 { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
 
-  .no-slot-selected {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    flex: 1; color: var(--muted); text-align: center; padding: 40px 20px;
-    background: var(--white); border: 1.5px solid var(--border);
-    border-radius: var(--radius); gap: 10px;
+  /* Переключатель: только подходящие / все */
+  .picker-tabs { display:flex; gap:0; background:var(--off-white); border:1.5px solid var(--border); border-radius:9px; padding:3px; }
+  .ptab {
+    flex:1; padding:5px 8px; text-align:center; font-size:11px; font-weight:700;
+    cursor:pointer; border-radius:7px; border:none; background:transparent;
+    color:var(--muted); font-family:var(--font); transition:all .18s;
   }
-  .no-slot-selected .hint-icon { font-size: 40px; }
-  .no-slot-selected p { font-size: 13px; line-height: 1.5; }
+  .ptab.active { background:var(--white); color:var(--green-mid); box-shadow:0 1px 4px rgba(30,77,20,.1); }
 
-  /* Модал выбора слота */
-  .modal-overlay {
-    display: none; position: fixed; inset: 0;
-    background: rgba(30,77,20,.35); z-index: 200;
-    backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;
-  }
-  .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
-  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  .modal {
-    background: var(--white); border-radius: 20px; width: 100%; max-width: 500px;
-    max-height: 80vh; overflow-y: auto; box-shadow: var(--shadow-md);
-    animation: slideUp .22s ease;
-  }
-  @keyframes slideUp { from { transform: translateY(16px); opacity: 0 } to { transform: none; opacity: 1 } }
-  .modal::-webkit-scrollbar { width: 4px; }
-  .modal::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-  .modal-head {
-    background: var(--green-dark); padding: 20px 22px 16px;
-    border-radius: 18px 18px 0 0; position: sticky; top: 0;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .modal-head-title { font-size: 16px; font-weight: 800; color: #fff; }
-  .modal-close {
-    background: rgba(255,255,255,.15); border: none; border-radius: 8px;
-    width: 30px; height: 30px; color: #fff; cursor: pointer; font-size: 15px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .modal-close:hover { background: rgba(255,255,255,.25); }
-  .slot-type-grid { display: flex; flex-direction: column; gap: 6px; padding: 16px; }
-  .slot-type-option {
-    display: flex; align-items: center; gap: 10px;
-    padding: 11px 14px; border-radius: 11px; cursor: pointer;
-    border: 1.5px solid var(--border-soft); transition: all .15s;
-    background: var(--off-white);
-  }
-  .slot-type-option:hover { border-color: var(--green); background: var(--light); }
-  .sto-icon { font-size: 18px; }
-  .sto-label { font-size: 13px; font-weight: 700; color: var(--text); }
+  .pcat { background:var(--white); border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .pcat-head { padding:9px 14px; background:var(--light); font-size:11px; font-weight:800; color:var(--text-mid); text-transform:uppercase; letter-spacing:1px; border-bottom:1px solid var(--border-soft); }
+  .pitem { display:flex; align-items:center; gap:10px; padding:10px 14px; cursor:pointer; transition:background .12s; border-bottom:1px solid var(--border-soft); }
+  .pitem:last-child { border-bottom:none; }
+  .pitem:hover { background:var(--off-white); }
+  .pitem.cur { background:var(--light); }
+  .pthumb { width:38px; height:38px; border-radius:8px; object-fit:cover; border:1.5px solid var(--border); flex-shrink:0; }
+  .pph { width:38px; height:38px; border-radius:8px; flex-shrink:0; background:var(--light); border:1.5px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .pinfo { flex:1; min-width:0; }
+  .pname { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pnutr { font-size:11px; color:var(--muted); font-weight:500; margin-top:2px; }
+  .psel { background:var(--green-dark); color:#fff; border:none; border-radius:8px; padding:7px 12px; font-family:var(--font); font-size:11px; font-weight:700; cursor:pointer; flex-shrink:0; transition:background .15s; }
+  .psel:hover { background:var(--green-mid); }
+  .psel.cur { background:var(--light); color:var(--green-mid); border:1.5px solid var(--green-light); }
+
+  .no-sel { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; color:var(--muted); text-align:center; padding:40px 20px; background:var(--white); border:1.5px solid var(--border); border-radius:var(--radius); gap:10px; }
+  .no-sel .ni { font-size:40px; }
+
+  /* Модал: выбор типа слота */
+  .mo { display:none; position:fixed; inset:0; background:rgba(30,77,20,.35); z-index:200; backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px; }
+  .mo.open { display:flex; animation:fi .2s ease; }
+  @keyframes fi { from{opacity:0} to{opacity:1} }
+  .mbox { background:var(--white); border-radius:20px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto; box-shadow:var(--shadow-md); animation:su .22s ease; }
+  @keyframes su { from{transform:translateY(14px);opacity:0} to{transform:none;opacity:1} }
+  .mbox::-webkit-scrollbar { width:4px; }
+  .mbox::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+  .mhead { background:var(--green-dark); padding:18px 20px 14px; border-radius:18px 18px 0 0; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; }
+  .mht { font-size:16px; font-weight:800; color:#fff; }
+  .mcl { background:rgba(255,255,255,.15); border:none; border-radius:8px; width:30px; height:30px; color:#fff; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; }
+  .mcl:hover { background:rgba(255,255,255,.25); }
+  .stgrid { display:flex; flex-direction:column; gap:6px; padding:14px; }
+  .stopt { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:11px; cursor:pointer; border:1.5px solid var(--border-soft); transition:all .15s; background:var(--off-white); }
+  .stopt:hover { border-color:var(--green); background:var(--light); }
+  .sti { font-size:18px; }
+  .stl { font-size:13px; font-weight:700; color:var(--text); }
 </style>
 </head>
 <body>
 
-<!-- TOP BAR -->
 <div class="topbar">
-  <a href="{% url 'ration_list' %}" class="back-btn">
-    ← Рационы
-  </a>
-  <span class="logo-text">O-<em>Live</em></span>
-  <span class="topbar-title">{{ ration.name }}</span>
-
+  <a href="{% url 'ration_group_list' %}" class="back-btn">← Рационы</a>
+  <span class="topbar-name">{{ ration.name }}</span>
   <div class="topbar-nutr">
-    <div class="tnutr-pill kcal">
-      <span>⚡</span>
-      <span class="tnutr-val" id="total-kcal">{{ total_kcal|floatformat:0 }}</span>
-      <span>/ {{ ration.kcal_category }} ккал</span>
-    </div>
-    <div class="tnutr-pill">Б: <span class="tnutr-val" id="total-protein">{{ total_protein|floatformat:1 }}</span></div>
-    <div class="tnutr-pill">Ж: <span class="tnutr-val" id="total-fat">{{ total_fat|floatformat:1 }}</span></div>
-    <div class="tnutr-pill">У: <span class="tnutr-val" id="total-carbs">{{ total_carbs|floatformat:1 }}</span></div>
+    <div class="tpill kcal">⚡ <strong id="t-kcal">{{ total_kcal|floatformat:0 }}</strong> / {{ ration.kcal_category }} ккал</div>
+    <div class="tpill">Б <strong id="t-prot">{{ total_protein|floatformat:1 }}</strong></div>
+    <div class="tpill">Ж <strong id="t-fat">{{ total_fat|floatformat:1 }}</strong></div>
+    <div class="tpill">У <strong id="t-carbs">{{ total_carbs|floatformat:1 }}</strong></div>
   </div>
 </div>
 
 <div class="layout">
 
-  <!-- LEFT PANEL -->
-  <div class="left-panel">
-
-    <!-- Мета: редактирование названия/даты/ккал -->
+  <!-- LEFT -->
+  <div class="left">
+    <!-- Мета -->
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="update_meta">
-      <div class="meta-section">
+      <div class="meta-form">
         <div class="meta-row">
-          <div class="meta-field" style="flex:2">
-            <label class="meta-label">Название</label>
-            <input class="meta-input" type="text" name="name" value="{{ ration.name }}" required>
+          <div class="mf" style="flex:2">
+            <label class="ml">Название</label>
+            <input class="mi" type="text" name="name" value="{{ ration.name }}" required>
           </div>
-          <div class="meta-field">
-            <label class="meta-label">Дата</label>
-            <input class="meta-input" type="date" name="date" value="{{ ration.date|date:'Y-m-d' }}" required>
+          <div class="mf">
+            <label class="ml">Дата</label>
+            <input class="mi" type="date" name="date" value="{{ ration.date|date:'Y-m-d' }}" required>
           </div>
         </div>
-        <div class="meta-row" style="margin-bottom:0">
-          <div class="meta-field" style="flex:2">
-            <label class="meta-label">Категория ккал</label>
-            <select class="meta-input" name="kcal_category">
+        <div class="meta-row">
+          <div class="mf" style="flex:2">
+            <label class="ml">Категория ккал</label>
+            <select class="mi" name="kcal_category">
               {% for val, label in kcal_categories %}
               <option value="{{ val }}" {% if val == ration.kcal_category %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="meta-field" style="justify-content:flex-end; padding-top:18px;">
-            <button type="submit" class="save-meta-btn">Сохранить</button>
+          <div class="mf" style="justify-content:flex-end; padding-top:16px;">
+            <button type="submit" class="save-btn">Сохранить</button>
           </div>
         </div>
       </div>
     </form>
 
     <!-- КБЖУ итог -->
-    <div class="nutr-summary">
-      <div class="ns-cell">
-        <div class="ns-val kcal" id="sum-kcal">{{ total_kcal|floatformat:0 }}</div>
-        <div class="ns-lbl">Ккал</div>
-        <div class="ns-target">цель: {{ ration.kcal_category }}</div>
-      </div>
-      <div class="ns-cell">
-        <div class="ns-val" id="sum-protein">{{ total_protein|floatformat:1 }}</div>
-        <div class="ns-lbl">Белки г</div>
-      </div>
-      <div class="ns-cell">
-        <div class="ns-val" id="sum-fat">{{ total_fat|floatformat:1 }}</div>
-        <div class="ns-lbl">Жиры г</div>
-      </div>
-      <div class="ns-cell">
-        <div class="ns-val" id="sum-carbs">{{ total_carbs|floatformat:1 }}</div>
-        <div class="ns-lbl">Углеводы г</div>
-      </div>
+    <div class="nutr-sum">
+      <div class="ns"><div class="ns-v k" id="s-kcal">{{ total_kcal|floatformat:0 }}</div><div class="ns-l">Ккал</div><div class="ns-t">/ {{ ration.kcal_category }}</div></div>
+      <div class="ns"><div class="ns-v" id="s-prot">{{ total_protein|floatformat:1 }}</div><div class="ns-l">Белки г</div></div>
+      <div class="ns"><div class="ns-v" id="s-fat">{{ total_fat|floatformat:1 }}</div><div class="ns-l">Жиры г</div></div>
+      <div class="ns"><div class="ns-v" id="s-carbs">{{ total_carbs|floatformat:1 }}</div><div class="ns-l">Углев. г</div></div>
     </div>
 
-    <!-- Прогресс ккал -->
-    <div class="kcal-progress">
-      {% with pct=total_kcal|div:ration.kcal_category|mul:100 %}
-      <div class="progress-bar-wrap">
-        <div class="progress-bar {% if total_kcal > ration.kcal_category %}over{% endif %}"
-             style="width: {% if pct > 100 %}100{% else %}{{ pct|floatformat:0 }}{% endif %}%"></div>
+    <!-- Прогресс -->
+    <div class="prog-wrap">
+      {% with pct=total_kcal|floatformat:0 %}
+      <div class="prog-bar-bg">
+        <div class="prog-bar {% if total_kcal > ration.kcal_category %}over{% endif %}"
+             id="prog-bar"
+             style="width:{% widthratio total_kcal ration.kcal_category 100 %}%"></div>
       </div>
-      <div class="progress-text">
+      <div class="prog-txt">
         <span>{{ total_kcal|floatformat:0 }} ккал набрано</span>
-        <span>{{ ration.kcal_category|add:0|floatformat:0|add:' — '|add:total_kcal|floatformat:0 }} = {{ ration.kcal_category|floatformat:0|add:' кк цель' }}</span>
+        <span>цель: {{ ration.kcal_category }} ккал</span>
       </div>
       {% endwith %}
     </div>
 
     <!-- Слоты -->
-    <div class="slots-section">
-      <div class="slots-title">Приёмы пищи</div>
+    <div class="slots-wrap">
+      <div class="sec-title">Приёмы пищи</div>
 
-      {% for sm in slots_with_meta %}
-      {% with slot=sm.slot %}
-      <div class="slot-card slot-{{ sm.color }}" id="slot-card-{{ slot.pk }}">
-        <div class="slot-head" onclick="selectSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', {{ slot.product_id|default:'null' }})">
-          <span class="slot-icon">{{ sm.icon }}</span>
-          <span class="slot-type-label">{{ sm.label }}</span>
-          {% if sm.kcal %}
-          <span class="slot-kcal-badge">{{ sm.kcal|floatformat:0 }} кк</span>
-          {% else %}
-          <span class="slot-kcal-badge" style="opacity:.5">— кк</span>
-          {% endif %}
+      {% for sm in slots_with_meta %}{% with slot=sm.slot %}
+      <div class="slot-card c-{{ sm.color }}" id="sc-{{ slot.pk }}">
+        <div class="slot-head" onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
+          <span class="si">{{ sm.icon }}</span>
+          <span class="sl">{{ sm.label }}</span>
+          {% if sm.kcal %}<span class="sk">{{ sm.kcal|floatformat:0 }} кк</span>
+          {% else %}<span class="sk" style="opacity:.45">— кк</span>{% endif %}
           <form method="post" style="display:inline" onsubmit="return confirm('Удалить этот слот?')">
             {% csrf_token %}
             <input type="hidden" name="action" value="delete_slot">
             <input type="hidden" name="slot_id" value="{{ slot.pk }}">
-            <button type="submit" class="slot-del-btn" title="Удалить слот">✕</button>
+            <button type="submit" class="sdel" title="Удалить">✕</button>
           </form>
         </div>
-        <div class="slot-product-row">
+        <div class="slot-body">
           {% if slot.product %}
-            {% if slot.product.photo %}
-              <img src="{{ slot.product.photo.url }}" class="slot-product-thumb" alt="">
-            {% else %}
-              <div class="slot-product-placeholder">🥗</div>
-            {% endif %}
-            <div class="slot-product-info">
-              <div class="slot-product-name">{{ slot.product.name }}</div>
-              <div class="slot-product-nutr">
-                Б: {{ sm.protein|floatformat:1 }} &nbsp;Ж: {{ sm.fat|floatformat:1 }} &nbsp;У: {{ sm.carbs|floatformat:1 }} г
-              </div>
+            {% if slot.product.photo %}<img src="{{ slot.product.photo.url }}" class="sthumb" alt="">
+            {% else %}<div class="sph">🥗</div>{% endif %}
+            <div class="spi">
+              <div class="spn">{{ slot.product.name }}</div>
+              <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г</div>
             </div>
           {% else %}
-            <div class="slot-product-placeholder">❓</div>
-            <div class="slot-product-info">
-              <div class="slot-product-name" style="color:var(--muted); font-weight:500;">Блюдо не выбрано</div>
-              <div class="slot-product-nutr">Нажмите чтобы выбрать</div>
+            <div class="sph">❓</div>
+            <div class="spi">
+              <div class="spn" style="color:var(--muted);font-weight:500;">Блюдо не выбрано</div>
+              <div class="spp">Нажмите чтобы выбрать</div>
             </div>
           {% endif %}
-          <button class="slot-change-btn" type="button"
-            onclick="selectSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', {{ slot.product_id|default:'null' }})">
+          <button class="schg" type="button"
+            onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
             {% if slot.product %}Изменить{% else %}Выбрать{% endif %}
           </button>
         </div>
       </div>
-      {% endwith %}
-      {% endfor %}
+      {% endwith %}{% endfor %}
 
-      <!-- Кнопка добавить слот -->
       <button type="button" class="add-slot-btn" onclick="openAddSlot()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
         </svg>
-        Добавить приём пищи
+        Добавить категорию блюда
       </button>
     </div>
   </div>
 
-  <!-- RIGHT PANEL — пикер блюд -->
-  <div class="right-panel" id="right-panel">
-    <div class="no-slot-selected" id="no-slot-hint">
-      <div class="hint-icon">👈</div>
+  <!-- RIGHT — пикер -->
+  <div class="right" id="right">
+    <div class="no-sel" id="no-sel">
+      <div class="ni">👈</div>
       <p>Выберите слот слева,<br>чтобы назначить блюдо</p>
     </div>
 
-    <!-- Пикер (скрыт до выбора слота) -->
-    <div id="picker-content" style="display:none; flex-direction:column; gap:14px;">
-      <div class="picker-header">
+    <div id="picker" style="display:none; flex-direction:column; gap:12px;">
+      <div class="picker-top">
         <div>
           <div class="picker-title">Выберите блюдо</div>
-          <div class="picker-slot-hint">Слот: <strong id="picker-slot-name">—</strong></div>
+          <div class="picker-hint">Категория: <strong id="ph-slot">—</strong>
+            <span id="ph-warn" class="warn" style="display:none"> — нет блюд с этой категорией, показаны все</span>
+          </div>
         </div>
-        <div class="picker-search">
-          <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="picker-tabs">
+          <button type="button" class="ptab active" id="ptab-match" onclick="setPickerTab('match')">✅ Подходящие</button>
+          <button type="button" class="ptab" id="ptab-all" onclick="setPickerTab('all')">📋 Все блюда</button>
+        </div>
+        <div class="psearch">
+          <svg class="si2" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input type="text" id="picker-search-input" placeholder="Поиск по названию…" oninput="filterProducts(this.value)">
+          <input type="text" id="psearch" placeholder="Поиск по названию…" oninput="renderPicker(this.value)">
         </div>
       </div>
-      <div id="picker-list"></div>
+      <div id="plist"></div>
     </div>
   </div>
 </div>
 
-<!-- МОДАЛ добавления слота -->
-<div class="modal-overlay" id="add-slot-modal" onclick="closeAddSlotOutside(event)">
-  <div class="modal">
-    <div class="modal-head">
-      <span class="modal-head-title">Выберите тип приёма пищи</span>
-      <button class="modal-close" onclick="closeAddSlot()">✕</button>
+<!-- Модал: добавить тип слота -->
+<div class="mo" id="add-modal" onclick="if(event.target===this)closeAddSlot()">
+  <div class="mbox">
+    <div class="mhead">
+      <span class="mht">Выберите категорию блюда</span>
+      <button class="mcl" onclick="closeAddSlot()">✕</button>
     </div>
-    <form method="post" id="add-slot-form">
+    <form method="post" id="add-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="add_slot">
-      <input type="hidden" name="slot_type" id="add-slot-type-input">
-      <div class="slot-type-grid">
+      <input type="hidden" name="slot_type" id="add-slot-type">
+      <div class="stgrid">
         {% for key, label in slot_types %}
-        <div class="slot-type-option" onclick="pickSlotType('{{ key }}')">
-          <span class="sto-icon">{{ slot_icons|get_item:key }}</span>
-          <span class="sto-label">{{ label }}</span>
+        <div class="stopt" onclick="pickSlotType('{{ key }}')">
+          <span class="sti">{{ slot_icons|get_item:key }}</span>
+          <span class="stl">{{ label }}</span>
         </div>
         {% endfor %}
       </div>
@@ -533,88 +384,92 @@
 </div>
 
 <script>
-// Все продукты
-const ALL_PRODUCTS = {{ all_products_json|safe }};
+const MEAL_CAT = {{ meal_cat_map_json|safe }};   // {slot_type: [products...]}
+const ALL = {{ all_products_json|safe }};          // все продукты
 
-// Текущий активный слот
-let activeSlotId = null;
-let activeCurrentProductId = null;
+let activeSlot = null;    // {id, label, slotType, currentProductId}
+let pickerTab = 'match';  // 'match' | 'all'
 
-// Группировка по категориям для рендера
-const byCategory = {};
-ALL_PRODUCTS.forEach(p => {
-  if (!byCategory[p.category]) byCategory[p.category] = [];
-  byCategory[p.category].push(p);
-});
+function selSlot(slotId, label, slotType, curProdId) {
+  activeSlot = { id: slotId, label, slotType, currentProductId: curProdId };
 
-function selectSlot(slotId, slotLabel, currentProductId) {
-  activeSlotId = slotId;
-  activeCurrentProductId = currentProductId;
+  document.querySelectorAll('.slot-card').forEach(el => el.classList.remove('active-slot'));
+  document.getElementById('sc-' + slotId)?.classList.add('active-slot');
 
-  // Подсветить активный
-  document.querySelectorAll('.slot-card').forEach(el => el.style.outline = '');
-  const card = document.getElementById('slot-card-' + slotId);
-  if (card) card.style.outline = '2px solid var(--green)';
+  document.getElementById('ph-slot').textContent = label;
+  document.getElementById('no-sel').style.display = 'none';
+  document.getElementById('picker').style.display = 'flex';
+  document.getElementById('psearch').value = '';
 
-  document.getElementById('no-slot-hint').style.display = 'none';
-  const pc = document.getElementById('picker-content');
-  pc.style.display = 'flex';
-  document.getElementById('picker-slot-name').textContent = slotLabel;
-  document.getElementById('picker-search-input').value = '';
-  renderProducts('');
+  // Проверим есть ли вообще блюда для этого слота
+  const matched = MEAL_CAT[slotType] || [];
+  const warn = document.getElementById('ph-warn');
+  if (matched.length === 0) {
+    warn.style.display = 'inline';
+    setPickerTab('all');
+  } else {
+    warn.style.display = 'none';
+    setPickerTab('match');
+  }
 }
 
-function renderProducts(query) {
-  const list = document.getElementById('picker-list');
-  const q = query.toLowerCase().trim();
+function setPickerTab(tab) {
+  pickerTab = tab;
+  document.getElementById('ptab-match').classList.toggle('active', tab === 'match');
+  document.getElementById('ptab-all').classList.toggle('active', tab === 'all');
+  renderPicker(document.getElementById('psearch').value);
+}
+
+function renderPicker(q) {
+  if (!activeSlot) return;
+  const query = q.toLowerCase().trim();
+
+  let products;
+  if (pickerTab === 'match') {
+    products = (MEAL_CAT[activeSlot.slotType] || []).filter(p => !query || p.name.toLowerCase().includes(query));
+  } else {
+    products = ALL.filter(p => !query || p.name.toLowerCase().includes(query));
+  }
+
+  // Группировка по category
+  const bycat = {};
+  products.forEach(p => {
+    if (!bycat[p.category]) bycat[p.category] = [];
+    bycat[p.category].push(p);
+  });
+
   let html = '';
-
-  Object.entries(byCategory).forEach(([cat, products]) => {
-    const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q));
-    if (!filtered.length) return;
-
-    html += `<div class="product-category-group">
-      <div class="cat-header">${cat}</div>`;
-
-    filtered.forEach(p => {
-      const isCurrent = p.id === activeCurrentProductId;
-      const photoHtml = p.photo
-        ? `<img src="${p.photo}" class="pick-thumb" alt="">`
-        : `<div class="pick-placeholder">🥗</div>`;
-      const nutr = `Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}`;
-      html += `<div class="product-pick-item ${isCurrent ? 'selected-item' : ''}">
-        ${photoHtml}
-        <div class="pick-info">
-          <div class="pick-name">${p.name}</div>
-          <div class="pick-nutr">${nutr}</div>
+  Object.entries(bycat).forEach(([cat, prods]) => {
+    html += `<div class="pcat"><div class="pcat-head">${cat}</div>`;
+    prods.forEach(p => {
+      const isCur = p.id === activeSlot.currentProductId;
+      const photo = p.photo ? `<img src="${p.photo}" class="pthumb" alt="">` : `<div class="pph">🥗</div>`;
+      html += `<div class="pitem ${isCur ? 'cur' : ''}">
+        ${photo}
+        <div class="pinfo">
+          <div class="pname">${p.name}</div>
+          <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}</div>
         </div>
-        <button class="pick-select-btn ${isCurrent ? 'current' : ''}"
-          onclick="assignProduct(${p.id})" type="button">
-          ${isCurrent ? '✓ Текущее' : 'Выбрать'}
+        <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
+          ${isCur ? '✓ Текущее' : 'Выбрать'}
         </button>
       </div>`;
     });
-
     html += `</div>`;
   });
 
-  if (!html) html = `<div style="text-align:center; color:var(--muted); padding:30px; font-size:13px;">Ничего не найдено</div>`;
-  list.innerHTML = html;
-}
-
-function filterProducts(q) {
-  if (activeSlotId) renderProducts(q);
+  if (!html) html = `<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">Ничего не найдено</div>`;
+  document.getElementById('plist').innerHTML = html;
 }
 
 function assignProduct(productId) {
-  if (!activeSlotId) return;
+  if (!activeSlot) return;
   const form = document.createElement('form');
   form.method = 'POST';
-  form.action = '';
   form.innerHTML = `
     <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrf()}">
     <input type="hidden" name="action" value="update_slot">
-    <input type="hidden" name="slot_id" value="${activeSlotId}">
+    <input type="hidden" name="slot_id" value="${activeSlot.id}">
     <input type="hidden" name="product_id" value="${productId}">
   `;
   document.body.appendChild(form);
@@ -627,18 +482,11 @@ function getCsrf() {
 }
 
 // Добавить слот
-function openAddSlot() {
-  document.getElementById('add-slot-modal').classList.add('open');
-}
-function closeAddSlot() {
-  document.getElementById('add-slot-modal').classList.remove('open');
-}
-function closeAddSlotOutside(e) {
-  if (e.target === document.getElementById('add-slot-modal')) closeAddSlot();
-}
+function openAddSlot() { document.getElementById('add-modal').classList.add('open'); }
+function closeAddSlot() { document.getElementById('add-modal').classList.remove('open'); }
 function pickSlotType(key) {
-  document.getElementById('add-slot-type-input').value = key;
-  document.getElementById('add-slot-form').submit();
+  document.getElementById('add-slot-type').value = key;
+  document.getElementById('add-form').submit();
 }
 
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAddSlot(); });
