@@ -557,13 +557,13 @@
         <thead>
           <tr class="thead-groups">
             <!-- 5 колонок основного: Категория, Наименование, Кратность, Масса, Себестоимость -->
-            <th colspan="4" class="g-base">Основная информация</th>
+            <th colspan="5" class="g-base">Основная информация</th>
             <th colspan="5" class="g-100 grp-border">На 100 г</th>
             <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
           </tr>
           <tr class="thead-cols">
             {% with s=filters.sort d=filters.dir %}
-
+            <th style="width:120px; color:var(--muted);">Категория</th>
             <th class="sortable {% if s == 'name' %}sort-active{% endif %}" onclick="sortBy('name')">
               Наименование <span class="sort-arr">{% if s == 'name' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>

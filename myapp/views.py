@@ -12,36 +12,33 @@ from .models import (
 
 def product_list(request):
     products = Product.objects.prefetch_related("meal_categories", "allergens").all()
-
-    # Все категории блюд для фильтра в сайдбаре
     all_meal_categories = MealCategory.objects.all()
     all_allergens = Allergen.objects.all()
 
     search                   = request.GET.get("search", "").strip()
-    selected_meal_categories = request.GET.getlist("meal_category")  # список key
+    selected_meal_categories = request.GET.getlist("meal_category")
     selected_allergens       = request.GET.getlist("allergen")
-
     cost_min = request.GET.get("cost_min", "")
     cost_max = request.GET.get("cost_max", "")
-    kcal_min     = request.GET.get("kcal_min", "")
-    kcal_max     = request.GET.get("kcal_max", "")
-    protein_min  = request.GET.get("protein_min", "")
-    protein_max  = request.GET.get("protein_max", "")
-    fat_min      = request.GET.get("fat_min", "")
-    fat_max      = request.GET.get("fat_max", "")
-    carbs_min    = request.GET.get("carbs_min", "")
-    carbs_max    = request.GET.get("carbs_max", "")
-    kcal_s_min   = request.GET.get("kcal_s_min", "")
-    kcal_s_max   = request.GET.get("kcal_s_max", "")
+    kcal_min      = request.GET.get("kcal_min", "")
+    kcal_max      = request.GET.get("kcal_max", "")
+    protein_min   = request.GET.get("protein_min", "")
+    protein_max   = request.GET.get("protein_max", "")
+    fat_min       = request.GET.get("fat_min", "")
+    fat_max       = request.GET.get("fat_max", "")
+    carbs_min     = request.GET.get("carbs_min", "")
+    carbs_max     = request.GET.get("carbs_max", "")
+    kcal_s_min    = request.GET.get("kcal_s_min", "")
+    kcal_s_max    = request.GET.get("kcal_s_max", "")
     protein_s_min = request.GET.get("protein_s_min", "")
     protein_s_max = request.GET.get("protein_s_max", "")
-    fat_s_min    = request.GET.get("fat_s_min", "")
-    fat_s_max    = request.GET.get("fat_s_max", "")
-    carbs_s_min  = request.GET.get("carbs_s_min", "")
-    carbs_s_max  = request.GET.get("carbs_s_max", "")
-    packing      = request.GET.get("packing", "").strip()
-    sort_by      = request.GET.get("sort", "name")
-    sort_dir     = request.GET.get("dir", "asc")
+    fat_s_min     = request.GET.get("fat_s_min", "")
+    fat_s_max     = request.GET.get("fat_s_max", "")
+    carbs_s_min   = request.GET.get("carbs_s_min", "")
+    carbs_s_max   = request.GET.get("carbs_s_max", "")
+    packing       = request.GET.get("packing", "").strip()
+    sort_by       = request.GET.get("sort", "name")
+    sort_dir      = request.GET.get("dir", "asc")
 
     if search:
         products = products.filter(Q(name__icontains=search) | Q(composition__icontains=search))
@@ -51,30 +48,28 @@ def product_list(request):
         products = products.filter(allergens__pk__in=selected_allergens).distinct()
     if cost_min: products = products.filter(cost__gte=cost_min)
     if cost_max: products = products.filter(cost__lte=cost_max)
-    if kcal_min:     products = products.filter(kcal_per_100__gte=kcal_min)
-    if kcal_max:     products = products.filter(kcal_per_100__lte=kcal_max)
-    if protein_min:  products = products.filter(protein__gte=protein_min)
-    if protein_max:  products = products.filter(protein__lte=protein_max)
-    if fat_min:      products = products.filter(fat__gte=fat_min)
-    if fat_max:      products = products.filter(fat__lte=fat_max)
-    if carbs_min:    products = products.filter(carbs__gte=carbs_min)
-    if carbs_max:    products = products.filter(carbs__lte=carbs_max)
-    if kcal_s_min:   products = products.filter(kcal_per_serving__gte=kcal_s_min)
-    if kcal_s_max:   products = products.filter(kcal_per_serving__lte=kcal_s_max)
+    if kcal_min:      products = products.filter(kcal_per_100__gte=kcal_min)
+    if kcal_max:      products = products.filter(kcal_per_100__lte=kcal_max)
+    if protein_min:   products = products.filter(protein__gte=protein_min)
+    if protein_max:   products = products.filter(protein__lte=protein_max)
+    if fat_min:       products = products.filter(fat__gte=fat_min)
+    if fat_max:       products = products.filter(fat__lte=fat_max)
+    if carbs_min:     products = products.filter(carbs__gte=carbs_min)
+    if carbs_max:     products = products.filter(carbs__lte=carbs_max)
+    if kcal_s_min:    products = products.filter(kcal_per_serving__gte=kcal_s_min)
+    if kcal_s_max:    products = products.filter(kcal_per_serving__lte=kcal_s_max)
     if protein_s_min: products = products.filter(protein_per_serving__gte=protein_s_min)
     if protein_s_max: products = products.filter(protein_per_serving__lte=protein_s_max)
-    if fat_s_min:    products = products.filter(fat_per_serving__gte=fat_s_min)
-    if fat_s_max:    products = products.filter(fat_per_serving__lte=fat_s_max)
-    if carbs_s_min:  products = products.filter(carbs_per_serving__gte=carbs_s_min)
-    if carbs_s_max:  products = products.filter(carbs_per_serving__lte=carbs_s_max)
+    if fat_s_min:     products = products.filter(fat_per_serving__gte=fat_s_min)
+    if fat_s_max:     products = products.filter(fat_per_serving__lte=fat_s_max)
+    if carbs_s_min:   products = products.filter(carbs_per_serving__gte=carbs_s_min)
+    if carbs_s_max:   products = products.filter(carbs_per_serving__lte=carbs_s_max)
     if packing:
         products = products.filter(packing__icontains=packing)
 
     sort_map = {
-        "name": "name",
-        "net_weight": "net_weight", "cost": "cost",
-        "kcal": "kcal_per_100", "protein": "protein",
-        "fat": "fat", "carbs": "carbs",
+        "name": "name", "net_weight": "net_weight", "cost": "cost",
+        "kcal": "kcal_per_100", "protein": "protein", "fat": "fat", "carbs": "carbs",
         "kcal_s": "kcal_per_serving", "protein_s": "protein_per_serving",
         "fat_s": "fat_per_serving", "carbs_s": "carbs_per_serving",
     }
@@ -92,23 +87,16 @@ def product_list(request):
         Allergen.objects.filter(pk__in=selected_allergens).values_list("name", flat=True)
     ) if selected_allergens else []
 
-    selected_meal_category_names = list(
-        MealCategory.objects.filter(key__in=selected_meal_categories).values_list("key", flat=True)
-    ) if selected_meal_categories else []
-
     return render(request, "myapp/product_list.html", {
-        "products": products,
-        "total": total,
+        "products": products, "total": total,
         "all_meal_categories": all_meal_categories,
-        "all_allergens": all_allergens,
-        "packings": packings,
+        "all_allergens": all_allergens, "packings": packings,
         "selected_meal_categories": selected_meal_categories,
         "selected_allergens": selected_allergens,
         "selected_allergen_names": selected_allergen_names,
         "slot_labels": SLOT_LABELS,
         "filters": {
-            "search": search,
-            "cost_min": cost_min, "cost_max": cost_max,
+            "search": search, "cost_min": cost_min, "cost_max": cost_max,
             "kcal_min": kcal_min, "kcal_max": kcal_max,
             "protein_min": protein_min, "protein_max": protein_max,
             "fat_min": fat_min, "fat_max": fat_max,
@@ -151,18 +139,32 @@ SLOT_COLORS = {
 # ── Группы рационов ───────────────────────────────────────────────────────────
 
 def ration_group_list(request):
-    groups = RationGroup.objects.prefetch_related("rations").all()
+    groups = RationGroup.objects.prefetch_related(
+        "rations__slots__product"
+    ).all()
     groups_data = []
     for g in groups:
         rations = list(g.rations.all())
+        rations_info = []
+        for r in rations:
+            slots = list(r.slots.select_related("product").order_by("order"))
+            total_kcal = sum(
+                float(s.product.kcal_per_serving or 0) for s in slots if s.product
+            )
+            rations_info.append({
+                "ration": r,
+                "slots": slots,
+                "total_kcal": round(total_kcal, 1),
+            })
         groups_data.append({
             "group": g,
-            "rations": rations,
+            "rations_info": rations_info,
             "count": len(rations),
         })
     return render(request, "myapp/ration_group_list.html", {
         "groups_data": groups_data,
         "ration_kcal_choices": Ration._meta.get_field("kcal_category").choices,
+        "slot_icons": SLOT_ICONS,
     })
 
 
@@ -185,38 +187,8 @@ def ration_group_delete(request, group_pk):
 # ── Рационы ───────────────────────────────────────────────────────────────────
 
 def ration_list(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    rations = Ration.objects.filter(group=group).prefetch_related("slots__product")
-
-    kcal_filter = request.GET.get("kcal", "")
-    if kcal_filter:
-        rations = rations.filter(kcal_category=kcal_filter)
-
-    rations_data = []
-    for r in rations:
-        slots = list(r.slots.select_related("product").all())
-        total_kcal    = sum(float(s.product.kcal_per_serving or 0) for s in slots if s.product)
-        total_protein = sum(float(s.product.protein_per_serving or 0) for s in slots if s.product)
-        total_fat     = sum(float(s.product.fat_per_serving or 0) for s in slots if s.product)
-        total_carbs   = sum(float(s.product.carbs_per_serving or 0) for s in slots if s.product)
-        rations_data.append({
-            "ration": r,
-            "slots": slots,
-            "total_kcal": round(total_kcal, 1),
-            "total_protein": round(total_protein, 1),
-            "total_fat": round(total_fat, 1),
-            "total_carbs": round(total_carbs, 1),
-            "slots_count": len(slots),
-            "filled_count": sum(1 for s in slots if s.product),
-        })
-
-    return render(request, "myapp/ration_list.html", {
-        "group": group,
-        "rations_data": rations_data,
-        "kcal_categories": Ration._meta.get_field("kcal_category").choices,
-        "kcal_filter": kcal_filter,
-        "slot_icons": SLOT_ICONS,
-    })
+    """Оставлен для совместимости с urls.py."""
+    return redirect("ration_group_list")
 
 
 def ration_create(request, group_pk):
@@ -233,7 +205,7 @@ def ration_create(request, group_pk):
                 notes=notes or None,
             )
             return redirect("ration_edit", pk=ration.pk)
-    return redirect("ration_list", group_pk=group_pk)
+    return redirect("ration_group_list")
 
 
 def ration_edit(request, pk):
@@ -273,7 +245,7 @@ def ration_edit(request, pk):
 
         return redirect("ration_edit", pk=pk)
 
-    # GET
+    # GET — собрать слоты
     slots = list(ration.slots.select_related("product").order_by("order", "id"))
     slots_with_meta = []
     total_kcal = total_protein = total_fat = total_carbs = 0
@@ -284,8 +256,10 @@ def ration_edit(request, pk):
         protein = float(p.protein_per_serving or 0) if p else 0
         fat     = float(p.fat_per_serving or 0) if p else 0
         carbs   = float(p.carbs_per_serving or 0) if p else 0
-        total_kcal += kcal; total_protein += protein
-        total_fat  += fat;  total_carbs   += carbs
+        total_kcal    += kcal
+        total_protein += protein
+        total_fat     += fat
+        total_carbs   += carbs
         slots_with_meta.append({
             "slot": slot,
             "label": SLOT_LABELS.get(slot.slot_type, slot.slot_type),
@@ -297,10 +271,26 @@ def ration_edit(request, pk):
             "carbs": round(carbs, 1),
         })
 
-    # Продукты по категории блюда для пикера
+    # ID продуктов занятых в ДРУГИХ рационах этой группы
+    occupied_ids = set()
+    if ration.group_id:
+        occupied_ids = set(
+            RationSlot.objects.filter(
+                ration__group_id=ration.group_id,
+                product__isnull=False,
+            ).exclude(ration=ration)
+            .values_list("product_id", flat=True)
+        )
+
+    # Продукты по категории — исключаем занятые в других рационах группы
     meal_cat_map = {}
     for key, _ in SLOT_TYPES:
-        prods = list(Product.objects.filter(meal_categories__key=key).order_by("name"))
+        prods = list(
+            Product.objects
+            .filter(meal_categories__key=key)
+            .exclude(pk__in=occupied_ids)
+            .order_by("name")
+        )
         meal_cat_map[key] = [
             {
                 "id": p.pk, "name": p.name,
@@ -314,7 +304,13 @@ def ration_edit(request, pk):
             for p in prods
         ]
 
-    all_products = list(Product.objects.prefetch_related("meal_categories").order_by("name"))
+    # Все продукты — тоже без занятых (для вкладки "Все блюда")
+    all_products = list(
+        Product.objects
+        .prefetch_related("meal_categories")
+        .exclude(pk__in=occupied_ids)
+        .order_by("name")
+    )
     all_products_json = [
         {
             "id": p.pk, "name": p.name,
@@ -342,12 +338,12 @@ def ration_edit(request, pk):
         "kcal_categories": Ration._meta.get_field("kcal_category").choices,
         "meal_cat_map_json": json.dumps(meal_cat_map, ensure_ascii=False),
         "all_products_json": json.dumps(all_products_json, ensure_ascii=False),
+        "occupied_count": len(occupied_ids),
     })
 
 
 def ration_delete(request, pk):
     ration = get_object_or_404(Ration, pk=pk)
-    group_pk = ration.group_id
     if request.method == "POST":
         ration.delete()
-    return redirect("ration_group_list" if not group_pk else "ration_list", group_pk=group_pk)
+    return redirect("ration_group_list")
