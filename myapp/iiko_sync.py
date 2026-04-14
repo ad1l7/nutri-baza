@@ -107,6 +107,7 @@ class IikoCloudClient:
 
 class IikoServerClient:
     def __init__(self, server_url: str, login: str, password: str):
+        
         # server_url например "http://localhost:8080"
         self.base = server_url.rstrip("/")
         self.login = login
@@ -115,7 +116,7 @@ class IikoServerClient:
 
     def _get_token(self) -> str:
         resp = requests.get(
-            f"{self.base}/resto/api/v2/auth/login",
+            f"{self.base}/api/auth",
             params={"login": self.login, "pass": self.password},
             timeout=20,
         )
@@ -135,7 +136,7 @@ class IikoServerClient:
         if self._token:
             try:
                 requests.get(
-                    f"{self.base}/resto/api/v2/auth/logout",
+                    f"{self.base}/api/auth/logout",
                     params={"key": self._token},
                     timeout=10,
                 )
@@ -145,7 +146,7 @@ class IikoServerClient:
     def get_products(self) -> list:
         """Список всей номенклатуры (блюда, заготовки и т.д.)."""
         resp = requests.get(
-            f"{self.base}/resto/api/v2/entities/products/list",
+            f"{self.base}/api/v2/entities/products/list",
             params=self._params({"includeDeleted": "false"}),
             timeout=60,
         )
@@ -157,7 +158,7 @@ class IikoServerClient:
         today = date.today().isoformat()
         try:
             resp = requests.get(
-                f"{self.base}/resto/api/v2/assemblyCharts/getAssembled",
+                f"{self.base}/api/v2/assemblyCharts/getAssembled",
                 params=self._params({"productId": product_id, "date": today}),
                 timeout=20,
             )
@@ -282,27 +283,35 @@ def sync_products_from_iiko(
     logger.info(f"iikoCloud: найдено {len(cloud_items)} блюд в меню {external_menu_id}")
 
     # ── 2. Получаем данные из iiko Server (состав) ────────────────────────────
+    # ── 2. Получаем данные из iiko Server (состав = description) ────────────
     server_data = {}
     if server_url and server_login:
         try:
+            import json as _json
             server = IikoServerClient(server_url, server_login, server_password)
             server_products = server.get_products()
-            names_map = {sp.get("id"): sp.get("name", "") for sp in server_products}
 
             menu_ids = {item["id"] for item in cloud_items}
-            for pid in menu_ids:
-                chart = server.get_assembly_chart(pid)
-                if not chart:
+            for sp in server_products:
+                pid  = sp.get("id") or ""
+                desc = sp.get("description") or ""
+                if pid not in menu_ids or not desc:
                     continue
-                parts = []
-                for ing in chart.get("items") or []:
-                    ing_id = ing.get("productId") or ""
-                    amount_out = ing.get("amountOut") or ing.get("amount") or 0
-                    ing_name = names_map.get(ing_id, "")
-                    if ing_name and amount_out:
-                        parts.append(f"{ing_name} — {float(amount_out)*1000:.0f}г")
-                if parts:
-                    server_data[pid] = {"composition": ", ".join(parts)}
+                # description может прийти как JSON-строка — парсим до plain text
+                if isinstance(desc, str):
+                    try:
+                        desc = _json.loads(desc)
+                    except Exception:
+                        pass
+                if isinstance(desc, list):
+                    # формат [{"text": "..."}, ...]
+                    desc = " ".join(
+                        block.get("text", "") if isinstance(block, dict) else str(block)
+                        for block in desc
+                    ).strip()
+                if desc:
+                    server_data[pid] = {"composition": str(desc).strip()}
+
             server.logout()
         except Exception as e:
             logger.warning(f"iiko Server недоступен: {e}")
