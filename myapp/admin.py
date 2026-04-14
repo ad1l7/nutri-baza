@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Product, Allergen, MealCategory, RationGroup, Ration, RationSlot
+from .models import (
+    Product, Allergen, MealCategory,
+    RationGroup, Ration, RationSlot,
+    RationTemplate, RationTemplateSlot,
+)
 
 
 @admin.register(Allergen)
@@ -36,10 +40,38 @@ class ProductAdmin(admin.ModelAdmin):
     get_categories.short_description = "Категории"
 
 
+# ── Шаблоны рационов ─────────────────────────────────────────────────────────
+
+class RationTemplateSlotInline(admin.TabularInline):
+    model = RationTemplateSlot
+    extra = 1
+    fields = ["order", "slot_type"]
+    ordering = ["order"]
+
+
+@admin.register(RationTemplate)
+class RationTemplateAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "kcal_category", "get_slots_count", "updated_at"]
+    inlines = [RationTemplateSlotInline]
+    readonly_fields = ["updated_at"]
+
+    def get_slots_count(self, obj):
+        return obj.slots.count()
+    get_slots_count.short_description = "Слотов"
+
+    def has_add_permission(self, request):
+        # Шаблоны создаются только для фиксированных калорийностей — запрещаем добавление лишних
+        from .models import KCAL_CATEGORIES
+        existing = RationTemplate.objects.count()
+        return existing < len(KCAL_CATEGORIES)
+
+
+# ── Группы и рационы ─────────────────────────────────────────────────────────
+
 class RationInline(admin.TabularInline):
     model = Ration
     extra = 0
-    fields = ["name", "date", "kcal_category"]
+    fields = ["name", "kcal_category"]
     show_change_link = True
 
 
@@ -62,7 +94,7 @@ class RationSlotInline(admin.TabularInline):
 
 @admin.register(Ration)
 class RationAdmin(admin.ModelAdmin):
-    list_display = ["name", "group", "date", "kcal_category"]
+    list_display = ["name", "group", "kcal_category"]
     list_filter = ["group", "kcal_category"]
     search_fields = ["name"]
     inlines = [RationSlotInline]

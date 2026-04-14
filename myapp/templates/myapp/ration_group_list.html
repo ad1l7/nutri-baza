@@ -19,7 +19,6 @@
   *{box-sizing:border-box;margin:0;padding:0;}
   body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
 
-  /* TOP BAR */
   .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
   .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
   .logo-text em{color:var(--green);font-style:normal;}
@@ -31,15 +30,12 @@
   .create-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .2s;box-shadow:0 2px 8px rgba(90,170,60,.3);}
   .create-btn:hover{background:var(--green-mid);}
 
-  /* MAIN */
   .main{max-width:960px;margin:0 auto;padding:32px 22px;}
   .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
   .page-sub{font-size:14px;color:var(--muted);margin-bottom:28px;}
   .groups-list{display:flex;flex-direction:column;gap:20px;}
 
-  /* Карточка группы */
   .group-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
-
   .group-header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--green-dark);}
   .group-icon{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
   .group-info{flex:1;min-width:0;}
@@ -49,31 +45,24 @@
   .grp-del-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
   .grp-del-btn:hover{background:rgba(214,75,42,.65);}
 
-  /* Список рационов внутри группы */
   .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
 
-  /* Строка рациона */
   .ration-item{border:1.5px solid var(--border-soft);border-radius:10px;overflow:hidden;background:var(--off-white);}
-
   .ration-row{display:flex;align-items:center;gap:10px;padding:10px 12px;}
   .ration-kcal{font-size:10px;font-weight:800;color:var(--green-mid);text-transform:uppercase;letter-spacing:.7px;background:var(--light);border:1.5px solid var(--green-light);border-radius:20px;padding:2px 9px;flex-shrink:0;}
   .ration-name{font-size:13px;font-weight:700;color:var(--text);flex:1;}
-  .ration-date{font-size:11px;color:var(--muted);font-weight:500;flex-shrink:0;}
   .ration-dish-count{font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0;}
 
-  /* Кнопки действий рациона */
   .ration-btns{display:flex;gap:4px;flex-shrink:0;}
   .r-btn{background:transparent;border:1.5px solid var(--border);border-radius:7px;width:26px;height:26px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s;text-decoration:none;color:var(--muted);}
   .r-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
   .r-btn.del:hover{border-color:var(--danger);color:var(--danger);background:rgba(214,75,42,.05);}
 
-  /* Кнопка-аккордеон */
   .accordion-btn{background:transparent;border:none;cursor:pointer;padding:4px 6px;color:var(--muted);font-size:11px;display:flex;align-items:center;gap:3px;font-family:var(--font);font-weight:600;transition:color .15s;flex-shrink:0;}
   .accordion-btn:hover{color:var(--green-mid);}
   .accordion-arrow{display:inline-block;transition:transform .25s;}
   .ration-item.open .accordion-arrow{transform:rotate(180deg);}
 
-  /* Превью блюд */
   .ration-preview{display:none;border-top:1px solid var(--border-soft);padding:10px 12px;background:var(--white);}
   .ration-item.open .ration-preview{display:block;}
 
@@ -90,11 +79,9 @@
   .pt-val{font-size:12px;color:var(--text-mid);font-weight:600;}
   .pt-val strong{color:var(--green-mid);font-weight:800;}
 
-  /* Кнопка добавить рацион */
   .add-ration-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-radius:9px;border:2px dashed var(--border);background:transparent;color:var(--muted);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;width:100%;margin-top:2px;}
   .add-ration-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
 
-  /* Пустое */
   .empty-state{text-align:center;padding:80px 20px;color:var(--muted);}
   .empty-state .icon{font-size:52px;margin-bottom:16px;}
   .empty-state h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;}
@@ -124,7 +111,11 @@
   .ko.sel{border-color:var(--green);background:var(--light);color:var(--green-mid);}
   .ko input{display:none;}
 
-  /* Модал удаления */
+  /* Превью слотов шаблона при выборе ккал */
+  .tmpl-preview{margin-top:10px;padding:10px 12px;background:var(--light);border-radius:9px;border:1.5px solid var(--green-light);display:none;}
+  .tmpl-preview-title{font-size:10px;font-weight:700;color:var(--green-mid);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
+  .tmpl-slot-pill{display:inline-block;background:var(--white);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--text-mid);margin:2px;}
+
   .del-modal{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:300;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;}
   .del-modal.open{display:flex;}
   .del-box{background:var(--white);border-radius:16px;padding:26px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow-md);}
@@ -157,15 +148,13 @@
 
 <div class="main">
   <div class="page-title">Рационы</div>
-  <div class="page-sub">Создавайте группы и добавляйте рационы с разбивкой по приёмам пищи</div>
+  <div class="page-sub">Создавайте группы и добавляйте рационы. Слоты подставляются автоматически из шаблона.</div>
 
   {% if groups_data %}
   <div class="groups-list">
     {% for gd in groups_data %}
     {% with g=gd.group %}
     <div class="group-card">
-
-      <!-- Заголовок группы -->
       <div class="group-header">
         <div class="group-icon">📋</div>
         <div class="group-info">
@@ -176,32 +165,23 @@
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 
-      <!-- Рационы -->
       <div class="rations-list">
         {% for ri in gd.rations_info %}
         {% with r=ri.ration %}
         <div class="ration-item" id="ri-{{ r.pk }}">
-
-          <!-- Строка рациона -->
           <div class="ration-row">
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
-            <span class="ration-date">{{ r.date|date:"d.m.Y" }}</span>
             <span class="ration-dish-count">{{ ri.slots|length }} блюд</span>
-
-            <!-- Аккордеон — список блюд -->
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
             </button>
-
-            <!-- Действия -->
             <div class="ration-btns">
               <a href="{% url 'ration_edit' r.pk %}" class="r-btn" title="Редактировать">✏️</a>
               <button class="r-btn del" onclick="confirmDel('ration', {{ r.pk }}, '{{ r.name|escapejs }}')" title="Удалить рацион">🗑️</button>
             </div>
           </div>
 
-          <!-- Превью блюд (скрыт по умолчанию) -->
           <div class="ration-preview">
             {% if ri.slots %}
             <div class="preview-slots">
@@ -230,12 +210,10 @@
             <div style="text-align:center;color:var(--muted);font-size:13px;padding:10px 0;">Блюда ещё не добавлены</div>
             {% endif %}
           </div>
-
         </div>
         {% endwith %}
         {% endfor %}
 
-        <!-- Добавить рацион -->
         <button class="add-ration-btn" onclick="openRationModal({{ g.pk }})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -243,7 +221,6 @@
           Добавить рацион
         </button>
       </div>
-
     </div>
     {% endwith %}
     {% endfor %}
@@ -264,7 +241,7 @@
   {% endif %}
 </div>
 
-<!-- МОДАЛ: создать группу -->
+<!-- МОДАЛ: создать группу (без даты) -->
 <div class="mo" id="group-modal" onclick="if(event.target===this)closeGroupModal()">
   <div class="mbox">
     <div class="mhead">
@@ -283,19 +260,18 @@
   </div>
 </div>
 
-<!-- МОДАЛ: создать рацион -->
+<!-- МОДАЛ: создать рацион (без даты, с превью шаблона) -->
 <div class="mo" id="ration-modal" onclick="if(event.target===this)closeRationModal()">
   <div class="mbox">
     <div class="mhead">
       <button class="mcl" onclick="closeRationModal()">✕</button>
       <div class="mht">Новый рацион</div>
-      <div class="mhs">Заполните параметры рациона</div>
+      <div class="mhs">Слоты добавятся автоматически из шаблона</div>
     </div>
     <form method="post" id="ration-form">
       {% csrf_token %}
       <div class="mbody">
-        <div class="ff"><label class="fl">Название</label><input class="fi" type="text" name="name" placeholder="Понедельник" required></div>
-        <div class="ff"><label class="fl">Дата</label><input class="fi" type="date" name="date" id="ration-date" required></div>
+        <div class="ff"><label class="fl">Название рациона</label><input class="fi" type="text" name="name" placeholder="Понедельник" required></div>
         <div class="ff">
           <label class="fl">Категория калорийности</label>
           <div class="kcal-grid">
@@ -306,6 +282,11 @@
             </label>
             {% endfor %}
           </div>
+          <!-- Превью шаблона -->
+          <div class="tmpl-preview" id="tmpl-preview">
+            <div class="tmpl-preview-title">📐 Слоты из шаблона:</div>
+            <div id="tmpl-preview-slots"></div>
+          </div>
         </div>
         <button type="submit" class="fsub">Создать и открыть редактор →</button>
       </div>
@@ -313,7 +294,7 @@
   </div>
 </div>
 
-<!-- МОДАЛ: подтверждение удаления (группы или рациона) -->
+<!-- МОДАЛ: удаление -->
 <div class="del-modal" id="del-modal">
   <div class="del-box">
     <h3 id="del-title">Удалить?</h3>
@@ -329,46 +310,59 @@
 </div>
 
 <script>
-  document.getElementById('ration-date').valueAsDate = new Date();
+const TMPL_DATA = {{ tmpl_data_json|safe }};
+const SLOT_ICONS = {'breakfast_250':'🌅','breakfast_400':'🌅','second_400':'🍽️','second_500':'🍽️','soup_200':'🥣','soup_300':'🥣','salad_150':'🥗','salad_250':'🥗','dessert_100':'🍰','dessert_300':'🍰','smoothie':'🥤','sandwich':'🥪'};
+const SLOT_LABELS = {{ slot_labels_json|safe }};
 
-  // Аккордеон
-  function toggleAccordion(pk) {
-    document.getElementById('ri-' + pk).classList.toggle('open');
+function toggleAccordion(pk) {
+  document.getElementById('ri-' + pk).classList.toggle('open');
+}
+
+function openGroupModal() { document.getElementById('group-modal').classList.add('open'); }
+function closeGroupModal() { document.getElementById('group-modal').classList.remove('open'); }
+
+function openRationModal(groupPk) {
+  document.getElementById('ration-form').action = '/rations/group/' + groupPk + '/create/';
+  document.getElementById('ration-modal').classList.add('open');
+}
+function closeRationModal() { document.getElementById('ration-modal').classList.remove('open'); }
+
+function selKcal(val) {
+  document.querySelectorAll('.ko').forEach(el => el.classList.remove('sel'));
+  document.getElementById('ko-' + val).classList.add('sel');
+  showTmplPreview(val);
+}
+
+function showTmplPreview(kcal) {
+  const preview = document.getElementById('tmpl-preview');
+  const slotsEl = document.getElementById('tmpl-preview-slots');
+  const data = TMPL_DATA[kcal] || [];
+  if (data.length === 0) {
+    preview.style.display = 'none';
+    return;
   }
+  preview.style.display = 'block';
+  slotsEl.innerHTML = data.map(st =>
+    `<span class="tmpl-slot-pill">${SLOT_ICONS[st] || '🍴'} ${SLOT_LABELS[st] || st}</span>`
+  ).join('');
+}
 
-  // Группа
-  function openGroupModal() { document.getElementById('group-modal').classList.add('open'); }
-  function closeGroupModal() { document.getElementById('group-modal').classList.remove('open'); }
+function confirmDel(type, pk, name) {
+  const isGroup = type === 'group';
+  document.getElementById('del-title').textContent = isGroup ? 'Удалить группу?' : 'Удалить рацион?';
+  document.getElementById('del-text').textContent = isGroup
+    ? '«' + name + '» и все рационы внутри будут удалены.'
+    : '«' + name + '» будет удалён. Это нельзя отменить.';
+  document.getElementById('del-form').action = isGroup
+    ? '/rations/group/' + pk + '/delete/'
+    : '/rations/' + pk + '/delete/';
+  document.getElementById('del-modal').classList.add('open');
+}
+function closeDel() { document.getElementById('del-modal').classList.remove('open'); }
 
-  // Рацион
-  function openRationModal(groupPk) {
-    document.getElementById('ration-form').action = '/rations/group/' + groupPk + '/create/';
-    document.getElementById('ration-modal').classList.add('open');
-  }
-  function closeRationModal() { document.getElementById('ration-modal').classList.remove('open'); }
-
-  function selKcal(val) {
-    document.querySelectorAll('.ko').forEach(el => el.classList.remove('sel'));
-    document.getElementById('ko-' + val).classList.add('sel');
-  }
-
-  // Универсальный модал удаления
-  function confirmDel(type, pk, name) {
-    const isGroup = type === 'group';
-    document.getElementById('del-title').textContent = isGroup ? 'Удалить группу?' : 'Удалить рацион?';
-    document.getElementById('del-text').textContent = isGroup
-      ? '«' + name + '» и все рационы внутри будут удалены.'
-      : '«' + name + '» будет удалён. Это нельзя отменить.';
-    document.getElementById('del-form').action = isGroup
-      ? '/rations/group/' + pk + '/delete/'
-      : '/rations/' + pk + '/delete/';
-    document.getElementById('del-modal').classList.add('open');
-  }
-  function closeDel() { document.getElementById('del-modal').classList.remove('open'); }
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeGroupModal(); closeRationModal(); closeDel(); }
-  });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeGroupModal(); closeRationModal(); closeDel(); }
+});
 </script>
 </body>
 </html>

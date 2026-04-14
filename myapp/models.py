@@ -33,11 +33,8 @@ SLOT_LABELS = dict(SLOT_TYPES)
 
 
 class MealCategory(models.Model):
-    """Единая категория блюда — используется и в каталоге, и в рационах."""
     key = models.CharField(
-        max_length=50, unique=True,
-        choices=SLOT_TYPES,
-        verbose_name="Категория"
+        max_length=50, unique=True, choices=SLOT_TYPES, verbose_name="Категория"
     )
 
     class Meta:
@@ -50,46 +47,34 @@ class MealCategory(models.Model):
 
 
 class Product(models.Model):
-    # category убран — вместо него meal_categories
+    # Основные поля
     name = models.CharField(max_length=300, verbose_name="Наименование")
-    photo = models.ImageField(
-        upload_to="products/", null=True, blank=True, verbose_name="Фото"
-    )
-    cost = models.DecimalField(
-        max_digits=10, decimal_places=2, null=True, blank=True,
-        verbose_name="Себестоимость ФЗ"
-    )
-    net_weight = models.DecimalField(
-        max_digits=12, decimal_places=3, null=True, blank=True,
-        verbose_name="Масса нетто (одной ед., г)"
-    )
-    packing = models.CharField(
-        max_length=100, null=True, blank=True,
-        verbose_name="Кратность / Фасовка"
-    )
+    photo = models.ImageField(upload_to="products/", null=True, blank=True, verbose_name="Фото")
+    cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Себестоимость ФЗ")
+    net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
+    packing = models.CharField(max_length=100, null=True, blank=True, verbose_name="Кратность / Фасовка")
     composition = models.TextField(null=True, blank=True, verbose_name="Состав")
-    allergens = models.ManyToManyField(
-        Allergen, blank=True, verbose_name="Аллергены"
-    )
-    meal_categories = models.ManyToManyField(
-        MealCategory, blank=True,
-        verbose_name="Категории блюда",
-        help_text="К каким приёмам пищи относится это блюдо"
-    )
+    allergens = models.ManyToManyField(Allergen, blank=True, verbose_name="Аллергены")
+    meal_categories = models.ManyToManyField(MealCategory, blank=True, verbose_name="Категории блюда")
 
-    # На 100г
+    # КБЖУ на 100г
     protein = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Белки")
     fat = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Жиры")
     carbs = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Углеводы")
     kcal_per_100 = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Ккал на 100г")
     kj_per_100 = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="КДж на 100г")
 
-    # На 1 порцию
+    # КБЖУ на порцию
     protein_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Белки на 1 порц.")
     fat_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Жиры на 1 порц.")
     carbs_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Углеводы на 1 порц.")
     kcal_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Ккал на 1 порц.")
     kj_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="КДж на 1 порц.")
+
+    # iiko интеграция
+    iiko_id = models.CharField(max_length=50, null=True, blank=True, unique=True, verbose_name="iiko UUID")
+    iiko_category = models.CharField(max_length=300, null=True, blank=True, verbose_name="Категория iiko")
+    iiko_synced_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя синхронизация")
 
     class Meta:
         verbose_name = "Продукт"
@@ -97,16 +82,53 @@ class Product(models.Model):
         ordering = ["name"]
 
     def __str__(self):
-        cats = ", ".join(str(c) for c in self.meal_categories.all())
-        return f"{self.name}" + (f" ({cats})" if cats else "")
-
-    def category_display(self):
-        """Первая категория для отображения в таблице."""
-        first = self.meal_categories.first()
-        return str(first) if first else "—"
+        return self.name
 
 
-# ── Группы рационов ──────────────────────────────────────
+# ── Шаблоны рационов ─────────────────────────────────────────────────────────
+
+KCAL_CATEGORIES = [
+    (1200, '1200 ккал'),
+    (1500, '1500 ккал'),
+    (1800, '1800 ккал'),
+    (2500, '2500 ккал'),
+]
+
+
+class RationTemplate(models.Model):
+    kcal_category = models.IntegerField(
+        choices=KCAL_CATEGORIES, unique=True,
+        verbose_name="Категория калорийности"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Шаблон рациона"
+        verbose_name_plural = "Шаблоны рационов"
+        ordering = ["kcal_category"]
+
+    def __str__(self):
+        return f"Шаблон {self.kcal_category} ккал"
+
+
+class RationTemplateSlot(models.Model):
+    template = models.ForeignKey(
+        RationTemplate, on_delete=models.CASCADE,
+        related_name="slots", verbose_name="Шаблон"
+    )
+    slot_type = models.CharField(max_length=50, choices=SLOT_TYPES, verbose_name="Тип слота")
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Слот шаблона"
+        verbose_name_plural = "Слоты шаблона"
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.template} / {self.get_slot_type_display()}"
+
+
+# ── Группы рационов ──────────────────────────────────────────────────────────
 
 class RationGroup(models.Model):
     name = models.CharField(max_length=300, verbose_name="Название группы")
@@ -122,27 +144,16 @@ class RationGroup(models.Model):
         return self.name
 
 
-# ── Рационы ──────────────────────────────────────────────
-
-KCAL_CATEGORIES = [
-    (1200, '1200 ккал'),
-    (1500, '1500 ккал'),
-    (1800, '1800 ккал'),
-    (2500, '2500 ккал'),
-]
-
+# ── Рационы ──────────────────────────────────────────────────────────────────
 
 class Ration(models.Model):
     group = models.ForeignKey(
         RationGroup, on_delete=models.CASCADE,
         related_name="rations", verbose_name="Группа",
-        null=True, blank=True,  # nullable чтобы старые записи не сломались
+        null=True, blank=True,
     )
     name = models.CharField(max_length=300, verbose_name="Название рациона")
-    date = models.DateField(verbose_name="Дата")
-    kcal_category = models.IntegerField(
-        choices=KCAL_CATEGORIES, verbose_name="Категория калорийности"
-    )
+    kcal_category = models.IntegerField(choices=KCAL_CATEGORIES, verbose_name="Категория калорийности")
     notes = models.TextField(blank=True, null=True, verbose_name="Примечания")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -150,10 +161,10 @@ class Ration(models.Model):
     class Meta:
         verbose_name = "Рацион"
         verbose_name_plural = "Рационы"
-        ordering = ["-date", "-created_at"]
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.name} ({self.date})"
+        return self.name
 
 
 class RationSlot(models.Model):
@@ -161,10 +172,7 @@ class RationSlot(models.Model):
         Ration, on_delete=models.CASCADE,
         related_name="slots", verbose_name="Рацион"
     )
-    slot_type = models.CharField(
-        max_length=50, choices=SLOT_TYPES,
-        verbose_name="Категория блюда"
-    )
+    slot_type = models.CharField(max_length=50, choices=SLOT_TYPES, verbose_name="Категория блюда")
     product = models.ForeignKey(
         Product, on_delete=models.SET_NULL,
         null=True, blank=True,

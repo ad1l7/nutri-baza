@@ -357,6 +357,36 @@
   .nutr-val { font-weight: 700; }
   .nutr-val.green { color: var(--green-mid); }
   .nutr-val.amber { color: var(--amber); }
+  .iiko-sync-btn {
+  background: var(--white); border: 1.5px solid var(--border);
+  color: var(--text-mid); border-radius: 9px; padding: 8px 14px;
+  font-family: var(--font); font-size: 13px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: all .2s; white-space: nowrap; flex-shrink: 0;
+}
+.iiko-sync-btn:hover { border-color: var(--green); color: var(--green-mid); background: var(--light); }
+.iiko-sync-btn.loading {
+  opacity: .7; cursor: not-allowed; pointer-events: none;
+  border-color: var(--green-light);
+}
+.iiko-sync-btn.loading svg { animation: spin .8s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+ 
+.iiko-toast {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--green-dark); color: #fff;
+  padding: 12px 22px; border-radius: 12px;
+  font-size: 13px; font-weight: 700; font-family: var(--font);
+  box-shadow: 0 4px 24px rgba(30,77,20,.25);
+  opacity: 0; pointer-events: none;
+  transition: all .3s ease; z-index: 9999; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+}
+.iiko-toast.show {
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+.iiko-toast.error { background: var(--danger); }
+.iiko-toast.warn { background: var(--amber); }
 </style>
 </head>
 <body>
@@ -384,6 +414,17 @@
     </svg>
     Фильтры
   </button>
+  <button type="button" id="iiko-sync-btn" class="iiko-sync-btn" onclick="runIikoSync()">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+    <polyline points="23 4 23 10 17 10"/>
+    <polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </svg>
+  <span id="iiko-sync-label">Обновить из iiko</span>
+</button>
+ 
+<!-- Тост-уведомление -->
+<div id="iiko-toast" class="iiko-toast"></div>
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
   <a href="?" class="reset-btn">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -688,6 +729,59 @@
 </div>
 
 <script>
+  function runIikoSync() {
+  const btn = document.getElementById('iiko-sync-btn');
+  const label = document.getElementById('iiko-sync-label');
+  btn.classList.add('loading');
+  label.textContent = 'Синхронизация…';
+ 
+  fetch('/iiko/sync/', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCsrfToken(),
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.classList.remove('loading');
+    label.textContent = 'Обновить из iiko';
+ 
+    const toast = document.getElementById('iiko-toast');
+    toast.className = 'iiko-toast ' + (data.ok ? '' : 'error');
+ 
+    if (data.ok) {
+      toast.innerHTML = '✅ ' + data.message;
+    } else {
+      const firstErr = data.detail?.errors?.[0] || data.message;
+      toast.innerHTML = '❌ ' + firstErr;
+    }
+ 
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 4000);
+ 
+    // Если были созданы/обновлены продукты — перезагрузить страницу
+    if (data.ok && (data.detail?.created > 0 || data.detail?.updated > 0)) {
+      setTimeout(() => window.location.reload(), 1500);
+    }
+  })
+  .catch(err => {
+    btn.classList.remove('loading');
+    label.textContent = 'Обновить из iiko';
+    const toast = document.getElementById('iiko-toast');
+    toast.className = 'iiko-toast error';
+    toast.innerHTML = '❌ Ошибка соединения';
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 4000);
+  });
+}
+ 
+function getCsrfToken() {
+  return document.cookie.split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith('csrftoken='))
+    ?.split('=')[1] || '';
+}
 const PD = {
   {% for p in products %}
   {{ p.pk }}: {

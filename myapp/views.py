@@ -1,11 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 import json
-
+from django.conf import settings
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.admin.views.decorators import staff_member_required
 from .models import (
     Product, Allergen, MealCategory,
     RationGroup, Ration, RationSlot,
-    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS,
+    RationTemplate, RationTemplateSlot,
+    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
 )
 
 # ── Каталог продуктов ─────────────────────────────────────────────────────────
@@ -136,12 +140,14 @@ SLOT_COLORS = {
 }
 
 
+# ── Шаблоны рационов ──────────────────────────────────────────────────────────
+
+
+
 # ── Группы рационов ───────────────────────────────────────────────────────────
 
 def ration_group_list(request):
-    groups = RationGroup.objects.prefetch_related(
-        "rations__slots__product"
-    ).all()
+    groups = RationGroup.objects.prefetch_related("rations__slots__product").all()
     groups_data = []
     for g in groups:
         rations = list(g.rations.all())
@@ -161,10 +167,21 @@ def ration_group_list(request):
             "rations_info": rations_info,
             "count": len(rations),
         })
+    # Данные шаблонов для превью в модале создания рациона
+    tmpl_data = {}
+    for kcal, _ in KCAL_CATEGORIES:
+        try:
+            tmpl = RationTemplate.objects.prefetch_related("slots").get(kcal_category=kcal)
+            tmpl_data[kcal] = [s.slot_type for s in tmpl.slots.order_by("order")]
+        except RationTemplate.DoesNotExist:
+            tmpl_data[kcal] = []
+
     return render(request, "myapp/ration_group_list.html", {
         "groups_data": groups_data,
-        "ration_kcal_choices": Ration._meta.get_field("kcal_category").choices,
+        "ration_kcal_choices": KCAL_CATEGORIES,
         "slot_icons": SLOT_ICONS,
+        "tmpl_data_json": json.dumps(tmpl_data, ensure_ascii=False),
+        "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
     })
 
 
@@ -187,7 +204,6 @@ def ration_group_delete(request, group_pk):
 # ── Рационы ───────────────────────────────────────────────────────────────────
 
 def ration_list(request, group_pk):
-    """Оставлен для совместимости с urls.py."""
     return redirect("ration_group_list")
 
 
@@ -195,15 +211,25 @@ def ration_create(request, group_pk):
     group = get_object_or_404(RationGroup, pk=group_pk)
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        date = request.POST.get("date", "")
         kcal_category = request.POST.get("kcal_category", "")
         notes = request.POST.get("notes", "").strip()
-        if name and date and kcal_category:
+        if name and kcal_category:
             ration = Ration.objects.create(
-                group=group, name=name, date=date,
+                group=group, name=name,
                 kcal_category=int(kcal_category),
                 notes=notes or None,
             )
+            # Автоматически добавить слоты из шаблона
+            try:
+                tmpl = RationTemplate.objects.get(kcal_category=int(kcal_category))
+                for tslot in tmpl.slots.order_by("order"):
+                    RationSlot.objects.create(
+                        ration=ration,
+                        slot_type=tslot.slot_type,
+                        order=tslot.order,
+                    )
+            except RationTemplate.DoesNotExist:
+                pass
             return redirect("ration_edit", pk=ration.pk)
     return redirect("ration_group_list")
 
@@ -216,18 +242,11 @@ def ration_edit(request, pk):
 
         if action == "update_meta":
             ration.name = request.POST.get("name", ration.name).strip()
-            ration.date = request.POST.get("date", str(ration.date))
             ration.kcal_category = int(request.POST.get("kcal_category", ration.kcal_category))
             ration.notes = request.POST.get("notes", "").strip() or None
             ration.save()
 
-        elif action == "add_slot":
-            slot_type = request.POST.get("slot_type", "")
-            if slot_type:
-                RationSlot.objects.create(
-                    ration=ration, slot_type=slot_type,
-                    order=SLOT_ORDER.get(slot_type, 99),
-                )
+        
 
         elif action == "update_slot":
             slot_id = request.POST.get("slot_id")
@@ -239,13 +258,10 @@ def ration_edit(request, pk):
             except RationSlot.DoesNotExist:
                 pass
 
-        elif action == "delete_slot":
-            slot_id = request.POST.get("slot_id")
-            RationSlot.objects.filter(pk=slot_id, ration=ration).delete()
 
         return redirect("ration_edit", pk=pk)
 
-    # GET — собрать слоты
+    # GET
     slots = list(ration.slots.select_related("product").order_by("order", "id"))
     slots_with_meta = []
     total_kcal = total_protein = total_fat = total_carbs = 0
@@ -271,7 +287,7 @@ def ration_edit(request, pk):
             "carbs": round(carbs, 1),
         })
 
-    # ID продуктов занятых в ДРУГИХ рационах этой группы
+    # Занятые продукты в других рационах группы
     occupied_ids = set()
     if ration.group_id:
         occupied_ids = set(
@@ -282,7 +298,6 @@ def ration_edit(request, pk):
             .values_list("product_id", flat=True)
         )
 
-    # Продукты по категории — исключаем занятые в других рационах группы
     meal_cat_map = {}
     for key, _ in SLOT_TYPES:
         prods = list(
@@ -304,7 +319,6 @@ def ration_edit(request, pk):
             for p in prods
         ]
 
-    # Все продукты — тоже без занятых (для вкладки "Все блюда")
     all_products = list(
         Product.objects
         .prefetch_related("meal_categories")
@@ -335,7 +349,7 @@ def ration_edit(request, pk):
         "slot_types": SLOT_TYPES,
         "slot_icons": SLOT_ICONS,
         "slot_colors": SLOT_COLORS,
-        "kcal_categories": Ration._meta.get_field("kcal_category").choices,
+        "kcal_categories": KCAL_CATEGORIES,
         "meal_cat_map_json": json.dumps(meal_cat_map, ensure_ascii=False),
         "all_products_json": json.dumps(all_products_json, ensure_ascii=False),
         "occupied_count": len(occupied_ids),
@@ -347,3 +361,61 @@ def ration_delete(request, pk):
     if request.method == "POST":
         ration.delete()
     return redirect("ration_group_list")
+"""
+Добавь это в views.py (в конец файла).
+Добавь URL в urls.py:
+    path("iiko/sync/", views.iiko_sync_view, name="iiko_sync"),
+"""
+
+
+@require_POST
+def iiko_sync_view(request):
+    """
+    AJAX-вьюха для синхронизации продуктов из iiko.
+    Вызывается кнопкой в product_list.html.
+    Возвращает JSON с результатом.
+    """
+    from .iiko_sync import sync_products_from_iiko
+
+    # Настройки берём из settings.py
+    cloud_api_key    = getattr(settings, "IIKO_CLOUD_API_KEY", "")
+    org_id           = getattr(settings, "IIKO_ORG_ID", "")
+    external_menu_id = getattr(settings, "IIKO_EXTERNAL_MENU_ID", "")
+    server_url       = getattr(settings, "IIKO_SERVER_URL", "")
+    server_login     = getattr(settings, "IIKO_SERVER_LOGIN", "")
+    server_password  = getattr(settings, "IIKO_SERVER_PASSWORD", "")
+
+    if not cloud_api_key or not org_id or not external_menu_id:
+        return JsonResponse({
+            "ok": False,
+            "message": "Не заданы IIKO_CLOUD_API_KEY, IIKO_ORG_ID или IIKO_EXTERNAL_MENU_ID в settings.py"
+        }, status=400)
+
+    try:
+        result = sync_products_from_iiko(
+            cloud_api_key=cloud_api_key,
+            org_id=org_id,
+            external_menu_id=external_menu_id,
+            server_url=server_url,
+            server_login=server_login,
+            server_password=server_password,
+        )
+        ok = result["skipped"] == 0 or result["created"] + result["updated"] > 0
+        msg_parts = []
+        if result["created"]:
+            msg_parts.append(f"Создано: {result['created']}")
+        if result["updated"]:
+            msg_parts.append(f"Обновлено: {result['updated']}")
+        if result["skipped"]:
+            msg_parts.append(f"Пропущено: {result['skipped']}")
+        message = " | ".join(msg_parts) if msg_parts else "Нет изменений"
+        if result["errors"]:
+            message += f" | Ошибок: {len(result['errors'])}"
+
+        return JsonResponse({
+            "ok": ok,
+            "message": message,
+            "detail": result,
+        })
+    except Exception as e:
+        return JsonResponse({"ok": False, "message": str(e)}, status=500)

@@ -30,8 +30,13 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-
+IIKO_CLOUD_API_KEY    = "5ee9c3345f694fb7b08b24e488b4a141"
+IIKO_ORG_ID           = "ce7007f2-fabd-4beb-886e-5e077f9aff66"
+IIKO_EXTERNAL_MENU_ID = "78054"
 # Application definition
+IIKO_SERVER_URL         = "https://fudzavod.iiko.it/resto"   # адрес iiko Server
+IIKO_SERVER_LOGIN       = "buh2"
+IIKO_SERVER_PASSWORD    = "39babe20c3be152b70f15bb8383040d09852d1bb"
 
 INSTALLED_APPS = [
     'django.contrib.admin',
