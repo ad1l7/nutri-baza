@@ -38,7 +38,7 @@
 
   .layout{display:flex;height:calc(100vh - 64px);}
 
-  .left{width:460px;flex-shrink:0;background:var(--white);border-right:1.5px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
+  .left{width:480px;flex-shrink:0;background:var(--white);border-right:1.5px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;}
   .left::-webkit-scrollbar{width:4px;}
   .left::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 
@@ -67,13 +67,25 @@
   .prog-bar.over{background:var(--danger);}
   .prog-txt{font-size:11px;color:var(--muted);font-weight:600;margin-top:5px;display:flex;justify-content:space-between;}
 
-  .slots-wrap{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:8px;}
-  .sec-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;display:flex;align-items:center;gap:8px;margin-bottom:2px;}
-  .sec-title::after{content:'';flex:1;height:1px;background:var(--border-soft);}
+  .slots-wrap{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:14px;}
+
+  .meal-group{}
+  .meal-group-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .meal-group-icon{font-size:18px;}
+  .meal-group-name{font-size:13px;font-weight:800;color:var(--text);flex:1;}
+  .add-cat-btn{background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:4px 10px;font-family:var(--font);font-size:11px;font-weight:700;color:var(--text-mid);cursor:pointer;transition:all .15s;white-space:nowrap;}
+  .add-cat-btn:hover{border-color:var(--green);color:var(--green-mid);}
+
+  .meal-slots{display:flex;flex-direction:column;gap:6px;padding-left:12px;border-left:2px solid var(--border-soft);}
 
   .slot-card{border:1.5px solid var(--border-soft);border-radius:11px;overflow:hidden;transition:box-shadow .15s;}
   .slot-card.active-slot{outline:2px solid var(--green);}
   .slot-card:hover{box-shadow:0 2px 12px rgba(30,77,20,.08);}
+
+  .slot-nocat{display:flex;align-items:center;gap:10px;padding:10px 12px;}
+  .slot-nocat-txt{flex:1;font-size:12px;color:var(--muted);font-weight:600;}
+  .slot-nocat-btn{background:var(--light);border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;font-family:var(--font);font-size:11px;font-weight:700;color:var(--text-mid);cursor:pointer;transition:all .15s;}
+  .slot-nocat-btn:hover{border-color:var(--green);color:var(--green-mid);}
 
   .slot-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;}
   .si{font-size:16px;flex-shrink:0;}
@@ -99,9 +111,7 @@
   .c-purple .slot-head{background:var(--purple-bg);} .c-purple .sl{color:var(--purple);} .c-purple .sk{background:var(--purple-bg);color:var(--purple);border:1px solid #c0a0e8;}
   .c-amber .slot-head{background:var(--amber-bg);} .c-amber .sl{color:var(--amber);} .c-amber .sk{background:var(--amber-bg);color:var(--amber);border:1px solid #e8c06a;}
 
-  .add-slot-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:11px;border:2px dashed var(--border);background:transparent;color:var(--muted);font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;margin-top:2px;}
-  .add-slot-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
-
+  /* RIGHT */
   .right{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
   .right::-webkit-scrollbar{width:5px;}
   .right::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
@@ -111,16 +121,16 @@
   .picker-hint{font-size:12px;color:var(--muted);}
   .picker-hint strong{color:var(--green-mid);}
 
+  .picker-tabs{display:flex;background:var(--off-white);border:1.5px solid var(--border);border-radius:9px;padding:3px;}
+  .ptab{flex:1;padding:5px 8px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;border-radius:7px;border:none;background:transparent;color:var(--muted);font-family:var(--font);transition:all .18s;}
+  .ptab.active{background:var(--white);color:var(--green-mid);box-shadow:0 1px 4px rgba(30,77,20,.1);}
+
   .psearch{position:relative;}
   .psearch input{width:100%;background:var(--off-white);border:1.5px solid var(--border);border-radius:9px;padding:9px 14px 9px 36px;color:var(--text);font-family:var(--font);font-size:13px;font-weight:500;outline:none;transition:border-color .2s;}
   .psearch input:focus{border-color:var(--green);background:var(--white);}
   .psearch .si2{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
 
-  .picker-tabs{display:flex;background:var(--off-white);border:1.5px solid var(--border);border-radius:9px;padding:3px;}
-  .ptab{flex:1;padding:5px 8px;text-align:center;font-size:11px;font-weight:700;cursor:pointer;border-radius:7px;border:none;background:transparent;color:var(--muted);font-family:var(--font);transition:all .18s;}
-  .ptab.active{background:var(--white);color:var(--green-mid);box-shadow:0 1px 4px rgba(30,77,20,.1);}
-
-  .pcat{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .pcat{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;}
   .pcat-head{padding:9px 14px;background:var(--light);font-size:11px;font-weight:800;color:var(--text-mid);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border-soft);}
   .pitem{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border-soft);}
   .pitem:last-child{border-bottom:none;}
@@ -135,9 +145,17 @@
   .psel:hover{background:var(--green-mid);}
   .psel.cur{background:var(--light);color:var(--green-mid);border:1.5px solid var(--green-light);}
 
+  /* Выбор категории справа */
+  .cat-pick-grid{display:flex;flex-direction:column;gap:6px;}
+  .cat-pick-item{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:11px;cursor:pointer;border:1.5px solid var(--border-soft);background:var(--off-white);transition:all .15s;}
+  .cat-pick-item:hover{border-color:var(--green);background:var(--light);}
+  .cat-pick-icon{font-size:18px;}
+  .cat-pick-label{font-size:13px;font-weight:700;color:var(--text);}
+
   .no-sel{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;color:var(--muted);text-align:center;padding:40px 20px;background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);gap:10px;}
   .no-sel .ni{font-size:40px;}
 
+  /* Модалы */
   .mo{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:200;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
   .mo.open{display:flex;animation:fi .2s ease;}
   @keyframes fi{from{opacity:0}to{opacity:1}}
@@ -155,7 +173,6 @@
   .sti{font-size:18px;}
   .stl{font-size:13px;font-weight:700;color:var(--text);}
 
-  /* Модал удаления рациона */
   .del-modal{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:300;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;}
   .del-modal.open{display:flex;}
   .del-box{background:var(--white);border-radius:16px;padding:26px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow-md);}
@@ -195,8 +212,9 @@
       <input type="hidden" name="action" value="update_meta">
       <div class="meta-form">
         <div class="meta-row">
-          <div class="mf" style="flex:2"><label class="ml">Название</label><input class="mi" type="text" name="name" value="{{ ration.name }}" required></div>
-          <div class="mf"><label class="ml">Дата</label><input class="mi" type="date" name="date" value="{{ ration.date|date:'Y-m-d' }}" required></div>
+          <div class="mf" style="flex:2"><label class="ml">Название</label>
+            <input class="mi" type="text" name="name" value="{{ ration.name }}" required>
+          </div>
         </div>
         <div class="meta-row">
           <div class="mf" style="flex:2">
@@ -233,38 +251,74 @@
     </div>
 
     <div class="slots-wrap">
-      <div class="sec-title">Приёмы пищи</div>
 
-      {% for sm in slots_with_meta %}{% with slot=sm.slot %}
-      <div class="slot-card c-{{ sm.color }}" id="sc-{{ slot.pk }}">
-        <div class="slot-head" onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
-          <span class="si">{{ sm.icon }}</span>
-          <span class="sl">{{ sm.label }}</span>
-          {% if sm.kcal %}<span class="sk">{{ sm.kcal|floatformat:0 }} кк</span>
-          {% else %}<span class="sk" style="opacity:.45">— кк</span>{% endif %}
-        </div>
-        <div class="slot-body">
-          {% if slot.product %}
-            {% if slot.product.photo %}<img src="{{ slot.product.photo.url }}" class="sthumb" alt="">
-            {% else %}<div class="sph">🥗</div>{% endif %}
-            <div class="spi">
-              <div class="spn">{{ slot.product.name }}</div>
-              <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г</div>
-            </div>
-          {% else %}
-            <div class="sph">❓</div>
-            <div class="spi">
-              <div class="spn" style="color:var(--muted);font-weight:500;">Блюдо не выбрано</div>
-              <div class="spp">Нажмите чтобы выбрать</div>
-            </div>
-          {% endif %}
-          <button class="schg" type="button"
-            onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
-            {% if slot.product %}Изменить{% else %}Выбрать{% endif %}
+      {% for group in meal_time_groups %}
+      <div class="meal-group">
+        <div class="meal-group-head">
+          <span class="meal-group-icon">{{ group.meal_time.icon }}</span>
+          <span class="meal-group-name">{{ group.meal_time.name }}</span>
+          <!-- Добавить категорию внутри приёма пищи -->
+          <button type="button" class="add-cat-btn"
+            onclick="openCatPickerRight({{ group.meal_time.pk }}, '{{ group.meal_time.name|escapejs }}')">
+            + категория
           </button>
         </div>
+
+        <div class="meal-slots">
+          {% for sm in group.slots %}{% with slot=sm.slot %}
+
+          <div class="slot-card {% if sm.label %}c-{{ sm.color }}{% endif %}" id="sc-{{ slot.pk }}">
+
+            {% if not sm.label %}
+            <!-- Нет категории -->
+
+
+            {% else %}
+            <!-- Есть категория -->
+            <div class="slot-head" onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
+              <span class="si">{{ sm.icon }}</span>
+              <span class="sl">{{ sm.label }}</span>
+              {% if sm.kcal %}<span class="sk">{{ sm.kcal|floatformat:0 }} кк</span>
+              {% else %}<span class="sk" style="opacity:.45">— кк</span>{% endif %}
+              <button type="button" class="sdel" title="Сменить категорию"
+                onclick="event.stopPropagation();openCatModal({{ slot.pk }}, '{{ group.meal_time.name|escapejs }}')">✏️</button>
+              <form method="post" style="margin:0;" onclick="event.stopPropagation()">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_slot">
+                <input type="hidden" name="slot_id" value="{{ slot.pk }}">
+                <button type="submit" class="sdel" title="Удалить">✕</button>
+              </form>
+            </div>
+            <!-- Блюдо -->
+            <div class="slot-body">
+              {% if slot.product %}
+                {% if slot.product.photo %}<img src="{{ slot.product.photo.url }}" class="sthumb" alt="">
+                {% else %}<div class="sph">🥗</div>{% endif %}
+                <div class="spi">
+                  <div class="spn">{{ slot.product.name }}</div>
+                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г</div>
+                </div>
+              {% else %}
+                <div class="sph">❓</div>
+                <div class="spi">
+                  <div class="spn" style="color:var(--muted);font-weight:500;">Блюдо не выбрано</div>
+                  <div class="spp">Нажмите чтобы выбрать</div>
+                </div>
+              {% endif %}
+              <button class="schg" type="button"
+                onclick="selSlot({{ slot.pk }}, '{{ sm.label|escapejs }}', '{{ slot.slot_type }}', {{ slot.product_id|default:'null' }})">
+                {% if slot.product %}Изменить{% else %}Выбрать{% endif %}
+              </button>
+            </div>
+            {% endif %}
+
+          </div>
+          {% endwith %}{% endfor %}
+        </div>
       </div>
-      {% endwith %}{% endfor %}
+      {% endfor %}
+
+      <!-- НЕТ кнопки "Добавить приём пищи" — приёмы фиксированы из шаблона -->
 
     </div>
   </div>
@@ -276,19 +330,28 @@
       <p>Выберите слот слева,<br>чтобы назначить блюдо</p>
       {% if occupied_count %}
       <p style="font-size:11px;color:var(--muted);margin-top:8px;">
-        ⚠️ {{ occupied_count }} блюд скрыто — они уже используются в других рационах этой группы
+        ⚠️ {{ occupied_count }} блюд скрыто — используются в других рационах группы
       </p>
       {% endif %}
     </div>
 
+    <!-- Выбор категории справа (для кнопки "+ категория") -->
+    <div id="cat-picker-right" style="display:none;flex-direction:column;gap:12px;">
+      <div class="picker-top">
+        <div class="picker-title">Выберите категорию</div>
+        <div class="picker-hint">Приём пищи: <strong id="cpr-meal-name">—</strong></div>
+      </div>
+      <div class="cat-pick-grid" id="cpr-list"></div>
+    </div>
+
+    <!-- Пикер блюд -->
     <div id="picker" style="display:none;flex-direction:column;gap:12px;">
       <div class="picker-top">
         <div>
           <div class="picker-title">Выберите блюдо</div>
-          <div class="picker-hint">Категория: <strong id="ph-slot">—</strong>
-            <span id="ph-warn" style="color:#b05000;font-weight:600;display:none"> — нет блюд, показаны все</span>
-          </div>
+          <div class="picker-hint">Категория: <strong id="ph-slot">—</strong></div>
         </div>
+        <!-- Две вкладки -->
         <div class="picker-tabs">
           <button type="button" class="ptab active" id="ptab-match" onclick="setPickerTab('match')">✅ Подходящие</button>
           <button type="button" class="ptab" id="ptab-all" onclick="setPickerTab('all')">📋 Все блюда</button>
@@ -305,20 +368,21 @@
   </div>
 </div>
 
-<!-- Модал: добавить тип слота -->
-<div class="mo" id="add-modal" onclick="if(event.target===this)closeAddSlot()">
+<!-- Модал: выбор категории для слота -->
+<div class="mo" id="cat-modal" onclick="if(event.target===this)closeCatModal()">
   <div class="mbox">
     <div class="mhead">
-      <span class="mht">Выберите категорию блюда</span>
-      <button class="mcl" onclick="closeAddSlot()">✕</button>
+      <span class="mht" id="cat-modal-title">Выберите категорию</span>
+      <button class="mcl" onclick="closeCatModal()">✕</button>
     </div>
-    <form method="post" id="add-form">
+    <form method="post" id="cat-form">
       {% csrf_token %}
-      <input type="hidden" name="action" value="add_slot">
-      <input type="hidden" name="slot_type" id="add-slot-type">
+      <input type="hidden" name="action" value="update_slot_category">
+      <input type="hidden" name="slot_id" id="cat-slot-id">
+      <input type="hidden" name="slot_type" id="cat-slot-type">
       <div class="stgrid">
         {% for key, label in slot_types %}
-        <div class="stopt" onclick="pickSlotType('{{ key }}')">
+        <div class="stopt" onclick="pickCategory('{{ key }}')">
           <span class="sti">{{ slot_icons|get_item:key }}</span>
           <span class="stl">{{ label }}</span>
         </div>
@@ -332,7 +396,7 @@
 <div class="del-modal" id="del-modal">
   <div class="del-box">
     <h3>Удалить рацион?</h3>
-    <p>«{{ ration.name }}» будет удалён вместе со всеми слотами. Это нельзя отменить.</p>
+    <p>«{{ ration.name }}» будет удалён вместе со всеми слотами.</p>
     <div class="del-btns">
       <button class="btn-cancel" onclick="closeDelModal()">Отмена</button>
       <form method="post" action="{% url 'ration_delete' ration.pk %}" style="flex:1">
@@ -344,77 +408,157 @@
 </div>
 
 <script>
-const MEAL_CAT = {{ meal_cat_map_json|safe }};
-const ALL      = {{ all_products_json|safe }};
+const MEAL_CAT   = {{ meal_cat_map_json|safe }};
+const ALL        = {{ all_products_json|safe }};
+const SLOT_ICONS  = {{ slot_icons_json|safe }};
+const SLOT_LABELS = {{ slot_labels_json|safe }};
 
-let activeSlot = null;
-let pickerTab  = 'match';
+let activeSlot  = null;
+let pickerTab   = 'match';
+let cprMealTimeId = null;  // для кнопки "+ категория"
+
+// ── Пикер блюд ───────────────────────────────────────────────────────────────
 
 function selSlot(slotId, label, slotType, curProdId) {
   activeSlot = { id: slotId, label, slotType, currentProductId: curProdId };
   document.querySelectorAll('.slot-card').forEach(el => el.classList.remove('active-slot'));
   document.getElementById('sc-' + slotId)?.classList.add('active-slot');
+
+  document.getElementById('no-sel').style.display          = 'none';
+  document.getElementById('cat-picker-right').style.display = 'none';
+  document.getElementById('picker').style.display           = 'flex';
+
   document.getElementById('ph-slot').textContent = label;
-  document.getElementById('no-sel').style.display = 'none';
-  document.getElementById('picker').style.display = 'flex';
   document.getElementById('psearch').value = '';
+
   const matched = MEAL_CAT[slotType] || [];
-  const warn = document.getElementById('ph-warn');
-  if (matched.length === 0) { warn.style.display = 'inline'; setPickerTab('all'); }
-  else { warn.style.display = 'none'; setPickerTab('match'); }
+  if (matched.length === 0) {
+    setPickerTab('all');
+  } else {
+    setPickerTab('match');
+  }
 }
 
 function setPickerTab(tab) {
   pickerTab = tab;
   document.getElementById('ptab-match').classList.toggle('active', tab === 'match');
   document.getElementById('ptab-all').classList.toggle('active', tab === 'all');
-  renderPicker(document.getElementById('psearch').value);
+  renderPicker(document.getElementById('psearch')?.value || '');
 }
 
 function renderPicker(q) {
   if (!activeSlot) return;
   const query = q.toLowerCase().trim();
-  let products = pickerTab === 'match'
-    ? (MEAL_CAT[activeSlot.slotType] || []).filter(p => !query || p.name.toLowerCase().includes(query))
-    : ALL.filter(p => !query || p.name.toLowerCase().includes(query));
+
+  let products;
+  if (pickerTab === 'match') {
+    products = (MEAL_CAT[activeSlot.slotType] || []).filter(p =>
+      !query || p.name.toLowerCase().includes(query)
+    );
+  } else {
+    products = ALL.filter(p =>
+      !query || p.name.toLowerCase().includes(query)
+    );
+  }
 
   const bycat = {};
-  products.forEach(p => { if (!bycat[p.category]) bycat[p.category] = []; bycat[p.category].push(p); });
-
-  let html = '';
-  Object.entries(bycat).forEach(([cat, prods]) => {
-    html += `<div class="pcat"><div class="pcat-head">${cat}</div>`;
-    prods.forEach(p => {
-      const isCur = p.id === activeSlot.currentProductId;
-      const photo = p.photo ? `<img src="${p.photo}" class="pthumb" alt="">` : `<div class="pph">🥗</div>`;
-      html += `<div class="pitem ${isCur ? 'cur' : ''}">
-        ${photo}
-        <div class="pinfo">
-          <div class="pname">${p.name}</div>
-          <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}</div>
-        </div>
-        <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
-          ${isCur ? '✓ Текущее' : 'Выбрать'}
-        </button>
-      </div>`;
-    });
-    html += `</div>`;
+  products.forEach(p => {
+    const cat = p.category || 'Без категории';
+    if (!bycat[cat]) bycat[cat] = [];
+    bycat[cat].push(p);
   });
 
-  if (!html) html = `<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">Ничего не найдено</div>`;
+  let html = '';
+  if (products.length === 0) {
+    html = `<div style="text-align:center;color:var(--muted);padding:30px;font-size:13px;">Ничего не найдено</div>`;
+  } else {
+    Object.entries(bycat).forEach(([cat, prods]) => {
+      html += `<div class="pcat"><div class="pcat-head">${cat || '—'}</div>`;
+      prods.forEach(p => {
+        const isCur = p.id === activeSlot.currentProductId;
+        const photo = p.photo
+          ? `<img src="${p.photo}" class="pthumb" alt="">`
+          : `<div class="pph">🥗</div>`;
+        html += `<div class="pitem ${isCur ? 'cur' : ''}">
+          ${photo}
+          <div class="pinfo">
+            <div class="pname">${p.name}</div>
+            <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}</div>
+          </div>
+          <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
+            ${isCur ? '✓ Текущее' : 'Выбрать'}
+          </button>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+  }
   document.getElementById('plist').innerHTML = html;
 }
 
 function assignProduct(productId) {
   if (!activeSlot) return;
+  submitForm({ action: 'update_slot', slot_id: activeSlot.id, product_id: productId });
+}
+
+// ── Выбор категории справа (кнопка "+ категория") ────────────────────────────
+
+function openCatPickerRight(mealTimeId, mealTimeName) {
+  cprMealTimeId = mealTimeId;
+  activeSlot = null;
+  document.querySelectorAll('.slot-card').forEach(el => el.classList.remove('active-slot'));
+
+  document.getElementById('no-sel').style.display          = 'none';
+  document.getElementById('picker').style.display           = 'none';
+  document.getElementById('cat-picker-right').style.display = 'flex';
+  document.getElementById('cpr-meal-name').textContent       = mealTimeName;
+
+  const keys = Object.keys(MEAL_CAT);
+  let html = '';
+  keys.forEach(key => {
+    const label = SLOT_LABELS[key] || key;
+    const icon  = SLOT_ICONS[key]  || '🍽️';
+    html += `<div class="cat-pick-item" onclick="pickCatRight('${key}')">
+      <span class="cat-pick-icon">${icon}</span>
+      <span class="cat-pick-label">${label}</span>
+    </div>`;
+  });
+  document.getElementById('cpr-list').innerHTML = html;
+}
+
+function pickCatRight(slotType) {
+  // Создаём новый слот с приёмом пищи + категорией
+  submitForm({ action: 'add_slot_with_category', meal_time_id: cprMealTimeId, slot_type: slotType });
+}
+
+// ── Модал: смена категории существующего слота ────────────────────────────────
+
+function openCatModal(slotId, mealTimeName) {
+  document.getElementById('cat-modal-title').textContent = `Категория — ${mealTimeName}`;
+  document.getElementById('cat-slot-id').value = slotId;
+  document.getElementById('cat-modal').classList.add('open');
+}
+function closeCatModal() { document.getElementById('cat-modal').classList.remove('open'); }
+function pickCategory(key) {
+  document.getElementById('cat-slot-type').value = key;
+  document.getElementById('cat-form').submit();
+}
+
+// ── Удаление рациона ─────────────────────────────────────────────────────────
+
+function openDelModal()  { document.getElementById('del-modal').classList.add('open'); }
+function closeDelModal() { document.getElementById('del-modal').classList.remove('open'); }
+
+// ── Утилиты ───────────────────────────────────────────────────────────────────
+
+function submitForm(data) {
   const form = document.createElement('form');
   form.method = 'POST';
-  form.innerHTML = `
-    <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrf()}">
-    <input type="hidden" name="action" value="update_slot">
-    <input type="hidden" name="slot_id" value="${activeSlot.id}">
-    <input type="hidden" name="product_id" value="${productId}">
-  `;
+  let html = `<input type="hidden" name="csrfmiddlewaretoken" value="${getCsrf()}">`;
+  Object.entries(data).forEach(([k, v]) => {
+    html += `<input type="hidden" name="${k}" value="${v}">`;
+  });
+  form.innerHTML = html;
   document.body.appendChild(form);
   form.submit();
 }
@@ -423,18 +567,8 @@ function getCsrf() {
   return document.cookie.split(';').map(c => c.trim()).find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
 }
 
-function openAddSlot()  { document.getElementById('add-modal').classList.add('open'); }
-function closeAddSlot() { document.getElementById('add-modal').classList.remove('open'); }
-function pickSlotType(key) {
-  document.getElementById('add-slot-type').value = key;
-  document.getElementById('add-form').submit();
-}
-
-function openDelModal()  { document.getElementById('del-modal').classList.add('open'); }
-function closeDelModal() { document.getElementById('del-modal').classList.remove('open'); }
-
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeAddSlot(); closeDelModal(); }
+  if (e.key === 'Escape') { closeCatModal(); closeDelModal(); }
 });
 </script>
 </body>

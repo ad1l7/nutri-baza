@@ -57,7 +57,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
+# LOGGING = {
+#     'version': 1,
+#     'handlers': {
+#         'console': {'class': 'logging.StreamHandler'},
+#     },
+#     'loggers': {
+#         'myapp': {'handlers': ['console'], 'level': 'DEBUG'},
+#     },
+# }
 ROOT_URLCONF = 'myproject.urls'
 
 TEMPLATES = [

@@ -1,29 +1,165 @@
 """
-iiko_sync.py — синхронизация продуктов из iiko в O-Live.
+iiko_sync.py — умная синхронизация продуктов из iiko в O-Live.
 
-Источники данных:
-  - iikoCloud API (/api/2/menu/by_id) — название, категория, КБЖУ
-  - iiko Server API (/resto/api/v2/...) — состав (техкарты), кратность
+Ключ синхронизации: артикул (num) из iiko — поле iiko_sku в Product.
 
-Поля в Product:
-  iiko_id          — UUID блюда (ключ синхронизации)
-  iiko_category    — название категории из iiko
-  iiko_synced_at   — время последней синхронизации
-  name             — наименование
-  kcal_per_100     — ккал на 100г
-  protein          — белки на 100г
-  fat              — жиры на 100г
-  carbs            — углеводы на 100г
-  composition      — состав (из техкарты iiko Server)
-  packing          — кратность (единица измерения из iiko Server)
+Логика обновления:
+  - Новые блюда (нет в БД) → создаём + скачиваем фото
+  - Существующие блюда → сравниваем поля, обновляем ТОЛЬКО если что-то изменилось
+  - Фото → скачиваем только если URL изменился или фото нет
+  - Аллергены → берём из item.allergens, get_or_create по имени
+  - Удалённые из iiko → удаляем из БД
 """
 
+import time
+import hashlib
 import requests
 import logging
-from datetime import date, datetime, timezone
+import json as _json
+import os
 from django.utils import timezone as dj_timezone
+from django.core.files.base import ContentFile
 
 logger = logging.getLogger(__name__)
+
+# ── Защита от блокировки ──────────────────────────────────────────────────────
+RATE_LIMIT_DELAY  = 0.2
+MAX_RETRIES       = 3
+RETRY_DELAY       = 5
+MIN_SYNC_INTERVAL = 30
+
+_last_sync_time = 0
+
+# ── Точное совпадение название группы iiko → ключ SLOT_TYPES ─────────────────
+_SLOT_LABEL_TO_KEY = {
+    'Завтрак 250–350 ккал':        'breakfast_250',
+    'Завтрак 400–500 ккал':        'breakfast_400',
+    'Второе 400–500 ккал':         'second_400',
+    'Второе 500–600 ккал':         'second_500',
+    'Суп 200 ккал':                'soup_200',
+    'Суп 300 ккал':                'soup_300',
+    'Салат 150–250 ккал':          'salad_150',
+    'Салат 250–350 ккал':          'salad_250',
+    'Выпечка/Десерт 100–250 ккал': 'dessert_100',
+    'Выпечка/Десерт 300–350 ккал': 'dessert_300',
+    'Смузи 100–150 ккал':          'smoothie',
+    'Сэндвич 300–350 ккал':        'sandwich',
+}
+
+_COMPARE_FIELDS = [
+    "name", "iiko_category", "packing", "net_weight",
+    "kcal_per_100", "protein", "fat", "carbs", "kj_per_100",
+    "kcal_per_serving", "protein_per_serving", "fat_per_serving",
+    "carbs_per_serving", "kj_per_serving", "composition", "cost",
+]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Утилиты
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _safe_float(val):
+    try:
+        return float(val) if val is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _round_for_compare(val):
+    if val is None:
+        return None
+    try:
+        return round(float(val), 2)
+    except (TypeError, ValueError):
+        return val
+
+
+def _fields_changed(product, new_fields: dict) -> tuple:
+    changed = []
+    for field in _COMPARE_FIELDS:
+        if field not in new_fields:
+            continue
+        old_val = getattr(product, field, None)
+        new_val = new_fields[field]
+        if isinstance(new_val, float) or isinstance(old_val, float):
+            if _round_for_compare(old_val) != _round_for_compare(new_val):
+                changed.append(field)
+        else:
+            old_str = str(old_val) if old_val is not None else ""
+            new_str = str(new_val) if new_val is not None else ""
+            if old_str != new_str:
+                changed.append(field)
+    return bool(changed), changed
+
+
+def _request_with_retry(method, url, **kwargs):
+    resp = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            resp = getattr(requests, method)(url, **kwargs)
+            if resp.status_code in (429, 503):
+                wait = RETRY_DELAY * (attempt + 1)
+                logger.warning(f"HTTP {resp.status_code} — ждём {wait}с (попытка {attempt+1})")
+                time.sleep(wait)
+                continue
+            return resp
+        except requests.ConnectionError:
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY)
+                continue
+            raise
+    return resp
+
+
+def _parse_description(desc) -> str:
+    if not desc:
+        return ""
+    if isinstance(desc, str):
+        try:
+            desc = _json.loads(desc)
+        except Exception:
+            return desc.strip()
+    if isinstance(desc, list):
+        return " ".join(
+            block.get("text", "") if isinstance(block, dict) else str(block)
+            for block in desc
+        ).strip()
+    if isinstance(desc, dict):
+        return desc.get("text", str(desc)).strip()
+    return str(desc).strip()
+
+
+def _download_photo(url: str) -> tuple:
+    if not url or not url.startswith("http"):
+        return None, None
+    try:
+        resp = requests.get(url, timeout=15)
+        if resp.status_code != 200:
+            return None, None
+        content_type = resp.headers.get("Content-Type", "")
+        if "jpeg" in content_type or "jpg" in content_type:
+            ext = ".jpg"
+        elif "png" in content_type:
+            ext = ".png"
+        elif "webp" in content_type:
+            ext = ".webp"
+        else:
+            url_path = url.split("?")[0]
+            ext = os.path.splitext(url_path)[1] or ".jpg"
+        return resp.content, ext
+    except Exception as e:
+        logger.warning(f"Не удалось скачать фото {url}: {e}")
+        return None, None
+
+
+def _photo_url_changed(product, new_url: str) -> bool:
+    if not product.photo:
+        return True
+    if not new_url:
+        return False
+    url_hash = hashlib.md5(new_url.encode()).hexdigest()[:8]
+    current_name = os.path.basename(str(product.photo.name))
+    return url_hash not in current_name
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -38,10 +174,9 @@ class IikoCloudClient:
         self._token = None
 
     def _get_token(self) -> str:
-        resp = requests.post(
-            f"{self.BASE}/api/1/access_token",
-            json={"apiLogin": self.api_key},
-            timeout=20,
+        resp = _request_with_retry(
+            "post", f"{self.BASE}/api/1/access_token",
+            json={"apiLogin": self.api_key}, timeout=20,
         )
         resp.raise_for_status()
         self._token = resp.json()["token"]
@@ -52,50 +187,25 @@ class IikoCloudClient:
             self._get_token()
         return {"Authorization": f"Bearer {self._token}", "Content-Type": "application/json"}
 
-    def get_organizations(self) -> list:
-        resp = requests.post(
-            f"{self.BASE}/api/1/organizations",
-            json={"returnAdditionalInfo": False},
-            headers=self._headers(),
-            timeout=20,
-        )
-        resp.raise_for_status()
-        return resp.json().get("organizations", [])
-
     def get_nomenclature(self, org_id: str) -> dict:
-        """Возвращает полную номенклатуру (продукты + категории)."""
-        resp = requests.post(
-            f"{self.BASE}/api/1/nomenclature",
+        resp = _request_with_retry(
+            "post", f"{self.BASE}/api/1/nomenclature",
             json={"organizationId": org_id, "startRevision": 0},
-            headers=self._headers(),
-            timeout=60,
+            headers=self._headers(), timeout=60,
         )
         resp.raise_for_status()
         return resp.json()
 
-    def get_external_menus(self) -> list:
-        """Возвращает список внешних меню организации."""
-        resp = requests.post(
-            f"{self.BASE}/api/2/menu",
-            json={},
-            headers=self._headers(),
-            timeout=20,
-        )
-        resp.raise_for_status()
-        return resp.json().get("externalMenus", []) or []
-
     def get_menu_by_id(self, menu_id: str, org_id: str) -> dict:
-        """Возвращает полное внешнее меню с КБЖУ."""
-        resp = requests.post(
-            f"{self.BASE}/api/2/menu/by_id",
+        resp = _request_with_retry(
+            "post", f"{self.BASE}/api/2/menu/by_id",
             json={
                 "externalMenuId": menu_id,
                 "organizationIds": [org_id],
                 "priceCategoryId": "00000000-0000-0000-0000-000000000000",
                 "version": 2,
             },
-            headers=self._headers(),
-            timeout=60,
+            headers=self._headers(), timeout=60,
         )
         resp.raise_for_status()
         return resp.json()
@@ -107,18 +217,15 @@ class IikoCloudClient:
 
 class IikoServerClient:
     def __init__(self, server_url: str, login: str, password: str):
-        
-        # server_url например "http://localhost:8080"
         self.base = server_url.rstrip("/")
         self.login = login
         self.password = password
         self._token = None
 
     def _get_token(self) -> str:
-        resp = requests.get(
-            f"{self.base}/api/auth",
-            params={"login": self.login, "pass": self.password},
-            timeout=20,
+        resp = _request_with_retry(
+            "get", f"{self.base}/api/auth",
+            params={"login": self.login, "pass": self.password}, timeout=20,
         )
         resp.raise_for_status()
         self._token = resp.text.strip().strip('"')
@@ -137,48 +244,85 @@ class IikoServerClient:
             try:
                 requests.get(
                     f"{self.base}/api/auth/logout",
-                    params={"key": self._token},
-                    timeout=10,
+                    params={"key": self._token}, timeout=10,
                 )
             except Exception:
                 pass
+            finally:
+                self._token = None
 
     def get_products(self) -> list:
-        """Список всей номенклатуры (блюда, заготовки и т.д.)."""
-        resp = requests.get(
-            f"{self.base}/api/v2/entities/products/list",
-            params=self._params({"includeDeleted": "false"}),
+        resp = _request_with_retry(
+            "get", f"{self.base}/api/v2/entities/products/list",
+            params=self._params({"includeDeleted": "false"}), timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    def get_cost_report(self) -> dict:
+        """OLAP-отчёт себестоимости за текущий месяц.
+        Контрагент: 0Частное лицо Покупатель, тип транзакции: OUTGOING_INVOICE.
+        Возвращает сырой JSON ответа iiko Server.
+        """
+        from datetime import date
+        today = date.today()
+        first_day = today.replace(day=1)
+        if today.month == 12:
+            next_first = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_first = today.replace(month=today.month + 1, day=1)
+
+        body = {
+            "reportType": "TRANSACTIONS",
+            "groupByRowFields": ["Product.Name"],
+            "groupByColFields": [],
+            "aggregateFields": ["Sum.Incoming"],
+            "filters": {
+                "DateTime.OperDayFilter": {
+                    "filterType": "DateRange",
+                    "from": first_day.strftime("%Y-%m-%dT00:00:00"),
+                    "to": next_first.strftime("%Y-%m-%dT00:00:00"),
+                    "includeLow": True,
+                    "includeHigh": False,
+                    "periodType": "CURRENT_MONTH",
+                },
+                "Product.ThirdParent": {
+                    "filterType": "IncludeValues",
+                    "values": ["ЗДОРОВОЕ ПИТАНИЕ"],
+                },
+                "TransactionType": {
+                    "filterType": "IncludeValues",
+                    "values": ["OUTGOING_INVOICE"],
+                },
+                "Counteragent.Name": {
+                    "filterType": "IncludeValues",
+                    "values": ["0Частное лицо Покупатель"],
+                },
+            },
+        }
+
+        resp = _request_with_retry(
+            "post", f"{self.base}/api/v2/reports/olap",
+            json=body,
+            params=self._params(),
+            headers={"Accept": "application/json"},
             timeout=60,
         )
         resp.raise_for_status()
         return resp.json()
 
-    def get_assembly_chart(self, product_id: str) -> dict | None:
-        """Техкарта (первый уровень) для конкретного блюда."""
-        today = date.today().isoformat()
-        try:
-            resp = requests.get(
-                f"{self.base}/api/v2/assemblyCharts/getAssembled",
-                params=self._params({"productId": product_id, "date": today}),
-                timeout=20,
-            )
-            if resp.status_code == 404:
-                return None
-            resp.raise_for_status()
-            data = resp.json()
-            charts = data.get("assemblyCharts") or []
-            return charts[0] if charts else None
-        except Exception as e:
-            logger.warning(f"Техкарта для {product_id}: {e}")
-            return None
-
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Парсер внешнего меню iikoCloud → плоский список блюд
+# Парсер внешнего меню
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _extract_items_from_menu(menu_data: dict) -> list[dict]:
-    items = []
+def _extract_menu_items(menu_data: dict) -> dict:
+    """
+    Возвращает {product_uuid: {name, category_name, packing, weight,
+                               photo_url, allergen_names, КБЖУ...}}
+    allergen_names — список строк с именами аллергенов
+    """
+    result = {}
 
     def _parse_item(item: dict, cat_name: str):
         product_id = item.get("itemId") or item.get("id") or ""
@@ -190,42 +334,58 @@ def _extract_items_from_menu(menu_data: dict) -> list[dict]:
         size = sizes[0] if sizes else {}
 
         nutr = size.get("nutritionPerHundredGrams") or {}
+        if isinstance(nutr, list):
+            nutr = nutr[0] if nutr else {}
         if not nutr:
             nutritions = size.get("nutritions") or []
             nutr = nutritions[0] if nutritions else {}
 
         weight_grams = _safe_float(size.get("portionWeightGrams"))
 
-        # КБЖУ на 100г
         kcal_100    = _safe_float(nutr.get("energy"))
         protein_100 = _safe_float(nutr.get("proteins"))
         fat_100     = _safe_float(nutr.get("fats"))
         carbs_100   = _safe_float(nutr.get("carbs"))
         kj_100      = round(kcal_100 * 4.184, 2) if kcal_100 is not None else None
 
-        # КБЖУ на порцию = значение на 100г * вес_порции / 100
         def per_serving(val):
             if val is not None and weight_grams:
                 return round(val * weight_grams / 100, 2)
             return None
 
-        items.append({
-            "id": product_id,
-            "name": name,
-            "category_name": cat_name,
-            "packing": item.get("measureUnit") or "",
-            "kcal":       kcal_100,
-            "protein":    protein_100,
-            "fat":        fat_100,
-            "carbs":      carbs_100,
-            "kj_100":     kj_100,
-            "kcal_s":     per_serving(kcal_100),
-            "protein_s":  per_serving(protein_100),
-            "fat_s":      per_serving(fat_100),
-            "carbs_s":    per_serving(carbs_100),
-            "kj_s":       per_serving(kj_100),
-            "weight":     weight_grams,
-            })  
+        photo_url = (
+            size.get("buttonImageUrl")
+            or item.get("buttonImageUrl")
+            or ""
+        )
+
+        # Аллергены — берём из item.allergens
+        # Формат: [{id, code, name, isDeleted}, ...]
+        allergen_names = []
+        for a in item.get("allergens") or []:
+            a_name = a.get("name") or ""
+            a_deleted = str(a.get("isDeleted", "false")).lower()
+            if a_name and a_deleted != "true":
+                allergen_names.append(a_name.strip())
+
+        result[product_id] = {
+            "name":           name,
+            "category_name":  cat_name,
+            "packing":        item.get("measureUnit") or "",
+            "weight":         weight_grams,
+            "photo_url":      photo_url,
+            "allergen_names": allergen_names,  # список имён аллергенов
+            "kcal":           kcal_100,
+            "protein":        protein_100,
+            "fat":            fat_100,
+            "carbs":          carbs_100,
+            "kj_100":         kj_100,
+            "kcal_s":         per_serving(kcal_100),
+            "protein_s":      per_serving(protein_100),
+            "fat_s":          per_serving(fat_100),
+            "carbs_s":        per_serving(carbs_100),
+            "kj_s":           per_serving(kj_100),
+        }
 
     def walk_categories(categories: list, parent_name: str = ""):
         for cat in categories or []:
@@ -235,20 +395,56 @@ def _extract_items_from_menu(menu_data: dict) -> list[dict]:
                 _parse_item(item, cat_name)
 
     walk_categories(menu_data.get("itemCategories") or [])
-
-    if not items:
+    if not result:
         for pcat in menu_data.get("productCategories") or []:
             cat_name = pcat.get("name") or ""
             for item in pcat.get("items") or []:
                 _parse_item(item, cat_name)
 
-    return items
+    return result
 
-def _safe_float(val) -> float | None:
-    try:
-        return float(val) if val is not None else None
-    except (TypeError, ValueError):
-        return None
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Парсер OLAP-отчёта себестоимости
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _parse_cost_report(report_data: dict) -> dict:
+    """Возвращает {product_name: cost} из ответа OLAP-отчёта iiko Server."""
+    costs = {}
+    columns = report_data.get("columnNames") or report_data.get("columns") or []
+    rows = report_data.get("data") or []
+
+    if not rows:
+        return costs
+
+    # Формат 1: список имён колонок + список строк-списков
+    if columns:
+        name_idx = next((i for i, c in enumerate(columns) if "Product.Name" in str(c)), None)
+        cost_idx = next((i for i, c in enumerate(columns) if "Sum.Incoming" in str(c)), None)
+        if name_idx is not None and cost_idx is not None:
+            for row in rows:
+                if isinstance(row, list) and len(row) > max(name_idx, cost_idx):
+                    try:
+                        name = str(row[name_idx]).strip()
+                        cost = float(row[cost_idx])
+                        if name:
+                            costs[name] = cost
+                    except (TypeError, ValueError):
+                        pass
+        return costs
+
+    # Формат 2: строки-словари
+    if rows and isinstance(rows[0], dict):
+        for row in rows:
+            name = str(row.get("Product.Name") or "").strip()
+            try:
+                cost = float(row.get("Sum.Incoming") or 0)
+                if name:
+                    costs[name] = cost
+            except (TypeError, ValueError):
+                pass
+
+    return costs
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -263,135 +459,250 @@ def sync_products_from_iiko(
     server_login: str = "",
     server_password: str = "",
 ) -> dict:
-    from .models import Product, MealCategory, SLOT_LABELS
+    global _last_sync_time
 
-    result = {"created": 0, "updated": 0, "skipped": 0, "errors": []}
+    now_ts = time.time()
+    elapsed = now_ts - _last_sync_time
+    if elapsed < MIN_SYNC_INTERVAL:
+        wait_left = int(MIN_SYNC_INTERVAL - elapsed)
+        return {
+            "created": 0, "updated": 0, "skipped": 0, "deleted": 0,
+            "errors": [f"Синхронизация запущена слишком часто. Подождите ещё {wait_left} сек."]
+        }
 
-    # ── 1. Получаем блюда из внешнего меню iikoCloud ──────────────────────────
+    from .models import Product, MealCategory, Allergen
+
+    result = {
+        "created": 0, "updated": 0, "skipped": 0,
+        "deleted": 0, "unchanged": 0, "errors": []
+    }
+
     cloud = IikoCloudClient(cloud_api_key)
+
+    # ── Шаг 1: Внешнее меню ──────────────────────────────────────────────────
     try:
         menu_data = cloud.get_menu_by_id(external_menu_id, org_id)
     except Exception as e:
-        result["errors"].append(f"iikoCloud: не удалось получить меню — {e}")
+        result["errors"].append(f"iikoCloud menu: {e}")
         return result
 
-    cloud_items = _extract_items_from_menu(menu_data)
-    if not cloud_items:
-        result["errors"].append("iikoCloud: меню получено, но блюд не найдено. Проверь external_menu_id.")
+    menu_map = _extract_menu_items(menu_data)
+    if not menu_map:
+        result["errors"].append("iikoCloud: блюд в меню не найдено.")
         return result
 
-    logger.info(f"iikoCloud: найдено {len(cloud_items)} блюд в меню {external_menu_id}")
+    logger.info(f"iikoCloud menu: {len(menu_map)} блюд")
 
-    # ── 2. Получаем данные из iiko Server (состав) ────────────────────────────
-    # ── 2. Получаем данные из iiko Server (состав = description) ────────────
-    server_data = {}
+    # ── Шаг 2: Номенклатура — артикулы ───────────────────────────────────────
+    uuid_to_sku = {}
+    try:
+        nom = cloud.get_nomenclature(org_id)
+        for prod in nom.get("products") or []:
+            pid = prod.get("id") or ""
+            num = prod.get("num") or prod.get("code") or ""
+            if pid and num:
+                uuid_to_sku[pid] = str(num).strip()
+        logger.info(f"Nomenclature: {len(uuid_to_sku)} артикулов")
+    except Exception as e:
+        logger.warning(f"Номенклатура: {e}")
+        result["errors"].append(f"Nomenclature: {e}")
+
+    # ── Шаг 3: iiko Server — состав + себестоимость ──────────────────────────
+    server_composition = {}
+    cost_by_name = {}
     if server_url and server_login:
+        server = None
         try:
-            import json as _json
             server = IikoServerClient(server_url, server_login, server_password)
-            server_products = server.get_products()
 
-            menu_ids = {item["id"] for item in cloud_items}
+            # Состав блюд
+            server_products = server.get_products()
+            menu_ids = set(menu_map.keys())
             for sp in server_products:
-                pid  = sp.get("id") or ""
-                desc = sp.get("description") or ""
-                if pid not in menu_ids or not desc:
+                pid = sp.get("id") or ""
+                if pid not in menu_ids:
                     continue
-                # description может прийти как JSON-строка — парсим до plain text
-                if isinstance(desc, str):
-                    try:
-                        desc = _json.loads(desc)
-                    except Exception:
-                        pass
-                if isinstance(desc, list):
-                    # формат [{"text": "..."}, ...]
-                    desc = " ".join(
-                        block.get("text", "") if isinstance(block, dict) else str(block)
-                        for block in desc
-                    ).strip()
+                desc = _parse_description(sp.get("description"))
                 if desc:
-                    server_data[pid] = {"composition": str(desc).strip()}
+                    server_composition[pid] = desc
+                time.sleep(RATE_LIMIT_DELAY)
+            logger.info(f"iiko Server: состав для {len(server_composition)} блюд")
+
+            # Себестоимость из OLAP-отчёта
+            try:
+                raw_report = server.get_cost_report()
+                cost_by_name = _parse_cost_report(raw_report)
+                logger.info(f"OLAP себестоимость: {len(cost_by_name)} блюд")
+            except Exception as e:
+                logger.warning(f"OLAP отчёт себестоимости: {e}")
+                result["errors"].append(f"OLAP себестоимость: {e}")
 
             server.logout()
         except Exception as e:
-            logger.warning(f"iiko Server недоступен: {e}")
-            result["errors"].append(f"iiko Server: {e} (синхронизация продолжена без состава)")
+            logger.warning(f"iiko Server: {e}")
+            result["errors"].append(f"iiko Server: {e}")
+            if server:
+                try:
+                    server.logout()
+                except Exception:
+                    pass
 
-    # ── 3. Синхронизируем с базой ─────────────────────────────────────────────
+    # ── Шаг 4: Артикулы ──────────────────────────────────────────────────────
+    iiko_skus_in_menu = set()
+    iiko_uuid_to_sku  = {}
+    for uuid in menu_map:
+        sku = uuid_to_sku.get(uuid, uuid)
+        iiko_skus_in_menu.add(sku)
+        iiko_uuid_to_sku[uuid] = sku
+
+    # ── Шаг 5: Удаление ──────────────────────────────────────────────────────
+    products_to_delete = Product.objects.filter(
+        iiko_sku__isnull=False
+    ).exclude(iiko_sku__in=iiko_skus_in_menu)
+
+    deleted_count = products_to_delete.count()
+    if deleted_count > 0:
+        if deleted_count > 100:
+            result["errors"].append(
+                f"Попытка удалить {deleted_count} продуктов — превышен лимит 100. "
+                f"Проверь IIKO_EXTERNAL_MENU_ID."
+            )
+            return result
+        names = list(products_to_delete.values_list("name", flat=True))
+        logger.info(f"Удаляем {deleted_count}: {names}")
+        products_to_delete.delete()
+        result["deleted"] = deleted_count
+
+    # ── Шаг 6: Предзагружаем существующие продукты ───────────────────────────
+    existing_by_sku = {
+        p.iiko_sku: p
+        for p in Product.objects.filter(iiko_sku__in=iiko_skus_in_menu)
+    }
+    existing_by_uuid = {
+        p.iiko_id: p
+        for p in Product.objects.filter(
+            iiko_id__in=set(menu_map.keys())
+        ).exclude(iiko_sku__isnull=False)
+    }
+
     now = dj_timezone.now()
 
-    for item in cloud_items:
-        iiko_id = item["id"]
+    # ── Шаг 7: Создаём / обновляем ───────────────────────────────────────────
+    for uuid, menu_info in menu_map.items():
+        sku = iiko_uuid_to_sku.get(uuid, uuid)
+
         try:
-            product = None
-            try:
-                product = Product.objects.get(iiko_id=iiko_id)
-            except Product.DoesNotExist:
-                pass
+            product = existing_by_sku.get(sku) or existing_by_uuid.get(uuid)
+            is_new = product is None
 
-            srv = server_data.get(iiko_id, {})
-
-            fields = {
-                "name":          item["name"],
-                "iiko_category": item["category_name"],
-                "iiko_synced_at": now,
+            new_fields = {
+                "name":           menu_info["name"],
+                "iiko_category":  menu_info.get("category_name", ""),
+                "iiko_sku":       sku,
+                "iiko_id":        uuid,
             }
+            if menu_info.get("packing"):
+                new_fields["packing"] = menu_info["packing"]
+            if menu_info.get("weight") is not None:
+                new_fields["net_weight"] = menu_info["weight"] / 1000
+            for src, dst in [
+                ("kcal",      "kcal_per_100"),
+                ("protein",   "protein"),
+                ("fat",       "fat"),
+                ("carbs",     "carbs"),
+                ("kj_100",    "kj_per_100"),
+                ("kcal_s",    "kcal_per_serving"),
+                ("protein_s", "protein_per_serving"),
+                ("fat_s",     "fat_per_serving"),
+                ("carbs_s",   "carbs_per_serving"),
+                ("kj_s",      "kj_per_serving"),
+            ]:
+                if menu_info.get(src) is not None:
+                    new_fields[dst] = menu_info[src]
+            if uuid in server_composition:
+                new_fields["composition"] = server_composition[uuid]
 
-            # Кратность из iikoCloud
-            if item.get("packing"):
-                fields["packing"] = item["packing"]
+            # Себестоимость: ищем по имени (сначала точное, потом без учёта регистра)
+            if cost_by_name:
+                product_name = menu_info["name"]
+                cost_val = cost_by_name.get(product_name)
+                if cost_val is None:
+                    name_upper = product_name.upper()
+                    cost_val = next(
+                        (v for k, v in cost_by_name.items() if k.upper() == name_upper),
+                        None,
+                    )
+                if cost_val is not None:
+                    new_fields["cost"] = round(cost_val, 2)
 
-            # КБЖУ на 100г
-            if item.get("kcal") is not None:
-                fields["kcal_per_100"] = item["kcal"]
-            if item.get("protein") is not None:
-                fields["protein"] = item["protein"]
-            if item.get("fat") is not None:
-                fields["fat"] = item["fat"]
-            if item.get("carbs") is not None:
-                fields["carbs"] = item["carbs"]
-
-            # КБЖУ на порцию
-            if item.get("kcal_s") is not None:
-                fields["kcal_per_serving"] = item["kcal_s"]
-            if item.get("protein_s") is not None:
-                fields["protein_per_serving"] = item["protein_s"]
-            if item.get("fat_s") is not None:
-                fields["fat_per_serving"] = item["fat_s"]
-            if item.get("carbs_s") is not None:
-                fields["carbs_per_serving"] = item["carbs_s"]
-
-            # Масса нетто (уже в граммах)
-            if item.get("weight") is not None:
-                fields["net_weight"] = item["weight"] / 1000
-
-            #КДЖ
-            if item.get("kj_100") is not None:
-                fields["kj_per_100"] = item["kj_100"]
-            if item.get("kj_s") is not None:
-                fields["kj_per_serving"] = item["kj_s"]
-            # Состав из iiko Server
-            if srv.get("composition"):
-                fields["composition"] = srv["composition"]
-
-            if product:
-                for k, v in fields.items():
-                    setattr(product, k, v)
-                product.save()
-                result["updated"] += 1
-            else:
-                fields["iiko_id"] = iiko_id
-                Product.objects.create(**fields)
+            if is_new:
+                new_fields["iiko_synced_at"] = now
+                product = Product.objects.create(**new_fields)
                 result["created"] += 1
+            else:
+                changed, changed_fields = _fields_changed(product, new_fields)
+                if changed:
+                    for k, v in new_fields.items():
+                        setattr(product, k, v)
+                    product.iiko_synced_at = now
+                    product.save()
+                    result["updated"] += 1
+                    logger.debug(f"Обновлён '{menu_info['name']}': {changed_fields}")
+                else:
+                    result["unchanged"] += 1
+
+            # ── Фото ─────────────────────────────────────────────────────────
+            photo_url = menu_info.get("photo_url", "")
+            if photo_url and _photo_url_changed(product, photo_url):
+                photo_data, ext = _download_photo(photo_url)
+                if photo_data:
+                    url_hash = hashlib.md5(photo_url.encode()).hexdigest()[:8]
+                    filename = f"iiko_{sku}_{url_hash}{ext}"
+                    if product.photo:
+                        try:
+                            product.photo.delete(save=False)
+                        except Exception:
+                            pass
+                    product.photo.save(filename, ContentFile(photo_data), save=True)
+
+            # ── Аллергены ─────────────────────────────────────────────────────
+            # get_or_create каждого аллергена по имени, затем синхронизируем M2M
+            allergen_names = menu_info.get("allergen_names") or []
+            if allergen_names:
+                allergen_objs = []
+                for a_name in allergen_names:
+                    allergen, _ = Allergen.objects.get_or_create(name=a_name)
+                    allergen_objs.append(allergen)
+                # Полная замена — устанавливаем ровно тех что пришли из iiko
+                product.allergens.set(allergen_objs)
+            else:
+                # Если в iiko аллергенов нет — очищаем
+                product.allergens.clear()
+
+            # ── Категория ─────────────────────────────────────────────────────
+            cat_name = menu_info.get("category_name", "").strip()
+            if cat_name:
+                slot_key = _SLOT_LABEL_TO_KEY.get(cat_name)
+                if slot_key:
+                    try:
+                        meal_cat = MealCategory.objects.get(key=slot_key)
+                        product.meal_categories.add(meal_cat)
+                    except MealCategory.DoesNotExist:
+                        logger.debug(f"MealCategory '{slot_key}' не найдена в БД")
 
         except Exception as e:
-            msg = f"Ошибка для '{item.get('name', iiko_id)}': {e}"
-            logger.error(msg)
+            msg = f"'{menu_info.get('name', uuid)}': {e}"
+            logger.error(f"Ошибка: {msg}")
             result["errors"].append(msg)
             result["skipped"] += 1
 
+    _last_sync_time = time.time()
+
     logger.info(
-        f"Синхронизация завершена: создано {result['created']}, "
-        f"обновлено {result['updated']}, пропущено {result['skipped']}"
+        f"Готово — создано: {result['created']}, "
+        f"обновлено: {result['updated']}, "
+        f"без изменений: {result['unchanged']}, "
+        f"удалено: {result['deleted']}, "
+        f"пропущено: {result['skipped']}"
     )
     return result

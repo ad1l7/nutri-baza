@@ -414,14 +414,23 @@
     </svg>
     Фильтры
   </button>
+  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
   <button type="button" id="iiko-sync-btn" class="iiko-sync-btn" onclick="runIikoSync()">
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-    <polyline points="23 4 23 10 17 10"/>
-    <polyline points="1 20 1 14 7 14"/>
-    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-  </svg>
-  <span id="iiko-sync-label">Обновить из iiko</span>
-</button>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <polyline points="23 4 23 10 17 10"/>
+      <polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+    <span id="iiko-sync-label">Обновить из iiko</span>
+  </button>
+  <!-- Счётчик попыток -->
+  <div id="iiko-counter" title="Осталось синхронизаций сегодня"
+       style="font-size:11px;font-weight:700;color:var(--muted);background:var(--light);
+              border:1.5px solid var(--border);border-radius:20px;padding:3px 10px;
+              white-space:nowrap;cursor:default;">
+    — / 5
+  </div>
+</div>
  
 <!-- Тост-уведомление -->
 <div id="iiko-toast" class="iiko-toast"></div>
@@ -729,8 +738,58 @@
 </div>
 
 <script>
-  function runIikoSync() {
-  const btn = document.getElementById('iiko-sync-btn');
+  // Загружаем счётчик при старте страницы
+(function loadSyncStatus() {
+  fetch('/iiko/status/')
+    .then(r => r.json())
+    .then(data => updateCounter(data))
+    .catch(() => {});
+})();
+ 
+function updateCounter(data) {
+  const counter = document.getElementById('iiko-counter');
+  const btn     = document.getElementById('iiko-sync-btn');
+  if (!counter) return;
+ 
+  const remaining = data.remaining ?? 0;
+  const limit     = data.limit ?? 5;
+ 
+  counter.textContent = `${remaining} / ${limit}`;
+ 
+  // Цвет счётчика по остатку
+  if (remaining === 0) {
+    counter.style.color      = 'var(--danger)';
+    counter.style.background = 'rgba(214,75,42,.08)';
+    counter.style.borderColor = 'rgba(214,75,42,.3)';
+    counter.title = 'Лимит исчерпан. Обновится завтра.';
+  } else if (remaining <= 2) {
+    counter.style.color       = 'var(--amber)';
+    counter.style.background  = 'var(--amber-bg)';
+    counter.style.borderColor = '#e8c06a';
+    counter.title = `Осталось ${remaining} попытки сегодня`;
+  } else {
+    counter.style.color       = 'var(--green-mid)';
+    counter.style.background  = 'var(--light)';
+    counter.style.borderColor = 'var(--border)';
+    counter.title = `Осталось ${remaining} попыток сегодня`;
+  }
+ 
+  // Блокируем кнопку если лимит исчерпан
+  if (!data.can_sync) {
+    btn.disabled = true;
+    btn.style.opacity = '0.45';
+    btn.style.cursor  = 'not-allowed';
+    btn.style.pointerEvents = 'none';
+  } else {
+    btn.disabled = false;
+    btn.style.opacity = '';
+    btn.style.cursor  = '';
+    btn.style.pointerEvents = '';
+  }
+}
+ 
+function runIikoSync() {
+  const btn   = document.getElementById('iiko-sync-btn');
   const label = document.getElementById('iiko-sync-label');
   btn.classList.add('loading');
   label.textContent = 'Синхронизация…';
@@ -747,22 +806,32 @@
     btn.classList.remove('loading');
     label.textContent = 'Обновить из iiko';
  
-    const toast = document.getElementById('iiko-toast');
-    toast.className = 'iiko-toast ' + (data.ok ? '' : 'error');
+    // Обновляем счётчик
+    if (data.remaining !== undefined) {
+      updateCounter({
+        remaining: data.remaining,
+        limit: 5,
+        can_sync: data.remaining > 0,
+      });
+    }
  
+    const toast = document.getElementById('iiko-toast');
     if (data.ok) {
-      toast.innerHTML = '✅ ' + data.message;
+      // Добавляем остаток попыток в сообщение
+      const rem = data.remaining !== undefined ? ` (осталось: ${data.remaining})` : '';
+      toast.className = 'iiko-toast';
+      toast.innerHTML = '✅ ' + data.message + rem;
     } else {
       const firstErr = data.detail?.errors?.[0] || data.message;
+      toast.className = 'iiko-toast error';
       toast.innerHTML = '❌ ' + firstErr;
     }
  
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 4000);
+    setTimeout(() => toast.classList.remove('show'), 5000);
  
-    // Если были созданы/обновлены продукты — перезагрузить страницу
-    if (data.ok && (data.detail?.created > 0 || data.detail?.updated > 0)) {
-      setTimeout(() => window.location.reload(), 1500);
+    if (data.ok && (data.detail?.created > 0 || data.detail?.updated > 0 || data.detail?.deleted > 0)) {
+      setTimeout(() => window.location.reload(), 1800);
     }
   })
   .catch(err => {

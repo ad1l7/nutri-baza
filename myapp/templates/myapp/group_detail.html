@@ -1,0 +1,311 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — {{ group.name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a;
+    --radius:12px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 12px rgba(30,77,20,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:13px;min-height:100vh;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 24px;height:56px;
+    display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .back-btn{display:flex;align-items:center;gap:5px;text-decoration:none;color:var(--muted);
+    font-size:12px;font-weight:700;padding:5px 11px;border-radius:8px;border:1.5px solid var(--border);transition:all .18s;}
+  .back-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
+  .topbar-title{font-size:15px;font-weight:800;color:var(--text);flex:1;}
+  .topbar-meta{font-size:12px;color:var(--muted);font-weight:600;}
+
+  .main{max-width:1400px;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
+
+  .group-header{background:var(--green-dark);border-radius:var(--radius);padding:18px 24px;
+    display:flex;align-items:center;gap:14px;}
+  .gh-info{flex:1;}
+  .gh-name{font-size:19px;font-weight:800;color:#fff;}
+  .gh-desc{font-size:11px;color:rgba(255,255,255,.6);margin-top:3px;}
+  .gh-stats{display:flex;gap:24px;}
+  .gh-stat{text-align:center;}
+  .gh-sv{font-size:20px;font-weight:800;color:#fff;}
+  .gh-sl{font-size:9px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.8px;margin-top:1px;}
+
+  .ration-block{background:var(--white);border:1.5px solid var(--border);
+    border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+
+  .rb-head{background:var(--green-dark);padding:11px 18px;display:flex;align-items:center;gap:12px;}
+  .rb-badge{background:rgba(255,255,255,.18);color:#fff;font-size:11px;font-weight:800;
+    padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0;}
+  .rb-name{font-size:14px;font-weight:800;color:#fff;flex:1;}
+  .rb-edit{background:rgba(255,255,255,.15);border:none;border-radius:7px;width:28px;height:28px;
+    color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;
+    text-decoration:none;transition:background .15s;flex-shrink:0;}
+  .rb-edit:hover{background:rgba(255,255,255,.3);}
+
+  /* КБЖУ */
+  .rb-nutr{display:flex;border-bottom:1.5px solid var(--border-soft);}
+  .rn{flex:1;padding:9px 12px;text-align:center;border-right:1px solid var(--border-soft);}
+  .rn:last-child{border-right:none;}
+  .rn-v{font-size:17px;font-weight:800;color:var(--text);}
+  .rn-v.k{color:var(--green-mid);}
+  .rn-l{font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-top:1px;}
+  .rn-prog{height:2px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;}
+  .rn-bar{height:100%;border-radius:2px;background:var(--green);}
+  .rn-bar.over{background:var(--danger);}
+
+  /* Подпись «КБЖУ на порцию» над таблицей */
+  .rb-table-label{
+    padding:6px 14px;
+    font-size:10px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.8px;
+    background:var(--off-white);
+    border-bottom:1px solid var(--border-soft);
+  }
+
+  .rb-table-wrap{overflow-x:auto;}
+
+  table.dt{
+    width:100%;border-collapse:collapse;font-size:12px;
+    table-layout:fixed;
+  }
+
+  col.c-photo  { width:50px; }
+  col.c-cat    { width:165px; }
+  col.c-name   { width:auto; }
+  col.c-weight { width:72px; }
+  col.c-cost   { width:80px; }
+  col.c-kcal   { width:62px; }
+  col.c-prot   { width:58px; }
+  col.c-fat    { width:58px; }
+  col.c-carb   { width:62px; }
+  col.c-allerg { width:220px; }
+
+  thead.dt-head th{
+    background:var(--off-white);
+    padding:6px 8px;
+    font-size:10px;font-weight:700;color:var(--muted);
+    text-transform:uppercase;letter-spacing:.6px;
+    border-bottom:1.5px solid var(--border-soft);
+    white-space:nowrap;
+    text-align:left;
+  }
+  thead.dt-head th.r{text-align:right;}
+  thead.dt-head th.c-photo{padding-left:14px;}
+  thead.dt-head th.c-allerg{padding-right:14px;}
+
+  tr.meal-hd td{
+    background:var(--light);
+    padding:5px 8px 5px 14px;
+    font-size:10px;font-weight:800;color:var(--text-mid);
+    text-transform:uppercase;letter-spacing:.8px;
+    border-top:1px solid var(--border-soft);
+    border-bottom:1px solid var(--border-soft);
+  }
+  tr.meal-hd:first-child td{border-top:none;}
+
+  /* Строка блюда — перенос текста разрешён */
+  tr.dish-r td{
+    padding:7px 8px;
+    border-bottom:1px solid var(--border-soft);
+    vertical-align:top; /* top чтобы многострочные ячейки выравнивались сверху */
+    overflow:hidden;
+  }
+  tr.dish-r:last-child td{border-bottom:none;}
+  tr.dish-r:hover td{background:var(--off-white);}
+
+  td.c-photo{padding-left:14px !important;padding-right:6px !important;vertical-align:middle;}
+  td.c-cat{
+    color:var(--muted);font-weight:600;font-size:11px;
+    white-space:normal; /* перенос */
+    line-height:1.4;
+  }
+  td.c-name{
+    font-weight:700;color:var(--text);
+    white-space:normal; /* перенос длинных названий */
+    line-height:1.4;
+  }
+  td.c-weight{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
+  td.c-cost{text-align:right;font-weight:700;color:var(--text);white-space:nowrap;vertical-align:middle;}
+  td.c-kcal{text-align:right;font-weight:800;color:var(--green-mid);white-space:nowrap;vertical-align:middle;}
+  td.c-prot{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
+  td.c-fat{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
+  td.c-carb{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
+  td.c-allerg{
+    padding-right:14px !important;
+    white-space:normal; /* аллергены переносятся */
+    line-height:1.6;
+    vertical-align:middle;
+  }
+
+  .thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid var(--border);display:block;}
+  .thumb-ph{width:34px;height:34px;border-radius:7px;background:var(--light);
+    border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:15px;}
+
+  .atag{display:inline-block;background:#fff3e0;border:1px solid #f5c06a;color:#7a4500;
+    border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin:1px 2px 1px 0;}
+
+  .rb-foot{padding:8px 16px;border-top:1px solid var(--border-soft);background:var(--off-white);}
+  .rb-filled{font-size:11px;color:var(--muted);font-weight:600;}
+  .rb-filled strong{color:var(--text-mid);}
+
+  .empty-state{text-align:center;padding:50px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="{% url 'ration_group_list' %}" class="back-btn">← Рационы</a>
+  <span class="topbar-title">{{ group.name }}</span>
+  <span class="topbar-meta">{{ rations_data|length }} рацион{{ rations_data|length|pluralize:",,ов" }}</span>
+</div>
+
+<div class="main">
+
+  <div class="group-header">
+    <div class="gh-info">
+      <div class="gh-name">{{ group.name }}</div>
+      {% if group.description %}<div class="gh-desc">{{ group.description }}</div>{% endif %}
+    </div>
+    <div class="gh-stats">
+      <div class="gh-stat"><div class="gh-sv">{{ rations_data|length }}</div><div class="gh-sl">Рационов</div></div>
+      <div class="gh-stat"><div class="gh-sv">{{ total_slots }}</div><div class="gh-sl">Слотов</div></div>
+      <div class="gh-stat"><div class="gh-sv">{{ filled_slots }}</div><div class="gh-sl">Заполнено</div></div>
+    </div>
+  </div>
+
+  {% if rations_data %}
+  {% for rd in rations_data %}{% with r=rd.ration %}
+  <div class="ration-block">
+
+    <div class="rb-head">
+      <div class="rb-badge">⚡ {{ r.kcal_category }} ккал</div>
+      <div class="rb-name">{{ r.name }}</div>
+      <a href="{% url 'ration_edit' r.pk %}" class="rb-edit" title="Редактировать">✏️</a>
+    </div>
+
+    <div class="rb-nutr">
+      <div class="rn">
+        <div class="rn-v k">{{ rd.total_kcal|floatformat:0 }}</div>
+        <div class="rn-l">Ккал</div>
+        <div class="rn-prog">
+          <div class="rn-bar {% if rd.total_kcal > r.kcal_category %}over{% endif %}"
+               style="width:{% if r.kcal_category %}{% widthratio rd.total_kcal r.kcal_category 100 %}{% else %}0{% endif %}%"></div>
+        </div>
+      </div>
+      <div class="rn"><div class="rn-v">{{ rd.total_protein|floatformat:1 }}</div><div class="rn-l">Белки г</div></div>
+      <div class="rn"><div class="rn-v">{{ rd.total_fat|floatformat:1 }}</div><div class="rn-l">Жиры г</div></div>
+      <div class="rn"><div class="rn-v">{{ rd.total_carbs|floatformat:1 }}</div><div class="rn-l">Углев. г</div></div>
+      <div class="rn"><div class="rn-v">{{ rd.filled }}</div><div class="rn-l">Блюд</div></div>
+    </div>
+
+    <!-- Подпись над таблицей -->
+    <div class="rb-table-label">КБЖУ указано на 1 порцию</div>
+
+    <div class="rb-table-wrap">
+      <table class="dt">
+        <colgroup>
+          <col class="c-photo">
+          <col class="c-cat">
+          <col class="c-name">
+          <col class="c-weight">
+          <col class="c-cost">
+          <col class="c-kcal">
+          <col class="c-prot">
+          <col class="c-fat">
+          <col class="c-carb">
+          <col class="c-allerg">
+        </colgroup>
+        <thead class="dt-head">
+          <tr>
+            <th class="c-photo"></th>
+            <th class="c-cat">Категория</th>
+            <th class="c-name">Наименование</th>
+            <th class="c-weight r">Масса, г</th>
+            <th class="c-cost r">Себест.</th>
+            <th class="c-kcal r">Ккал</th>
+            <th class="c-prot r">Белки</th>
+            <th class="c-fat r">Жиры</th>
+            <th class="c-carb r">Углев.</th>
+            <th class="c-allerg">Аллергены</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for mg in rd.meal_groups %}
+
+          <tr class="meal-hd">
+            <td colspan="10">{{ mg.meal_time.icon }} {{ mg.meal_time.name }}</td>
+          </tr>
+
+          {% for slot in mg.slots %}{% if slot.product %}
+          <tr class="dish-r">
+            <td class="c-photo">
+              {% if slot.product.photo %}
+                <img src="{{ slot.product.photo.url }}" class="thumb" alt="">
+              {% else %}
+                <div class="thumb-ph">🥗</div>
+              {% endif %}
+            </td>
+            <td class="c-cat">{{ slot.get_slot_type_display|default:"—" }}</td>
+            <td class="c-name">{{ slot.product.name }}</td>
+            <td class="c-weight">
+              {# net_weight хранится в кг → умножаем на 1000 для отображения в граммах #}
+              {% if slot.product.net_weight %}
+                {% with w=slot.product.net_weight|mul:1000 %}
+                  0.{{ w|floatformat:0 }}
+                {% endwith %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="c-cost">
+              {% if slot.product.cost %}{{ slot.product.cost|floatformat:0 }} ₸{% else %}—{% endif %}
+            </td>
+            <td class="c-kcal">
+              {% if slot.product.kcal_per_serving %}{{ slot.product.kcal_per_serving|floatformat:0 }}{% else %}—{% endif %}
+            </td>
+            <td class="c-prot">
+              {% if slot.product.protein_per_serving %}{{ slot.product.protein_per_serving|floatformat:1 }}{% else %}—{% endif %}
+            </td>
+            <td class="c-fat">
+              {% if slot.product.fat_per_serving %}{{ slot.product.fat_per_serving|floatformat:1 }}{% else %}—{% endif %}
+            </td>
+            <td class="c-carb">
+              {% if slot.product.carbs_per_serving %}{{ slot.product.carbs_per_serving|floatformat:1 }}{% else %}—{% endif %}
+            </td>
+            <td class="c-allerg">
+              {% for a in slot.product.allergens.all %}
+                <span class="atag">{{ a.name }}</span>
+              {% empty %}—{% endfor %}
+            </td>
+          </tr>
+          {% endif %}{% endfor %}
+
+          {% empty %}
+          <tr><td colspan="10" style="padding:12px 14px;color:var(--muted);font-style:italic;">Нет приёмов пищи</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rb-foot">
+      <span class="rb-filled">Заполнено <strong>{{ rd.filled }}</strong> из {{ rd.total }} блюд</span>
+    </div>
+
+  </div>
+  {% endwith %}{% endfor %}
+
+  {% else %}
+  <div class="empty-state">🥗<br><br>В этой группе пока нет рационов</div>
+  {% endif %}
+
+</div>
+</body>
+</html>

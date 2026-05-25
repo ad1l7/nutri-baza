@@ -162,6 +162,8 @@
           {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
         </div>
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
+        <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn" 
+   title="Просмотр группы" style="text-decoration:none;">👁️</a>
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 
@@ -172,7 +174,7 @@
           <div class="ration-row">
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
-            <span class="ration-dish-count">{{ ri.slots|length }} блюд</span>
+            <span class="ration-dish-count">{{ ri.filled_count }} блюд</span>
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
             </button>
@@ -283,10 +285,6 @@
             {% endfor %}
           </div>
           <!-- Превью шаблона -->
-          <div class="tmpl-preview" id="tmpl-preview">
-            <div class="tmpl-preview-title">📐 Слоты из шаблона:</div>
-            <div id="tmpl-preview-slots"></div>
-          </div>
         </div>
         <button type="submit" class="fsub">Создать и открыть редактор →</button>
       </div>

@@ -40,3 +40,12 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return 0
+    
+@register.filter
+def multiply(value, arg):
+    """Умножает value на arg. Используется для перевода кг → г."""
+    try:
+        return float(value) * float(arg)
+    except (TypeError, ValueError):
+        return ""
+ 
