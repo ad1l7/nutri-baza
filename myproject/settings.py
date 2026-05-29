@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 import os
 
 MEDIA_URL = '/media/'
@@ -26,12 +27,21 @@ MEDIA_ROOT = BASE_DIR / 'media'
 SECRET_KEY = 'f^$ns03x0^0++xawzg2u71adjfy8&eo2zy%k#1s@y6y8!kpxd-'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = ['malaysia-curule-unmelodiously.ngrok-free.dev', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['olive-nutri-baza.kz', 'www.olive-nutri-baza.kz', '89.207.253.104']
 CSRF_TRUSTED_ORIGINS = ['https://malaysia-curule-unmelodiously.ngrok-free.dev']
 
-
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
+}
 IIKO_CLOUD_API_KEY    = "5ee9c3345f694fb7b08b24e488b4a141"
 IIKO_ORG_ID           = "ce7007f2-fabd-4beb-886e-5e077f9aff66"
 IIKO_EXTERNAL_MENU_ID = "78054"
@@ -97,11 +107,14 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
@@ -143,3 +156,4 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.1/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
