@@ -1012,6 +1012,9 @@ function toggleSidebar() {
   }
 })();
 </script>
+{% comment %}csrf_token вне GET-формы — нужен чтобы Django устанавливал csrftoken cookie, которую читает doLogout(){% endcomment %}
+<div style="display:none">{% csrf_token %}</div>
+
 <script>
 function doLogout() {
   fetch('/logout/', {
