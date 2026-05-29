@@ -432,7 +432,8 @@
               white-space:nowrap;cursor:default;">
     — / 5
   </div>
-<button type="submit" form="logout-form" class="logout-btn" title="Выйти из системы">
+<button type="button" class="logout-btn" title="Выйти из системы"
+    onclick="document.getElementById('logout-form').submit()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
       <polyline points="16 17 21 12 16 7"/>
