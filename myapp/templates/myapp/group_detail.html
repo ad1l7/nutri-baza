@@ -27,6 +27,8 @@
   .back-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
   .topbar-title{font-size:15px;font-weight:800;color:var(--text);flex:1;}
   .topbar-meta{font-size:12px;color:var(--muted);font-weight:600;}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:8px;padding:5px 11px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;flex-shrink:0;}
+  .logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
 
   .main{max-width:1400px;margin:0 auto;padding:20px 24px;display:flex;flex-direction:column;gap:16px;}
 
@@ -167,6 +169,17 @@
   <a href="{% url 'ration_group_list' %}" class="back-btn">← Рационы</a>
   <span class="topbar-title">{{ group.name }}</span>
   <span class="topbar-meta">{{ rations_data|length }} рацион{{ rations_data|length|pluralize:",,ов" }}</span>
+  <form method="post" action="{% url 'logout' %}" style="display:contents">
+    {% csrf_token %}
+    <button type="submit" class="logout-btn" title="Выйти из системы">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Выйти
+    </button>
+  </form>
 </div>
 
 <div class="main">

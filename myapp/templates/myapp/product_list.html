@@ -357,7 +357,9 @@
   .nutr-val { font-weight: 700; }
   .nutr-val.green { color: var(--green-mid); }
   .nutr-val.amber { color: var(--amber); }
-  .iiko-sync-btn {
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
+.iiko-sync-btn {
   background: var(--white); border: 1.5px solid var(--border);
   color: var(--text-mid); border-radius: 9px; padding: 8px 14px;
   font-family: var(--font); font-size: 13px; font-weight: 700;
@@ -430,6 +432,17 @@
               white-space:nowrap;cursor:default;">
     — / 5
   </div>
+  <form method="post" action="{% url 'logout' %}" style="display:contents">
+    {% csrf_token %}
+    <button type="submit" class="logout-btn" title="Выйти из системы">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Выйти
+    </button>
+  </form>
 </div>
  
 <!-- Тост-уведомление -->

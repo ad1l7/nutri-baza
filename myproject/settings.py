@@ -26,9 +26,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 SECRET_KEY = 'f^$ns03x0^0++xawzg2u71adjfy8&eo2zy%k#1s@y6y8!kpxd-'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ['malaysia-curule-unmelodiously.ngrok-free.dev', 'localhost', '127.0.0.1']
+CSRF_TRUSTED_ORIGINS = ['https://malaysia-curule-unmelodiously.ngrok-free.dev']
+
 
 IIKO_CLOUD_API_KEY    = "5ee9c3345f694fb7b08b24e488b4a141"
 IIKO_ORG_ID           = "ce7007f2-fabd-4beb-886e-5e077f9aff66"
@@ -54,9 +56,15 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'myapp.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# ── Авторизация ───────────────────────────────────────────────────────────────
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
 # LOGGING = {
 #     'version': 1,
 #     'handlers': {

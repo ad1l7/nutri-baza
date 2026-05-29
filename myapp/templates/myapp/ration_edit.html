@@ -28,6 +28,8 @@
   .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 24px;height:64px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
   .back-btn{display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--muted);font-size:13px;font-weight:600;padding:7px 12px;border-radius:9px;border:1.5px solid var(--border);transition:all .18s;flex-shrink:0;}
   .back-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;flex-shrink:0;}
+  .logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
   .topbar-name{font-size:15px;font-weight:700;color:var(--text-mid);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .topbar-nutr{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .tpill{background:var(--light);border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--text-mid);display:flex;align-items:center;gap:4px;white-space:nowrap;}
@@ -202,6 +204,17 @@
     </svg>
     Удалить рацион
   </button>
+  <form method="post" action="{% url 'logout' %}" style="display:contents">
+    {% csrf_token %}
+    <button type="submit" class="logout-btn" title="Выйти из системы">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Выйти
+    </button>
+  </form>
 </div>
 
 <div class="layout">

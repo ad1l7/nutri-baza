@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Вход</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc;
+    --danger:#d64b2a; --font:'Manrope',sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--green-dark);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image:
+      radial-gradient(ellipse at 65% 35%, rgba(90,170,60,.20) 0%, transparent 55%),
+      radial-gradient(ellipse at 15% 80%, rgba(0,0,0,.25) 0%, transparent 50%);
+  }
+
+  .login-card {
+    background: var(--white);
+    border-radius: 22px;
+    padding: 48px 44px 44px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 32px 80px rgba(0,0,0,.30), 0 4px 20px rgba(0,0,0,.18);
+  }
+
+  .logo {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--green-dark);
+    letter-spacing: -.5px;
+    margin-bottom: 4px;
+  }
+  .logo em { color: var(--green); font-style: normal; }
+  .logo-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: .2px;
+    margin-bottom: 36px;
+    padding-bottom: 28px;
+    border-bottom: 1.5px solid var(--border);
+  }
+
+  .card-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 26px; }
+
+  .error-box {
+    background: #fff5f3;
+    border: 1.5px solid #f4b8ae;
+    border-radius: 10px;
+    padding: 11px 14px;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-mid);
+    margin-bottom: 7px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--off-white);
+    border: 1.5px solid var(--border);
+    border-radius: 11px;
+    padding: 13px 16px;
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  .field input:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 0 3px rgba(90,170,60,.13);
+    background: var(--white);
+  }
+  .field input::placeholder { color: var(--muted); font-weight: 400; }
+
+  .submit-btn {
+    width: 100%;
+    background: var(--green);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 15px;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background .18s, transform .1s, box-shadow .18s;
+    margin-top: 10px;
+    box-shadow: 0 4px 18px rgba(90,170,60,.38);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .submit-btn:hover { background: var(--green-mid); box-shadow: 0 6px 24px rgba(90,170,60,.42); }
+  .submit-btn:active { transform: scale(.98); }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo">O-<em>Live</em></div>
+  <div class="logo-sub">Система управления рационами</div>
+
+  <div class="card-title">Вход в систему</div>
+  <div class="card-sub">Введите логин и пароль для продолжения</div>
+
+  <form method="post">
+    {% csrf_token %}
+    {% if form.errors %}
+    <div class="error-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Неверный логин или пароль. Попробуйте снова.
+    </div>
+    {% endif %}
+
+    <div class="field">
+      <label for="id_username">Логин</label>
+      <input type="text" name="username" id="id_username"
+             autofocus autocomplete="username" placeholder="Введите логин">
+    </div>
+    <div class="field">
+      <label for="id_password">Пароль</label>
+      <input type="password" name="password" id="id_password"
+             autocomplete="current-password" placeholder="Введите пароль">
+    </div>
+
+    {% if next %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+
+    <button type="submit" class="submit-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+        <polyline points="10 17 15 12 10 7"/>
+        <line x1="15" y1="12" x2="3" y2="12"/>
+      </svg>
+      Войти
+    </button>
+  </form>
+</div>
+</body>
+</html>
