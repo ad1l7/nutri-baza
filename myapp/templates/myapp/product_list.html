@@ -433,7 +433,7 @@
     — / 5
   </div>
 <button type="button" class="logout-btn" title="Выйти из системы"
-    onclick="document.getElementById('logout-form').submit()">
+    onclick="doLogout()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
       <polyline points="16 17 21 12 16 7"/>
@@ -1012,6 +1012,16 @@ function toggleSidebar() {
   }
 })();
 </script>
-<form method="post" action="{% url 'logout' %}" id="logout-form">{% csrf_token %}</form>
+<script>
+function doLogout() {
+  fetch('/logout/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrfToken() },
+    credentials: 'same-origin',
+  })
+  .then(() => { window.location.href = '/login/'; })
+  .catch(() => { window.location.href = '/login/'; });
+}
+</script>
 </body>
 </html>
