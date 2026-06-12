@@ -343,7 +343,7 @@
       <p>Выберите слот слева,<br>чтобы назначить блюдо</p>
       {% if occupied_count %}
       <p style="font-size:11px;color:var(--muted);margin-top:8px;">
-        ⚠️ {{ occupied_count }} блюд скрыто — используются в других рационах группы
+        ⚠️ {{ occupied_count }} блюд скрыто — используются в других рационах {{ ration.kcal_category }} ккал этой группы
       </p>
       {% endif %}
     </div>

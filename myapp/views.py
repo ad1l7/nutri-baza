@@ -335,12 +335,14 @@ def ration_edit(request, pk):
             "carbs":   round(carbs, 1),
         })
 
-    # Занятые продукты в других рационах группы
+    # Занятые продукты в других рационах группы той же калорийности:
+    # блюдо может повторяться в 1200 и 1500, но не в двух рационах по 1200
     occupied_ids = set()
     if ration.group_id:
         occupied_ids = set(
             RationSlot.objects.filter(
                 ration__group_id=ration.group_id,
+                ration__kcal_category=ration.kcal_category,
                 product__isnull=False,
             ).exclude(ration=ration)
             .values_list("product_id", flat=True)
