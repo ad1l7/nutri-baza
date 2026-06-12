@@ -11,6 +11,7 @@ iiko_sync.py — умная синхронизация продуктов из i
   - Удалённые из iiko → удаляем из БД
 """
 
+import re
 import time
 import hashlib
 import requests
@@ -44,6 +45,21 @@ _SLOT_LABEL_TO_KEY = {
     'Выпечка/Десерт 300–350 ккал': 'dessert_300',
     'Смузи 100–150 ккал':          'smoothie',
     'Сэндвич 300–350 ккал':        'sandwich',
+}
+
+
+def _normalize_label(s: str) -> str:
+    """Приводит название группы к единому виду для сравнения:
+    разные виды тире/дефиса → '-', убираем слово 'ккал', лишние пробелы, регистр."""
+    s = s.strip().lower()
+    s = re.sub(r'[‐-―−]', '-', s)
+    s = re.sub(r'\s*ккал\s*', '', s)
+    s = re.sub(r'\s+', ' ', s).strip()
+    return s
+
+
+_SLOT_LABEL_TO_KEY_NORM = {
+    _normalize_label(label): key for label, key in _SLOT_LABEL_TO_KEY.items()
 }
 
 _COMPARE_FIELDS = [
@@ -682,7 +698,7 @@ def sync_products_from_iiko(
             # ── Категория ─────────────────────────────────────────────────────
             cat_name = menu_info.get("category_name", "").strip()
             if cat_name:
-                slot_key = _SLOT_LABEL_TO_KEY.get(cat_name)
+                slot_key = _SLOT_LABEL_TO_KEY_NORM.get(_normalize_label(cat_name))
                 if slot_key:
                     try:
                         meal_cat = MealCategory.objects.get(key=slot_key)
