@@ -89,7 +89,7 @@ class Product(models.Model):
 # ── Лог синхронизаций iiko ────────────────────────────────────────────────────
 
 class IikoSyncLog(models.Model):
-    DAILY_LIMIT = 5
+    DAILY_LIMIT = 1000  # временно увеличено для тестирования категорий
 
     synced_at = models.DateTimeField(auto_now_add=True, verbose_name="Время синхронизации")
     created_count = models.IntegerField(default=0, verbose_name="Создано")

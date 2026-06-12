@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 RATE_LIMIT_DELAY  = 0.2
 MAX_RETRIES       = 3
 RETRY_DELAY       = 5
-MIN_SYNC_INTERVAL = 30
+MIN_SYNC_INTERVAL = 5  # временно уменьшено для тестирования категорий
 
 _last_sync_time = 0
 
@@ -538,6 +538,20 @@ def sync_products_from_iiko(
         return result
 
     logger.info(f"iikoCloud menu: {len(menu_map)} блюд")
+
+    # Диагностика: какие категории реально приходят из iiko и совпадают ли с SLOT_TYPES
+    all_cat_names = {}
+    for info in menu_map.values():
+        for cn in info.get("category_names") or []:
+            if cn:
+                all_cat_names[cn] = all_cat_names.get(cn, 0) + 1
+    for cn, cnt in sorted(all_cat_names.items()):
+        matched = _SLOT_LABEL_TO_KEY_NORM.get(_normalize_label(cn))
+        codes = " ".join(f"U+{ord(c):04X}" for c in cn if not c.isalnum() and not c.isspace())
+        logger.info(
+            f"iiko категория: '{cn}' (символы: {codes or '-'}) — блюд: {cnt} "
+            f"— match: {matched or 'НЕТ'}"
+        )
 
     # ── Шаг 2: Номенклатура — артикулы ───────────────────────────────────────
     uuid_to_sku = {}
