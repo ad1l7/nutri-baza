@@ -62,6 +62,27 @@ _SLOT_LABEL_TO_KEY_NORM = {
     _normalize_label(label): key for label, key in _SLOT_LABEL_TO_KEY.items()
 }
 
+
+def _pick_category(menu_info: dict) -> tuple:
+    """Блюдо может входить сразу в несколько категорий внешнего меню
+    (например, ещё в техническую категорию типа 'ПП Упак').
+    Возвращает (название_категории_для_отображения, slot_key_или_None) —
+    выбираем первую категорию, совпавшую с SLOT_TYPES, иначе первую попавшуюся."""
+    cat_names = menu_info.get("category_names") or []
+    if not cat_names and menu_info.get("category_name"):
+        cat_names = [menu_info["category_name"]]
+
+    for cn in cat_names:
+        cn = (cn or "").strip()
+        if not cn:
+            continue
+        slot_key = _SLOT_LABEL_TO_KEY_NORM.get(_normalize_label(cn))
+        if slot_key:
+            return cn, slot_key
+
+    first = next((cn.strip() for cn in cat_names if cn and cn.strip()), "")
+    return first, None
+
 _COMPARE_FIELDS = [
     "name", "iiko_category", "packing", "net_weight",
     "kcal_per_100", "protein", "fat", "carbs", "kj_per_100",
@@ -346,6 +367,14 @@ def _extract_menu_items(menu_data: dict) -> dict:
         if not product_id or not name:
             return
 
+        # Блюдо может входить в несколько категорий внешнего меню —
+        # копим все варианты, чтобы потом выбрать подходящую под SLOT_TYPES.
+        if product_id in result:
+            existing_cats = result[product_id]["category_names"]
+            if cat_name and cat_name not in existing_cats:
+                existing_cats.append(cat_name)
+            return
+
         sizes = item.get("itemSizes") or []
         size = sizes[0] if sizes else {}
 
@@ -387,6 +416,7 @@ def _extract_menu_items(menu_data: dict) -> dict:
         result[product_id] = {
             "name":           name,
             "category_name":  cat_name,
+            "category_names": [cat_name] if cat_name else [],
             "packing":        item.get("measureUnit") or "",
             "weight":         weight_grams,
             "photo_url":      photo_url,
@@ -611,9 +641,11 @@ def sync_products_from_iiko(
             product = existing_by_sku.get(sku) or existing_by_uuid.get(uuid)
             is_new = product is None
 
+            cat_display, matched_slot_key = _pick_category(menu_info)
+
             new_fields = {
                 "name":           menu_info["name"],
-                "iiko_category":  menu_info.get("category_name", ""),
+                "iiko_category":  cat_display,
                 "iiko_sku":       sku,
                 "iiko_id":        uuid,
             }
@@ -696,15 +728,12 @@ def sync_products_from_iiko(
                 product.allergens.clear()
 
             # ── Категория ─────────────────────────────────────────────────────
-            cat_name = menu_info.get("category_name", "").strip()
-            if cat_name:
-                slot_key = _SLOT_LABEL_TO_KEY_NORM.get(_normalize_label(cat_name))
-                if slot_key:
-                    try:
-                        meal_cat = MealCategory.objects.get(key=slot_key)
-                        product.meal_categories.add(meal_cat)
-                    except MealCategory.DoesNotExist:
-                        logger.debug(f"MealCategory '{slot_key}' не найдена в БД")
+            if matched_slot_key:
+                try:
+                    meal_cat = MealCategory.objects.get(key=matched_slot_key)
+                    product.meal_categories.set([meal_cat])
+                except MealCategory.DoesNotExist:
+                    logger.debug(f"MealCategory '{matched_slot_key}' не найдена в БД")
 
         except Exception as e:
             msg = f"'{menu_info.get('name', uuid)}': {e}"
