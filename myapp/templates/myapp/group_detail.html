@@ -269,7 +269,7 @@
               {% endif %}
             </td>
             <td class="c-cat">{{ slot.get_slot_type_display|default:"—" }}</td>
-            <td class="c-name">{{ slot.product.name }}</td>
+            <td class="c-name">{{ slot.product.name }}{% if slot.product.article %}<br><span style="color:#9aa;font-size:11px;">Артикул: {{ slot.product.article }}</span>{% endif %}</td>
             <td class="c-weight">
               {# net_weight хранится в кг → умножаем на 1000 для отображения в граммах #}
               {% if slot.product.net_weight %}

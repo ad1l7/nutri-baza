@@ -617,8 +617,8 @@
       <table>
         <thead>
           <tr class="thead-groups">
-            <!-- 5 колонок основного: Категория, Наименование, Кратность, Масса, Себестоимость -->
-            <th colspan="5" class="g-base">Основная информация</th>
+            <!-- 6 колонок основного: Категория, Наименование, Артикул, Кратность, Масса, Себестоимость -->
+            <th colspan="6" class="g-base">Основная информация</th>
             <th colspan="5" class="g-100 grp-border">На 100 г</th>
             <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
           </tr>
@@ -627,6 +627,10 @@
             <th style="width:120px; color:var(--muted);">Категория</th>
             <th class="sortable {% if s == 'name' %}sort-active{% endif %}" onclick="sortBy('name')">
               Наименование <span class="sort-arr">{% if s == 'name' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
+            </th>
+            <!-- Артикул -->
+            <th class="sortable {% if s == 'article' %}sort-active{% endif %}" onclick="sortBy('article')" style="width:90px">
+              Артикул <span class="sort-arr">{% if s == 'article' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>
             <!-- Кратность — текст, без сортировки -->
             <th style="width:80px">Кратность</th>
@@ -687,6 +691,8 @@
                 <span class="td-name">{{ p.name }}</span>
               </div>
             </td>
+            <!-- Артикул -->
+            <td class="td-article" style="font-size:12px; color:var(--muted);">{{ p.article|default:"—" }}</td>
             <!-- Кратность — просто текст -->
             <td class="td-pack">{{ p.packing|default:"—" }}</td>
             <!-- Масса — без smart_num, чтобы сохранить нули (напр. 500.000) -->
@@ -866,6 +872,7 @@ const PD = {
   {% for p in products %}
   {{ p.pk }}: {
     name:   "{{ p.name|escapejs }}",
+    article: "{{ p.article|default:''|escapejs }}",
     cat: "{% for mc in p.meal_categories.all %}{{ mc }}{% if not forloop.last %}, {% endif %}{% endfor %}",
     weight: "{{ p.net_weight|default:'' }}",
     pack:   "{{ p.packing|default:''|escapejs }}",
@@ -912,6 +919,10 @@ function showDetail(pk) {
 
   document.getElementById('m-body').innerHTML = `
     <div class="modal-meta">
+      <div class="meta-card">
+        <div class="meta-label">Артикул</div>
+        <div class="meta-val">${d.article || '—'}</div>
+      </div>
       <div class="meta-card">
         <div class="meta-label">Масса нетто</div>
         <div class="meta-val">${weightStr}</div>

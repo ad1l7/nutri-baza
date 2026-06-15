@@ -70,7 +70,7 @@ def product_list(request):
     if packing:        products = products.filter(packing__icontains=packing)
 
     sort_map = {
-        "name": "name", "net_weight": "net_weight", "cost": "cost",
+        "name": "name", "article": "article", "net_weight": "net_weight", "cost": "cost",
         "kcal": "kcal_per_100", "protein": "protein", "fat": "fat", "carbs": "carbs",
         "kcal_s": "kcal_per_serving", "protein_s": "protein_per_serving",
         "fat_s": "fat_per_serving", "carbs_s": "carbs_per_serving",
@@ -359,7 +359,7 @@ def ration_edit(request, pk):
         )
         meal_cat_map[key] = [
             {
-                "id": p.pk, "name": p.name,
+                "id": p.pk, "name": p.name, "article": p.article or "",
                 "kcal":    float(p.kcal_per_serving or 0),
                 "protein": float(p.protein_per_serving or 0),
                 "fat":     float(p.fat_per_serving or 0),
@@ -380,7 +380,7 @@ def ration_edit(request, pk):
     )
     all_products_json = [
         {
-            "id": p.pk, "name": p.name,
+            "id": p.pk, "name": p.name, "article": p.article or "",
             "category": " / ".join(str(c) for c in p.meal_categories.all()),
             "kcal":    float(p.kcal_per_serving or 0),
             "protein": float(p.protein_per_serving or 0),

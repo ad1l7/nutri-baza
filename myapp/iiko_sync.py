@@ -84,7 +84,7 @@ def _pick_category(menu_info: dict) -> tuple:
     return first, None
 
 _COMPARE_FIELDS = [
-    "name", "iiko_category", "packing", "net_weight",
+    "name", "article", "iiko_category", "packing", "net_weight",
     "kcal_per_100", "protein", "fat", "carbs", "kj_per_100",
     "kcal_per_serving", "protein_per_serving", "fat_per_serving",
     "carbs_per_serving", "kj_per_serving", "composition", "cost",
@@ -404,6 +404,16 @@ def _extract_menu_items(menu_data: dict) -> dict:
             or ""
         )
 
+        # Артикул блюда из внешнего меню iiko (короткий код)
+        article = (
+            item.get("sku")
+            or size.get("sku")
+            or item.get("code")
+            or size.get("code")
+            or ""
+        )
+        article = str(article).strip()
+
         # Аллергены — берём из item.allergens
         # Формат: [{id, code, name, isDeleted}, ...]
         allergen_names = []
@@ -417,6 +427,7 @@ def _extract_menu_items(menu_data: dict) -> dict:
             "name":           name,
             "category_name":  cat_name,
             "category_names": [cat_name] if cat_name else [],
+            "article":        article,
             "packing":        item.get("measureUnit") or "",
             "weight":         weight_grams,
             "photo_url":      photo_url,
@@ -553,6 +564,11 @@ def sync_products_from_iiko(
             f"— match: {matched or 'НЕТ'}"
         )
 
+    # Диагностика артикулов из меню
+    with_article = sum(1 for i in menu_map.values() if i.get("article"))
+    sample = [(i.get("article"), i.get("name")) for i in menu_map.values() if i.get("article")][:5]
+    logger.info(f"iiko артикулы из меню: {with_article}/{len(menu_map)} блюд. Примеры: {sample}")
+
     # ── Шаг 2: Номенклатура — артикулы ───────────────────────────────────────
     uuid_to_sku = {}
     try:
@@ -657,8 +673,16 @@ def sync_products_from_iiko(
 
             cat_display, matched_slot_key = _pick_category(menu_info)
 
+            # Артикул: сначала из меню, иначе из номенклатуры (num), но НЕ uuid
+            article = menu_info.get("article") or ""
+            if not article:
+                nom_num = uuid_to_sku.get(uuid)
+                if nom_num and nom_num != uuid:
+                    article = nom_num
+
             new_fields = {
                 "name":           menu_info["name"],
+                "article":        article,
                 "iiko_category":  cat_display,
                 "iiko_sku":       sku,
                 "iiko_id":        uuid,

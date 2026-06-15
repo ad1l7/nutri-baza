@@ -27,14 +27,14 @@ class MealTimeAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["name", "get_categories", "cost", "kcal_per_100", "protein", "fat", "carbs", "packing"]
+    list_display = ["name", "article", "get_categories", "cost", "kcal_per_100", "protein", "fat", "carbs", "packing"]
     list_filter = ["meal_categories", "packing", "allergens"]
-    search_fields = ["name", "composition"]
+    search_fields = ["name", "article", "composition"]
     ordering = ["name"]
     filter_horizontal = ["allergens", "meal_categories"]
     fieldsets = [
         ("Основное", {
-            "fields": ["name", "photo", "cost", "packing", "net_weight", "composition", "allergens", "meal_categories"]
+            "fields": ["name", "article", "photo", "cost", "packing", "net_weight", "composition", "allergens", "meal_categories"]
         }),
         ("На 100 г", {
             "fields": ["protein", "fat", "carbs", "kcal_per_100", "kj_per_100"]

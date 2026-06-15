@@ -71,6 +71,9 @@ class Product(models.Model):
     kcal_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="Ккал на 1 порц.")
     kj_per_serving = models.DecimalField(max_digits=10, decimal_places=5, null=True, blank=True, verbose_name="КДж на 1 порц.")
 
+    # Артикул блюда (короткий код из iiko, для отображения)
+    article = models.CharField(max_length=100, null=True, blank=True, db_index=True, verbose_name="Артикул")
+
     # iiko интеграция
     iiko_id = models.CharField(max_length=50, null=True, blank=True, unique=True, verbose_name="iiko UUID")
     iiko_sku = models.CharField(max_length=100, null=True, blank=True, db_index=True, verbose_name="Артикул iiko (num)")

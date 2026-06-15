@@ -114,3 +114,6 @@ USE_TZ = True
 # ── Статика ───────────────────────────────────────────────────────────────────
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Тип авто-PK (совпадает с тем, что уже создано в БД)
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
