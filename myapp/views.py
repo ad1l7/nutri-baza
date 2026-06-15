@@ -436,10 +436,12 @@ def ration_group_export(request, group_pk):
 
     group = get_object_or_404(RationGroup, pk=group_pk)
 
-    # Естественная сортировка: "Рацион 2" раньше "Рацион 10"
+    # Естественная сортировка: "Рацион 2" раньше "Рацион 10".
+    # Чистим лишние пробелы, чтобы названия с пробелом в начале не вылезали вперёд.
     def natural_key(ration):
-        parts = re.split(r'(\d+)', ration.name or '')
-        return [int(p) if p.isdigit() else p.lower() for p in parts]
+        name = re.sub(r'\s+', ' ', (ration.name or '').strip()).lower()
+        parts = re.split(r'(\d+)', name)
+        return [int(p) if p.isdigit() else p for p in parts]
 
     rations = sorted(
         group.rations.prefetch_related("slots__product__allergens", "slots__meal_time"),
