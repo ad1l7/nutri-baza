@@ -310,7 +310,7 @@ def ration_edit(request, pk):
 
     # Группируем слоты по приёму пищи
     meal_time_groups = {}  # {meal_time_id: {meal_time, slots: []}}
-    total_kcal = total_protein = total_fat = total_carbs = 0
+    total_kcal = total_protein = total_fat = total_carbs = total_cost = 0
 
     for slot in slots:
         mt_id = slot.meal_time_id
@@ -324,10 +324,12 @@ def ration_edit(request, pk):
         protein = float(p.protein_per_serving or 0) if p else 0
         fat     = float(p.fat_per_serving or 0) if p else 0
         carbs   = float(p.carbs_per_serving or 0) if p else 0
+        cost    = float(p.cost or 0) if p else 0
         total_kcal    += kcal
         total_protein += protein
         total_fat     += fat
         total_carbs   += carbs
+        total_cost    += cost
 
         meal_time_groups[mt_id]["slots"].append({
             "slot": slot,
@@ -403,6 +405,7 @@ def ration_edit(request, pk):
         "total_protein": round(total_protein, 1),
         "total_fat":     round(total_fat, 1),
         "total_carbs":   round(total_carbs, 1),
+        "total_cost":    round(total_cost, 2),
         "slot_types":    SLOT_TYPES,
         "slot_icons":    SLOT_ICONS,
         "slot_colors":   SLOT_COLORS,

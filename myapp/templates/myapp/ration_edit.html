@@ -34,6 +34,7 @@
   .topbar-nutr{display:flex;align-items:center;gap:6px;flex-shrink:0;}
   .tpill{background:var(--light);border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:var(--text-mid);display:flex;align-items:center;gap:4px;white-space:nowrap;}
   .tpill.kcal{color:var(--green-mid);background:#e8f7e0;border-color:var(--green-light);}
+  .tpill.cost{color:#b8860b;background:#fff7e0;border-color:#f0d98a;}
   .tpill strong{font-size:14px;font-weight:800;}
   .del-ration-btn{background:transparent;border:1.5px solid var(--border);color:var(--muted);border-radius:9px;padding:7px 12px;font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;flex-shrink:0;}
   .del-ration-btn:hover{border-color:var(--danger);color:var(--danger);background:rgba(214,75,42,.05);}
@@ -197,6 +198,7 @@
     <div class="tpill">Б <strong>{{ total_protein|floatformat:1 }}</strong></div>
     <div class="tpill">Ж <strong>{{ total_fat|floatformat:1 }}</strong></div>
     <div class="tpill">У <strong>{{ total_carbs|floatformat:1 }}</strong></div>
+    <div class="tpill cost">💰 <strong>{{ total_cost|floatformat:0 }}</strong> ₸</div>
   </div>
   <button class="del-ration-btn" onclick="openDelModal()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -250,6 +252,7 @@
       <div class="ns"><div class="ns-v">{{ total_protein|floatformat:1 }}</div><div class="ns-l">Белки г</div></div>
       <div class="ns"><div class="ns-v">{{ total_fat|floatformat:1 }}</div><div class="ns-l">Жиры г</div></div>
       <div class="ns"><div class="ns-v">{{ total_carbs|floatformat:1 }}</div><div class="ns-l">Углев. г</div></div>
+      <div class="ns"><div class="ns-v" style="color:#b8860b;">{{ total_cost|floatformat:0 }} ₸</div><div class="ns-l">Себест.</div></div>
     </div>
 
     <div class="prog-wrap">
