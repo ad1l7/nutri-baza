@@ -427,6 +427,7 @@ def ration_delete(request, pk):
 # ── Экспорт группы рационов в Excel ───────────────────────────────────────────
 
 def ration_group_export(request, group_pk):
+    import re
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
@@ -434,10 +435,15 @@ def ration_group_export(request, group_pk):
     from urllib.parse import quote
 
     group = get_object_or_404(RationGroup, pk=group_pk)
-    rations = list(
-        group.rations
-        .prefetch_related("slots__product__allergens", "slots__meal_time")
-        .order_by("name")
+
+    # Естественная сортировка: "Рацион 2" раньше "Рацион 10"
+    def natural_key(ration):
+        parts = re.split(r'(\d+)', ration.name or '')
+        return [int(p) if p.isdigit() else p.lower() for p in parts]
+
+    rations = sorted(
+        group.rations.prefetch_related("slots__product__allergens", "slots__meal_time"),
+        key=natural_key,
     )
 
     wb = openpyxl.Workbook()
