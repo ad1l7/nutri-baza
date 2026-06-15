@@ -193,6 +193,7 @@
       <div class="gh-stat"><div class="gh-sv">{{ rations_data|length }}</div><div class="gh-sl">Рационов</div></div>
       <div class="gh-stat"><div class="gh-sv">{{ total_slots }}</div><div class="gh-sl">Слотов</div></div>
       <div class="gh-stat"><div class="gh-sv">{{ filled_slots }}</div><div class="gh-sl">Заполнено</div></div>
+      <div class="gh-stat"><div class="gh-sv" style="color:#b8860b;">{{ group_cost|floatformat:0 }} ₸</div><div class="gh-sl">Себест. всего</div></div>
     </div>
   </div>
 
@@ -218,6 +219,7 @@
       <div class="rn"><div class="rn-v">{{ rd.total_protein|floatformat:1 }}</div><div class="rn-l">Белки г</div></div>
       <div class="rn"><div class="rn-v">{{ rd.total_fat|floatformat:1 }}</div><div class="rn-l">Жиры г</div></div>
       <div class="rn"><div class="rn-v">{{ rd.total_carbs|floatformat:1 }}</div><div class="rn-l">Углев. г</div></div>
+      <div class="rn"><div class="rn-v" style="color:#b8860b;">{{ rd.total_cost|floatformat:0 }} ₸</div><div class="rn-l">Себест.</div></div>
       <div class="rn"><div class="rn-v">{{ rd.filled }}</div><div class="rn-l">Блюд</div></div>
     </div>
 

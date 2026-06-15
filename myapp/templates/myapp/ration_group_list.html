@@ -46,6 +46,25 @@
   .group-count{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;}
   .grp-del-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
   .grp-del-btn:hover{background:rgba(214,75,42,.65);}
+  /* кнопка глаза не должна краснеть как удаление */
+  .grp-view-btn:hover{background:rgba(255,255,255,.3);}
+
+  /* Кнопка экспорта Excel — с текстом */
+  .grp-export-btn{background:rgba(255,255,255,.15);border:none;border-radius:8px;height:28px;padding:0 11px;color:#fff;cursor:pointer;font-family:var(--font);font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px;transition:background .15s;flex-shrink:0;text-decoration:none;white-space:nowrap;}
+  .grp-export-btn:hover{background:#1f7a3a;}
+
+  /* Бейдж себестоимости группы */
+  .group-cost{background:rgba(255,210,80,.22);color:#ffe08a;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap;}
+
+  /* Кнопка сворачивания группы */
+  .group-collapse-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .group-collapse-btn:hover{background:rgba(255,255,255,.28);}
+  .group-collapse-arrow{display:inline-block;transition:transform .25s;}
+  .group-card.collapsed .group-collapse-arrow{transform:rotate(-90deg);}
+  .group-card.collapsed .rations-list{display:none;}
+
+  /* Себестоимость рациона в строке */
+  .ration-cost{font-size:11px;color:var(--green-mid);font-weight:800;flex-shrink:0;background:var(--light);border:1.5px solid var(--green-light);border-radius:20px;padding:2px 9px;}
 
   .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
 
@@ -167,18 +186,22 @@
   <div class="groups-list">
     {% for gd in groups_data %}
     {% with g=gd.group %}
-    <div class="group-card">
+    <div class="group-card" id="group-{{ g.pk }}">
       <div class="group-header">
+        <button class="group-collapse-btn" onclick="toggleGroup({{ g.pk }})" title="Свернуть / развернуть">
+          <span class="group-collapse-arrow">▼</span>
+        </button>
         <div class="group-icon">📋</div>
         <div class="group-info">
           <div class="group-title">{{ g.name }}</div>
           {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
         </div>
+        {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
-        <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn"
+        <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
    title="Просмотр группы" style="text-decoration:none;">👁️</a>
-        <a href="{% url 'ration_group_export' g.pk %}" class="grp-del-btn"
-   title="Экспорт в Excel" style="text-decoration:none;">📊</a>
+        <a href="{% url 'ration_group_export' g.pk %}" class="grp-export-btn"
+   title="Скачать Excel">⬇ Excel</a>
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 
@@ -189,6 +212,7 @@
           <div class="ration-row">
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
+            {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
             <span class="ration-dish-count">{{ ri.filled_count }} блюд</span>
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
@@ -330,6 +354,33 @@ const SLOT_LABELS = {{ slot_labels_json|safe }};
 function toggleAccordion(pk) {
   document.getElementById('ri-' + pk).classList.toggle('open');
 }
+
+function toggleGroup(pk) {
+  const card = document.getElementById('group-' + pk);
+  card.classList.toggle('collapsed');
+  // Запоминаем состояние свёрнутых групп в браузере
+  try {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedGroups') || '[]');
+    const idx = collapsed.indexOf(pk);
+    if (card.classList.contains('collapsed')) {
+      if (idx === -1) collapsed.push(pk);
+    } else if (idx !== -1) {
+      collapsed.splice(idx, 1);
+    }
+    localStorage.setItem('collapsedGroups', JSON.stringify(collapsed));
+  } catch (e) {}
+}
+
+// Восстанавливаем свёрнутые группы при загрузке
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedGroups') || '[]');
+    collapsed.forEach(pk => {
+      const card = document.getElementById('group-' + pk);
+      if (card) card.classList.add('collapsed');
+    });
+  } catch (e) {}
+});
 
 function openGroupModal() { document.getElementById('group-modal').classList.add('open'); }
 function closeGroupModal() { document.getElementById('group-modal').classList.remove('open'); }
