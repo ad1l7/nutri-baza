@@ -175,8 +175,10 @@
           {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
         </div>
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
-        <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn" 
+        <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn"
    title="Просмотр группы" style="text-decoration:none;">👁️</a>
+        <a href="{% url 'ration_group_export' g.pk %}" class="grp-del-btn"
+   title="Экспорт в Excel" style="text-decoration:none;">📊</a>
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 

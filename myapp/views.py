@@ -419,6 +419,173 @@ def ration_delete(request, pk):
     return redirect("ration_group_list")
 
 
+# ── Экспорт группы рационов в Excel ───────────────────────────────────────────
+
+def ration_group_export(request, group_pk):
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    group = get_object_or_404(RationGroup, pk=group_pk)
+    rations = list(
+        group.rations
+        .prefetch_related("slots__product__allergens", "slots__meal_time")
+        .order_by("kcal_category", "name")
+    )
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Рационы"
+
+    # Стили
+    green_dark  = PatternFill("solid", fgColor="2E7D32")
+    green_mid   = PatternFill("solid", fgColor="66A03C")
+    green_light = PatternFill("solid", fgColor="E8F5E0")
+    grey_light  = PatternFill("solid", fgColor="F0F0F0")
+    white_bold  = Font(bold=True, color="FFFFFF", size=11)
+    title_font  = Font(bold=True, color="FFFFFF", size=14)
+    bold        = Font(bold=True, size=11)
+    muted       = Font(color="888888", size=10)
+    thin        = Side(style="thin", color="DDDDDD")
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center      = Alignment(horizontal="center", vertical="center")
+    left_wrap   = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    headers = [
+        "Приём пищи", "Категория блюда", "Наименование", "Артикул",
+        "Масса, г", "Себест., ₸",
+        "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
+        "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
+        "Аллергены",
+    ]
+    ncols = len(headers)
+
+    def num(val):
+        if val is None:
+            return None
+        try:
+            return round(float(val), 2)
+        except (TypeError, ValueError):
+            return None
+
+    row = 1
+    # ── Заголовок группы ──
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+    c = ws.cell(row=row, column=1, value=f"Группа рационов: {group.name}")
+    c.font = title_font
+    c.fill = green_dark
+    c.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[row].height = 26
+    row += 1
+
+    if group.description:
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+        c = ws.cell(row=row, column=1, value=group.description)
+        c.font = muted
+        row += 1
+
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+    c = ws.cell(row=row, column=1, value=f"Всего рационов: {len(rations)}")
+    c.font = muted
+    row += 2
+
+    # ── По каждому рациону ──
+    for ration in rations:
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncols)
+        c = ws.cell(row=row, column=1,
+                    value=f"🍽 {ration.name}  ·  {ration.kcal_category} ккал")
+        c.font = white_bold
+        c.fill = green_mid
+        c.alignment = Alignment(horizontal="left", vertical="center")
+        ws.row_dimensions[row].height = 20
+        row += 1
+
+        # Шапка таблицы
+        for col, h in enumerate(headers, start=1):
+            c = ws.cell(row=row, column=col, value=h)
+            c.font = bold
+            c.fill = green_light
+            c.alignment = center
+            c.border = border
+        row += 1
+
+        slots = sorted(
+            ration.slots.all(),
+            key=lambda s: (s.meal_time.order if s.meal_time_id else 999, s.order),
+        )
+
+        tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
+        for slot in slots:
+            p = slot.product
+            meal = slot.meal_time.name if slot.meal_time_id else "—"
+            cat  = SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else "—"
+            if p:
+                allergens = ", ".join(a.name for a in p.allergens.all())
+                weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
+                values = [
+                    meal, cat, p.name, p.article or "",
+                    weight_g, num(p.cost),
+                    num(p.protein_per_serving), num(p.fat_per_serving),
+                    num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
+                    num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
+                    allergens,
+                ]
+                tot_kcal += float(p.kcal_per_serving or 0)
+                tot_p    += float(p.protein_per_serving or 0)
+                tot_f    += float(p.fat_per_serving or 0)
+                tot_c    += float(p.carbs_per_serving or 0)
+                tot_cost += float(p.cost or 0)
+            else:
+                values = [meal, cat, "— блюдо не выбрано —", ""] + [None] * (ncols - 5) + [""]
+
+            for col, val in enumerate(values, start=1):
+                c = ws.cell(row=row, column=col, value=val)
+                c.border = border
+                if col in (3, 16):
+                    c.alignment = left_wrap
+                elif col <= 2:
+                    c.alignment = Alignment(horizontal="left", vertical="center")
+                else:
+                    c.alignment = center
+            row += 1
+
+        # Итого по рациону
+        c = ws.cell(row=row, column=3, value="ИТОГО по рациону:")
+        c.font = bold
+        c.alignment = Alignment(horizontal="right", vertical="center")
+        totals = {5: None, 6: round(tot_cost, 2), 7: round(tot_p, 1),
+                  8: round(tot_f, 1), 9: round(tot_c, 1), 10: round(tot_kcal, 1)}
+        for col in range(1, ncols + 1):
+            c = ws.cell(row=row, column=col)
+            c.fill = grey_light
+            c.border = border
+            if col in totals and totals[col] is not None:
+                c.value = totals[col]
+                c.font = bold
+                c.alignment = center
+        row += 2
+
+    # Ширина колонок
+    widths = [16, 20, 34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 24]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.freeze_panes = "A1"
+
+    # Имя файла (с поддержкой кириллицы)
+    safe_name = "".join(ch for ch in group.name if ch.isalnum() or ch in " -_").strip() or "group"
+    filename = f"Рационы_{safe_name}.xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    wb.save(response)
+    return response
+
+
 # ── iiko синхронизация ────────────────────────────────────────────────────────
 
 @require_POST

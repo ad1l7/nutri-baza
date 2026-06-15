@@ -13,6 +13,7 @@ urlpatterns = [
     path("rations/group/<int:group_pk>/", views.ration_list, name="ration_list"),
     path("rations/group/<int:group_pk>/create/", views.ration_create, name="ration_create"),
     path("rations/group/<int:group_pk>/detail/", views.ration_group_detail, name="ration_group_detail"),
+    path("rations/group/<int:group_pk>/export/", views.ration_group_export, name="ration_group_export"),
 
     # Рационы
     path("rations/<int:pk>/edit/", views.ration_edit, name="ration_edit"),
