@@ -437,7 +437,7 @@ def ration_group_export(request, group_pk):
     rations = list(
         group.rations
         .prefetch_related("slots__product__allergens", "slots__meal_time")
-        .order_by("kcal_category", "name")
+        .order_by("name")
     )
 
     wb = openpyxl.Workbook()
@@ -516,10 +516,19 @@ def ration_group_export(request, group_pk):
             c.border = border
         row += 1
 
-        slots = sorted(
+        all_slots = sorted(
             ration.slots.all(),
             key=lambda s: (s.meal_time.order if s.meal_time_id else 999, s.order),
         )
+        # Приёмы пищи, где уже есть выбранное блюдо
+        filled_meal_times = {s.meal_time_id for s in all_slots if s.product_id}
+        # Убираем пустые слоты-заглушки (без блюда и без категории),
+        # если в этом приёме пищи уже есть блюда
+        slots = [
+            s for s in all_slots
+            if not (s.product_id is None and s.slot_type is None
+                    and s.meal_time_id in filled_meal_times)
+        ]
 
         tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
         for slot in slots:
