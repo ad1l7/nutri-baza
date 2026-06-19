@@ -465,6 +465,17 @@ def _extract_menu_items(menu_data: dict) -> dict:
 # Парсер OLAP-отчёта себестоимости
 # ──────────────────────────────────────────────────────────────────────────────
 
+def _norm_name(s) -> str:
+    """Нормализует название блюда: схлопывает пробелы, нижний регистр."""
+    return re.sub(r'\s+', ' ', str(s or '')).strip().lower()
+
+
+def _norm_name_nosuffix(s) -> str:
+    """То же + убирает хвостовой суффикс в скобках, напр. '(1порц)', '(3шт)'."""
+    s = _norm_name(s)
+    return re.sub(r'\s*\([^)]*\)\s*$', '', s).strip()
+
+
 def _parse_cost_report(report_data: dict) -> dict:
     """Возвращает {product_name: cost} из ответа OLAP-отчёта iiko Server."""
     costs = {}
@@ -609,6 +620,8 @@ def sync_products_from_iiko(
                 raw_report = server.get_cost_report()
                 cost_by_name = _parse_cost_report(raw_report)
                 logger.info(f"OLAP себестоимость: {len(cost_by_name)} блюд")
+                sample_keys = list(cost_by_name.keys())[:8]
+                logger.info(f"OLAP примеры названий: {sample_keys}")
             except Exception as e:
                 logger.warning(f"OLAP отчёт себестоимости: {e}")
                 result["errors"].append(f"OLAP себестоимость: {e}")
@@ -663,6 +676,15 @@ def sync_products_from_iiko(
 
     now = dj_timezone.now()
 
+    # Нормализованные словари себестоимости для устойчивого сопоставления
+    cost_norm = {}
+    cost_norm_nosuffix = {}
+    for k, v in cost_by_name.items():
+        cost_norm.setdefault(_norm_name(k), v)
+        cost_norm_nosuffix.setdefault(_norm_name_nosuffix(k), v)
+    cost_matched = 0
+    cost_unmatched = []
+
     # ── Шаг 7: Создаём / обновляем ───────────────────────────────────────────
     for uuid, menu_info in menu_map.items():
         sku = iiko_uuid_to_sku.get(uuid, uuid)
@@ -708,18 +730,19 @@ def sync_products_from_iiko(
             if uuid in server_composition:
                 new_fields["composition"] = server_composition[uuid]
 
-            # Себестоимость: ищем по имени (сначала точное, потом без учёта регистра)
+            # Себестоимость: точное → по нормализованному имени → без суффикса "(1порц)"
             if cost_by_name:
                 product_name = menu_info["name"]
                 cost_val = cost_by_name.get(product_name)
                 if cost_val is None:
-                    name_upper = product_name.upper()
-                    cost_val = next(
-                        (v for k, v in cost_by_name.items() if k.upper() == name_upper),
-                        None,
-                    )
+                    cost_val = cost_norm.get(_norm_name(product_name))
+                if cost_val is None:
+                    cost_val = cost_norm_nosuffix.get(_norm_name_nosuffix(product_name))
                 if cost_val is not None:
                     new_fields["cost"] = round(cost_val, 2)
+                    cost_matched += 1
+                else:
+                    cost_unmatched.append(product_name)
 
             if is_new:
                 new_fields["iiko_synced_at"] = now
@@ -780,6 +803,13 @@ def sync_products_from_iiko(
             result["skipped"] += 1
 
     _last_sync_time = time.time()
+
+    if cost_by_name:
+        logger.info(
+            f"Себестоимость: сопоставлено {cost_matched}, "
+            f"не найдено {len(cost_unmatched)}. "
+            f"Без цены: {cost_unmatched[:15]}"
+        )
 
     logger.info(
         f"Готово — создано: {result['created']}, "

@@ -371,6 +371,7 @@ def ration_edit(request, pk):
                 "protein": float(p.protein_per_serving or 0),
                 "fat":     float(p.fat_per_serving or 0),
                 "carbs":   float(p.carbs_per_serving or 0),
+                "cost":    float(p.cost or 0),
                 "photo":   p.photo.url if p.photo else "",
             }
             for p in prods
@@ -393,6 +394,7 @@ def ration_edit(request, pk):
             "protein": float(p.protein_per_serving or 0),
             "fat":     float(p.fat_per_serving or 0),
             "carbs":   float(p.carbs_per_serving or 0),
+            "cost":    float(p.cost or 0),
             "photo":   p.photo.url if p.photo else "",
         }
         for p in all_products

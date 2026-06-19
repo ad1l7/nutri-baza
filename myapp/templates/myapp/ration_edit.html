@@ -312,7 +312,7 @@
                 {% else %}<div class="sph">🥗</div>{% endif %}
                 <div class="spi">
                   <div class="spn">{{ slot.product.name }}{% if slot.product.article %} <span style="color:var(--muted);font-weight:500;font-size:11px;">· {{ slot.product.article }}</span>{% endif %}</div>
-                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г</div>
+                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г{% if slot.product.cost %} <span style="color:#b8860b;font-weight:700;">· 💰 {{ slot.product.cost|floatformat:0 }} ₸</span>{% endif %}</div>
                 </div>
               {% else %}
                 <div class="sph">❓</div>
@@ -499,7 +499,7 @@ function renderPicker(q) {
           ${photo}
           <div class="pinfo">
             <div class="pname">${p.name}${p.article ? ` <span style="color:var(--muted);font-weight:500;font-size:11px;">· ${p.article}</span>` : ''}</div>
-            <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}</div>
+            <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} &nbsp;Б: ${p.protein.toFixed(1)} &nbsp;Ж: ${p.fat.toFixed(1)} &nbsp;У: ${p.carbs.toFixed(1)}${p.cost ? ` &nbsp;<span style="color:#b8860b;font-weight:700;">💰 ${p.cost.toFixed(0)} ₸</span>` : ''}</div>
           </div>
           <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
             ${isCur ? '✓ Текущее' : 'Выбрать'}
