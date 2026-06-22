@@ -66,7 +66,14 @@
   /* Себестоимость рациона в строке */
   .ration-cost{font-size:11px;color:var(--green-mid);font-weight:800;flex-shrink:0;background:var(--light);border:1.5px solid var(--green-light);border-radius:20px;padding:2px 9px;}
 
-  .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;}
+  .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;min-height:20px;}
+
+  /* Перетаскивание рационов */
+  .drag-handle{cursor:grab;color:var(--muted);font-size:16px;line-height:1;padding:0 4px;flex-shrink:0;user-select:none;touch-action:none;}
+  .drag-handle:active{cursor:grabbing;}
+  .ration-item.sortable-ghost{opacity:.4;background:var(--light);border:1.5px dashed var(--green);}
+  .ration-item.sortable-chosen{box-shadow:var(--shadow-md);}
+  .rations-list.drag-over{outline:2px dashed var(--green);outline-offset:-2px;border-radius:10px;}
 
   .ration-item{border:1.5px solid var(--border-soft);border-radius:10px;overflow:hidden;background:var(--off-white);}
   .ration-row{display:flex;align-items:center;gap:10px;padding:10px 12px;}
@@ -206,11 +213,12 @@
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 
-      <div class="rations-list">
+      <div class="rations-list" data-group-id="{{ g.pk }}">
         {% for ri in gd.rations_info %}
         {% with r=ri.ration %}
-        <div class="ration-item" id="ri-{{ r.pk }}">
+        <div class="ration-item" id="ri-{{ r.pk }}" data-ration-id="{{ r.pk }}" data-kcal="{{ r.kcal_category }}">
           <div class="ration-row">
+            <span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
             {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
@@ -455,6 +463,64 @@ function closeDel() { document.getElementById('del-modal').classList.remove('ope
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeGroupModal(); closeRationModal(); closeDel(); }
+});
+</script>
+
+<!-- Перетаскивание рационов (drag & drop) -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof Sortable === 'undefined') return;
+
+  document.querySelectorAll('.rations-list').forEach(function (list) {
+    new Sortable(list, {
+      group: 'rations',
+      handle: '.drag-handle',
+      draggable: '.ration-item',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function (evt) {
+        const crossGroup = evt.from !== evt.to;
+        const item = evt.item;
+        const toList = evt.to;
+        const rationId = item.dataset.rationId;
+        const targetGroupId = toList.dataset.groupId;
+        const orderedIds = [...toList.querySelectorAll('.ration-item')]
+          .map(el => el.dataset.rationId);
+
+        fetch('/rations/reorder/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            ration_id: rationId,
+            target_group_id: targetGroupId,
+            ordered_ids: orderedIds,
+          }),
+        })
+          .then(r => r.json().then(d => ({ ok: r.ok, d })))
+          .then(({ d }) => {
+            if (!d.ok) {
+              alert(d.message || 'Не удалось переместить рацион');
+              location.reload();
+              return;
+            }
+            // Перемещение между группами — перезагружаем, чтобы обновить счётчики и себестоимость
+            if (crossGroup) location.reload();
+          })
+          .catch(() => location.reload());
+      },
+    });
+  });
 });
 </script>
 </body>

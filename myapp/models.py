@@ -225,13 +225,14 @@ class Ration(models.Model):
     name = models.CharField(max_length=300, verbose_name="Название рациона")
     kcal_category = models.IntegerField(choices=KCAL_CATEGORIES, verbose_name="Категория калорийности")
     notes = models.TextField(blank=True, null=True, verbose_name="Примечания")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Рацион"
         verbose_name_plural = "Рационы"
-        ordering = ["-created_at"]
+        ordering = ["order", "-created_at"]
 
     def __str__(self):
         return self.name

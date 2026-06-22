@@ -217,6 +217,64 @@ def ration_group_delete(request, group_pk):
     return redirect("ration_group_list")
 
 
+@require_POST
+def ration_reorder(request):
+    """Сохраняет новый порядок рационов и (опц.) перемещение в другую группу.
+    Тело JSON: {ration_id, target_group_id, ordered_ids: [...]}.
+    При перемещении в другую группу проверяет дубли блюд одной калорийности."""
+    try:
+        data = json.loads(request.body or "{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "message": "Некорректные данные"}, status=400)
+
+    ration_id       = data.get("ration_id")
+    target_group_id = data.get("target_group_id")
+    ordered_ids     = data.get("ordered_ids") or []
+
+    ration = get_object_or_404(Ration, pk=ration_id)
+    target_group = get_object_or_404(RationGroup, pk=target_group_id)
+
+    # Перемещение в ДРУГУЮ группу — проверяем конфликт по блюдам той же калорийности
+    if ration.group_id != target_group.pk:
+        moved_product_ids = set(
+            RationSlot.objects.filter(ration=ration, product__isnull=False)
+            .values_list("product_id", flat=True)
+        )
+        if moved_product_ids:
+            conflicts = (
+                RationSlot.objects.filter(
+                    ration__group_id=target_group.pk,
+                    ration__kcal_category=ration.kcal_category,
+                    product_id__in=moved_product_ids,
+                )
+                .exclude(ration=ration)
+                .select_related("product", "ration")
+            )
+            conflict_names = sorted({
+                f"{c.product.name} (в «{c.ration.name}»)"
+                for c in conflicts if c.product_id
+            })
+            if conflict_names:
+                return JsonResponse({
+                    "ok": False,
+                    "conflict": True,
+                    "message": (
+                        f"Нельзя переместить: в группе «{target_group.name}» "
+                        f"уже есть рацион {ration.kcal_category} ккал с теми же блюдами:\n"
+                        + "\n".join("• " + n for n in conflict_names)
+                    ),
+                }, status=409)
+
+        ration.group = target_group
+        ration.save(update_fields=["group"])
+
+    # Обновляем порядок всех рационов целевой группы
+    for index, rid in enumerate(ordered_ids):
+        Ration.objects.filter(pk=rid, group_id=target_group.pk).update(order=index)
+
+    return JsonResponse({"ok": True})
+
+
 # ── Рационы ───────────────────────────────────────────────────────────────────
 
 def ration_list(request, group_pk):

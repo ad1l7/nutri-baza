@@ -9,6 +9,7 @@ urlpatterns = [
     # Группы рационов
     path("rations/", views.ration_group_list, name="ration_group_list"),
     path("rations/group/create/", views.ration_group_create, name="ration_group_create"),
+    path("rations/reorder/", views.ration_reorder, name="ration_reorder"),
     path("rations/group/<int:group_pk>/edit/", views.ration_group_edit, name="ration_group_edit"),
     path("rations/group/<int:group_pk>/delete/", views.ration_group_delete, name="ration_group_delete"),
     path("rations/group/<int:group_pk>/", views.ration_list, name="ration_list"),
