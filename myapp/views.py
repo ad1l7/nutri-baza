@@ -121,21 +121,21 @@ def product_detail(request, pk):
 # ── Вспомогательные константы ─────────────────────────────────────────────────
 
 SLOT_ICONS = {
-    'breakfast_250': '🌅', 'breakfast_400': '🌅',
-    'second_400': '🍽️',   'second_500': '🍽️',
-    'soup_200': '🥣',      'soup_300': '🥣',
-    'salad_150': '🥗',     'salad_250': '🥗',
-    'dessert_100': '🍰',   'dessert_300': '🍰',
-    'smoothie': '🥤',      'sandwich': '🥪',
+    'breakfast': '🌅',
+    'hot_400': '🍽️',  'hot_500': '🍽️',
+    'soup': '🥣',
+    'salad': '🥗',
+    'dessert': '🍰',
+    'smoothie': '🥤',  'sandwich': '🥪',
 }
 
 SLOT_COLORS = {
-    'breakfast_250': 'orange', 'breakfast_400': 'orange',
-    'second_400': 'green',     'second_500': 'green',
-    'soup_200': 'blue',        'soup_300': 'blue',
-    'salad_150': 'teal',       'salad_250': 'teal',
-    'dessert_100': 'pink',     'dessert_300': 'pink',
-    'smoothie': 'purple',      'sandwich': 'amber',
+    'breakfast': 'orange',
+    'hot_400': 'green',  'hot_500': 'green',
+    'soup': 'blue',
+    'salad': 'teal',
+    'dessert': 'pink',
+    'smoothie': 'purple',  'sandwich': 'amber',
 }
 
 
