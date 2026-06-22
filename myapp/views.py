@@ -198,6 +198,18 @@ def ration_group_create(request):
     return redirect("ration_group_list")
 
 
+def ration_group_edit(request, group_pk):
+    group = get_object_or_404(RationGroup, pk=group_pk)
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        if name:
+            group.name = name
+            group.description = description or None
+            group.save()
+    return redirect("ration_group_list")
+
+
 def ration_group_delete(request, group_pk):
     group = get_object_or_404(RationGroup, pk=group_pk)
     if request.method == "POST":

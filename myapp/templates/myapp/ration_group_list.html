@@ -198,6 +198,7 @@
         </div>
         {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
+        <button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>
         <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
    title="Просмотр группы" style="text-decoration:none;">👁️</a>
         <a href="{% url 'ration_group_export' g.pk %}" class="grp-export-btn"
@@ -301,6 +302,25 @@
   </div>
 </div>
 
+<!-- МОДАЛ: редактировать группу -->
+<div class="mo" id="edit-group-modal" onclick="if(event.target===this)closeEditGroupModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeEditGroupModal()">✕</button>
+      <div class="mht">Редактировать группу</div>
+      <div class="mhs">Измените название или описание группы</div>
+    </div>
+    <form method="post" id="edit-group-form">
+      {% csrf_token %}
+      <div class="mbody">
+        <div class="ff"><label class="fl">Название группы</label><input class="fi" type="text" name="name" id="edit-group-name" placeholder="Неделя 1" required></div>
+        <div class="ff"><label class="fl">Описание (необязательно)</label><input class="fi" type="text" name="description" id="edit-group-desc" placeholder="Любые заметки…"></div>
+        <button type="submit" class="fsub">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- МОДАЛ: создать рацион (без даты, с превью шаблона) -->
 <div class="mo" id="ration-modal" onclick="if(event.target===this)closeRationModal()">
   <div class="mbox">
@@ -384,6 +404,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function openGroupModal() { document.getElementById('group-modal').classList.add('open'); }
 function closeGroupModal() { document.getElementById('group-modal').classList.remove('open'); }
+
+function openEditGroupModal(pk, name, description) {
+  const form = document.getElementById('edit-group-form');
+  form.action = '/rations/group/' + pk + '/edit/';
+  document.getElementById('edit-group-name').value = name || '';
+  document.getElementById('edit-group-desc').value = description || '';
+  document.getElementById('edit-group-modal').classList.add('open');
+}
+function closeEditGroupModal() { document.getElementById('edit-group-modal').classList.remove('open'); }
 
 function openRationModal(groupPk) {
   document.getElementById('ration-form').action = '/rations/group/' + groupPk + '/create/';
