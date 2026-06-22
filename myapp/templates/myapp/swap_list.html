@@ -46,6 +46,12 @@
   .grp-btn:hover{background:rgba(255,255,255,.3);}
   .grp-btn.del:hover{background:rgba(214,75,42,.65);}
 
+  .group-collapse-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .group-collapse-btn:hover{background:rgba(255,255,255,.28);}
+  .group-collapse-arrow{display:inline-block;transition:transform .25s;}
+  .group-card.collapsed .group-collapse-arrow{transform:rotate(-90deg);}
+  .group-card.collapsed .items-list{display:none;}
+
   .items-list{padding:12px 14px;display:flex;flex-direction:column;gap:7px;}
   .swap-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border:1.5px solid var(--border-soft);border-radius:10px;background:var(--off-white);}
   .si-thumb{width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--light);}
@@ -119,8 +125,11 @@
   <div class="groups-list">
     {% for gd in groups_data %}
     {% with g=gd.group %}
-    <div class="group-card">
+    <div class="group-card" id="swap-group-{{ g.pk }}">
       <div class="group-header">
+        <button class="group-collapse-btn" onclick="toggleSwapGroup({{ g.pk }})" title="Свернуть / развернуть">
+          <span class="group-collapse-arrow">▼</span>
+        </button>
         <div class="group-icon">🔄</div>
         <div class="group-title">{{ g.name }}</div>
         <div class="group-count">{{ gd.count }} позици{{ gd.count|pluralize:"я,и,й" }}</div>
@@ -277,6 +286,31 @@ function addProduct(productId){
   document.getElementById('add-item-product').value = productId;
   form.submit();
 }
+
+function toggleSwapGroup(pk){
+  const card = document.getElementById('swap-group-' + pk);
+  card.classList.toggle('collapsed');
+  try {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedSwapGroups') || '[]');
+    const idx = collapsed.indexOf(pk);
+    if(card.classList.contains('collapsed')){
+      if(idx === -1) collapsed.push(pk);
+    } else if(idx !== -1){
+      collapsed.splice(idx, 1);
+    }
+    localStorage.setItem('collapsedSwapGroups', JSON.stringify(collapsed));
+  } catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  try {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedSwapGroups') || '[]');
+    collapsed.forEach(pk => {
+      const card = document.getElementById('swap-group-' + pk);
+      if(card) card.classList.add('collapsed');
+    });
+  } catch(e){}
+});
 
 document.addEventListener('keydown', e => {
   if(e.key === 'Escape'){ closeCreateModal(); closeEditModal(); closeAddItemModal(); }
