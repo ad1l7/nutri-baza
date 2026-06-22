@@ -4,6 +4,7 @@ from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     RationTemplate, RationTemplateSlot,
+    SwapGroup, SwapItem,
     KCAL_CATEGORIES,
 )
 
@@ -109,6 +110,26 @@ class RationAdmin(admin.ModelAdmin):
     list_filter = ["group", "kcal_category"]
     search_fields = ["name"]
     inlines = [RationSlotInline]
+
+
+# ── Блюда на замену ──────────────────────────────────────────────────────────
+
+class SwapItemInline(admin.TabularInline):
+    model = SwapItem
+    extra = 1
+    fields = ["product", "order"]
+    autocomplete_fields = ["product"]
+
+
+@admin.register(SwapGroup)
+class SwapGroupAdmin(admin.ModelAdmin):
+    list_display = ["name", "get_items_count", "order"]
+    search_fields = ["name"]
+    inlines = [SwapItemInline]
+
+    def get_items_count(self, obj):
+        return obj.items.count()
+    get_items_count.short_description = "Позиций"
 
 
 # ── iiko Лог ─────────────────────────────────────────────────────────────────

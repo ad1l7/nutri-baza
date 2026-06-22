@@ -8,6 +8,7 @@ from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     RationTemplate, RationTemplateSlot,
+    SwapGroup, SwapItem,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
 )
 
@@ -497,6 +498,93 @@ def ration_delete(request, pk):
     if request.method == "POST":
         ration.delete()
     return redirect("ration_group_list")
+
+
+# ── Блюда на замену ───────────────────────────────────────────────────────────
+
+def swap_list(request):
+    groups = list(
+        SwapGroup.objects.prefetch_related("items__product__allergens").all()
+    )
+    groups_data = []
+    for g in groups:
+        items = []
+        for it in g.items.all():
+            p = it.product
+            items.append({
+                "item": it,
+                "product": p,
+            })
+        groups_data.append({"group": g, "items": items, "count": len(items)})
+
+    # Все блюда для модала выбора
+    all_products = (
+        Product.objects.prefetch_related("meal_categories").order_by("name")
+    )
+    all_products_json = [
+        {
+            "id": p.pk, "name": p.name, "article": p.article or "",
+            "category": " / ".join(str(c) for c in p.meal_categories.all()),
+            "kcal":    float(p.kcal_per_serving or 0),
+            "protein": float(p.protein_per_serving or 0),
+            "fat":     float(p.fat_per_serving or 0),
+            "carbs":   float(p.carbs_per_serving or 0),
+            "cost":    float(p.cost or 0),
+            "photo":   p.photo.url if p.photo else "",
+        }
+        for p in all_products
+    ]
+
+    return render(request, "myapp/swap_list.html", {
+        "groups_data": groups_data,
+        "all_products_json": json.dumps(all_products_json, ensure_ascii=False),
+    })
+
+
+def swap_group_create(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        if name:
+            last = SwapGroup.objects.count()
+            SwapGroup.objects.create(name=name, order=last)
+    return redirect("swap_list")
+
+
+def swap_group_edit(request, group_pk):
+    group = get_object_or_404(SwapGroup, pk=group_pk)
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        if name:
+            group.name = name
+            group.save(update_fields=["name"])
+    return redirect("swap_list")
+
+
+def swap_group_delete(request, group_pk):
+    group = get_object_or_404(SwapGroup, pk=group_pk)
+    if request.method == "POST":
+        group.delete()
+    return redirect("swap_list")
+
+
+@require_POST
+def swap_item_add(request, group_pk):
+    group = get_object_or_404(SwapGroup, pk=group_pk)
+    product_id = request.POST.get("product_id")
+    if product_id:
+        product = get_object_or_404(Product, pk=product_id)
+        # Не добавляем дубль одного и того же блюда в подгруппу
+        if not SwapItem.objects.filter(swap_group=group, product=product).exists():
+            last = group.items.count()
+            SwapItem.objects.create(swap_group=group, product=product, order=last)
+    return redirect("swap_list")
+
+
+@require_POST
+def swap_item_remove(request, item_pk):
+    item = get_object_or_404(SwapItem, pk=item_pk)
+    item.delete()
+    return redirect("swap_list")
 
 
 # ── Экспорт группы рационов в Excel ───────────────────────────────────────────

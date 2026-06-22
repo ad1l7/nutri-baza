@@ -21,6 +21,14 @@ urlpatterns = [
     path("rations/<int:pk>/edit/", views.ration_edit, name="ration_edit"),
     path("rations/<int:pk>/delete/", views.ration_delete, name="ration_delete"),
 
+    # Блюда на замену
+    path("swap/", views.swap_list, name="swap_list"),
+    path("swap/group/create/", views.swap_group_create, name="swap_group_create"),
+    path("swap/group/<int:group_pk>/edit/", views.swap_group_edit, name="swap_group_edit"),
+    path("swap/group/<int:group_pk>/delete/", views.swap_group_delete, name="swap_group_delete"),
+    path("swap/group/<int:group_pk>/add/", views.swap_item_add, name="swap_item_add"),
+    path("swap/item/<int:item_pk>/remove/", views.swap_item_remove, name="swap_item_remove"),
+
     # iiko
     path("iiko/sync/", views.iiko_sync_view, name="iiko_sync"),
     path("iiko/status/", views.iiko_sync_status, name="iiko_sync_status"),

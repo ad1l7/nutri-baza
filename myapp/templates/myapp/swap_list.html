@@ -1,0 +1,286 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Блюда на замену</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
+  .logo-text em{color:var(--green);font-style:normal;}
+  .nav-tabs{display:flex;gap:4px;margin-left:12px;}
+  .nav-tab{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;color:var(--muted);border:1.5px solid var(--border);transition:all .18s;}
+  .nav-tab:hover{background:var(--light);color:var(--text-mid);}
+  .nav-tab.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .create-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .2s;box-shadow:0 2px 8px rgba(90,170,60,.3);}
+  .create-btn:hover{background:var(--green-mid);}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;}
+  .logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
+
+  .main{max-width:1000px;margin:0 auto;padding:32px 22px;}
+  .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
+  .page-sub{font-size:14px;color:var(--muted);margin-bottom:28px;}
+  .groups-list{display:flex;flex-direction:column;gap:18px;}
+
+  .group-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+  .group-header{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--green-dark);}
+  .group-icon{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+  .group-title{font-size:15px;font-weight:800;color:#fff;flex:1;min-width:0;}
+  .group-count{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;}
+  .grp-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .grp-btn:hover{background:rgba(255,255,255,.3);}
+  .grp-btn.del:hover{background:rgba(214,75,42,.65);}
+
+  .items-list{padding:12px 14px;display:flex;flex-direction:column;gap:7px;}
+  .swap-item{display:flex;align-items:center;gap:11px;padding:9px 12px;border:1.5px solid var(--border-soft);border-radius:10px;background:var(--off-white);}
+  .si-thumb{width:42px;height:42px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--light);}
+  .si-thumb-ph{width:42px;height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--light);flex-shrink:0;}
+  .si-info{flex:1;min-width:0;}
+  .si-name{font-size:13px;font-weight:700;color:var(--text);}
+  .si-art{color:var(--muted);font-weight:500;font-size:11px;}
+  .si-nutr{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;}
+  .si-nutr .cost{color:#b8860b;font-weight:700;}
+  .si-remove{background:transparent;border:1.5px solid var(--border);border-radius:7px;width:28px;height:28px;cursor:pointer;font-size:12px;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+  .si-remove:hover{border-color:var(--danger);color:var(--danger);background:rgba(214,75,42,.05);}
+
+  .add-item-btn{display:flex;align-items:center;justify-content:center;gap:6px;padding:10px;border-radius:9px;border:2px dashed var(--border);background:transparent;color:var(--muted);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;width:100%;margin-top:3px;}
+  .add-item-btn:hover{border-color:var(--green);color:var(--green-mid);background:var(--light);}
+  .empty-sub{text-align:center;color:var(--muted);font-size:13px;padding:8px 0;}
+
+  .empty-state{text-align:center;padding:80px 20px;color:var(--muted);}
+  .empty-state .icon{font-size:52px;margin-bottom:16px;}
+  .empty-state h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;}
+
+  /* Модалы */
+  .mo{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:200;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
+  .mo.open{display:flex;}
+  .mbox{background:var(--white);border-radius:20px;width:100%;max-width:480px;box-shadow:var(--shadow-md);overflow:hidden;display:flex;flex-direction:column;max-height:85vh;}
+  .mhead{background:var(--green-dark);padding:18px 22px 14px;position:relative;flex-shrink:0;}
+  .mht{font-size:17px;font-weight:800;color:#fff;}
+  .mhs{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;}
+  .mcl{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;}
+  .mbody{padding:20px 22px;overflow-y:auto;}
+  .ff{margin-bottom:14px;}
+  .fl{display:block;font-size:12px;font-weight:700;color:var(--text-mid);margin-bottom:6px;}
+  .fi{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;transition:border .15s;}
+  .fi:focus{border-color:var(--green);}
+  .fsub{width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s;}
+  .fsub:hover{background:var(--green-mid);}
+
+  /* Пикер блюд в модале */
+  .picker-list{display:flex;flex-direction:column;gap:6px;}
+  .pitem{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1.5px solid var(--border-soft);border-radius:10px;cursor:pointer;transition:all .15s;background:var(--off-white);}
+  .pitem:hover{border-color:var(--green);background:var(--light);}
+  .pthumb{width:36px;height:36px;border-radius:7px;object-fit:cover;background:var(--light);flex-shrink:0;}
+  .pph{width:36px;height:36px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:var(--light);flex-shrink:0;font-size:16px;}
+  .pinfo{flex:1;min-width:0;}
+  .pname{font-size:13px;font-weight:700;color:var(--text);}
+  .pnutr{font-size:11px;color:var(--muted);margin-top:1px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
+    <a href="{% url 'swap_list' %}" class="nav-tab active">🔄 Блюда на замену</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="create-btn" onclick="openCreateModal()">＋ Создать подгруппу</button>
+    <form method="post" action="{% url 'logout' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
+    </form>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">Блюда на замену</div>
+  <div class="page-sub">Подгруппы взаимозаменяемых блюд. В каждую подгруппу можно добавить сколько угодно позиций.</div>
+
+  {% if groups_data %}
+  <div class="groups-list">
+    {% for gd in groups_data %}
+    {% with g=gd.group %}
+    <div class="group-card">
+      <div class="group-header">
+        <div class="group-icon">🔄</div>
+        <div class="group-title">{{ g.name }}</div>
+        <div class="group-count">{{ gd.count }} позици{{ gd.count|pluralize:"я,и,й" }}</div>
+        <button class="grp-btn" onclick="openEditModal({{ g.pk }}, '{{ g.name|escapejs }}')" title="Переименовать">✏️</button>
+        <form method="post" action="{% url 'swap_group_delete' g.pk %}" onsubmit="return confirm('Удалить подгруппу «{{ g.name|escapejs }}» со всеми позициями?')" style="display:contents">
+          {% csrf_token %}
+          <button type="submit" class="grp-btn del" title="Удалить подгруппу">🗑️</button>
+        </form>
+      </div>
+
+      <div class="items-list">
+        {% for it in gd.items %}
+        {% with p=it.product %}
+        <div class="swap-item">
+          {% if p.photo %}<img src="{{ p.photo.url }}" class="si-thumb" alt="">
+          {% else %}<div class="si-thumb-ph">🥗</div>{% endif %}
+          <div class="si-info">
+            <div class="si-name">{{ p.name }}{% if p.article %} <span class="si-art">· {{ p.article }}</span>{% endif %}</div>
+            <div class="si-nutr">
+              Ккал: {{ p.kcal_per_serving|floatformat:0 }} · Б {{ p.protein_per_serving|floatformat:1 }} · Ж {{ p.fat_per_serving|floatformat:1 }} · У {{ p.carbs_per_serving|floatformat:1 }}{% if p.cost %} · <span class="cost">💰 {{ p.cost|floatformat:0 }} ₸</span>{% endif %}
+            </div>
+          </div>
+          <form method="post" action="{% url 'swap_item_remove' it.item.pk %}" onsubmit="return confirm('Убрать «{{ p.name|escapejs }}» из подгруппы?')" style="display:contents">
+            {% csrf_token %}
+            <button type="submit" class="si-remove" title="Убрать из подгруппы">✕</button>
+          </form>
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="empty-sub">Пока нет позиций</div>
+        {% endfor %}
+
+        <button class="add-item-btn" onclick="openAddItemModal({{ g.pk }}, '{{ g.name|escapejs }}')">＋ Добавить блюдо</button>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🔄</div>
+    <h2>Пока нет подгрупп</h2>
+    <p>Создайте первую подгруппу блюд на замену.</p>
+    <br>
+    <button class="create-btn" onclick="openCreateModal()" style="margin:0 auto;">＋ Создать подгруппу</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- МОДАЛ: создать подгруппу -->
+<div class="mo" id="create-modal" onclick="if(event.target===this)closeCreateModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeCreateModal()">✕</button>
+      <div class="mht">Новая подгруппа</div>
+      <div class="mhs">Например: «Завтраки на замену», «Супы на замену»</div>
+    </div>
+    <form method="post" action="{% url 'swap_group_create' %}">
+      {% csrf_token %}
+      <div class="mbody">
+        <div class="ff"><label class="fl">Название подгруппы</label><input class="fi" type="text" name="name" placeholder="Завтраки на замену" required autofocus></div>
+        <button type="submit" class="fsub">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- МОДАЛ: переименовать подгруппу -->
+<div class="mo" id="edit-modal" onclick="if(event.target===this)closeEditModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeEditModal()">✕</button>
+      <div class="mht">Переименовать подгруппу</div>
+    </div>
+    <form method="post" id="edit-form">
+      {% csrf_token %}
+      <div class="mbody">
+        <div class="ff"><label class="fl">Название подгруппы</label><input class="fi" type="text" name="name" id="edit-name" required></div>
+        <button type="submit" class="fsub">Сохранить</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- МОДАЛ: добавить блюдо -->
+<div class="mo" id="add-item-modal" onclick="if(event.target===this)closeAddItemModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeAddItemModal()">✕</button>
+      <div class="mht">Добавить блюдо</div>
+      <div class="mhs" id="add-item-sub"></div>
+    </div>
+    <div class="mbody">
+      <div class="ff"><input class="fi" type="text" id="picker-search" placeholder="🔍 Поиск по названию или артикулу…" oninput="renderPicker()"></div>
+      <div class="picker-list" id="picker-list"></div>
+    </div>
+  </div>
+</div>
+
+<form method="post" id="add-item-form" style="display:none">
+  {% csrf_token %}
+  <input type="hidden" name="product_id" id="add-item-product">
+</form>
+
+<script>
+const ALL_PRODUCTS = {{ all_products_json|safe }};
+let currentGroupId = null;
+
+function openCreateModal(){ document.getElementById('create-modal').classList.add('open'); }
+function closeCreateModal(){ document.getElementById('create-modal').classList.remove('open'); }
+
+function openEditModal(pk, name){
+  document.getElementById('edit-form').action = '/swap/group/' + pk + '/edit/';
+  document.getElementById('edit-name').value = name || '';
+  document.getElementById('edit-modal').classList.add('open');
+}
+function closeEditModal(){ document.getElementById('edit-modal').classList.remove('open'); }
+
+function openAddItemModal(pk, name){
+  currentGroupId = pk;
+  document.getElementById('add-item-sub').textContent = 'в подгруппу «' + name + '»';
+  document.getElementById('picker-search').value = '';
+  document.getElementById('add-item-modal').classList.add('open');
+  renderPicker();
+  setTimeout(() => document.getElementById('picker-search').focus(), 50);
+}
+function closeAddItemModal(){ document.getElementById('add-item-modal').classList.remove('open'); }
+
+function renderPicker(){
+  const q = document.getElementById('picker-search').value.trim().toLowerCase();
+  const list = ALL_PRODUCTS.filter(p =>
+    !q || p.name.toLowerCase().includes(q) || (p.article && p.article.toLowerCase().includes(q))
+  );
+  let html = '';
+  list.slice(0, 200).forEach(p => {
+    const photo = p.photo ? `<img src="${p.photo}" class="pthumb" alt="">` : `<div class="pph">🥗</div>`;
+    const art = p.article ? ` <span style="color:var(--muted);font-weight:500;font-size:11px;">· ${p.article}</span>` : '';
+    const cost = p.cost ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.cost.toFixed(0)} ₸</span>` : '';
+    html += `<div class="pitem" onclick="addProduct(${p.id})">
+      ${photo}
+      <div class="pinfo">
+        <div class="pname">${p.name}${art}</div>
+        <div class="pnutr">Ккал: ${p.kcal.toFixed(0)} · Б ${p.protein.toFixed(1)} · Ж ${p.fat.toFixed(1)} · У ${p.carbs.toFixed(1)}${cost}</div>
+      </div>
+    </div>`;
+  });
+  if(!html) html = '<div class="empty-sub">Ничего не найдено</div>';
+  document.getElementById('picker-list').innerHTML = html;
+}
+
+function addProduct(productId){
+  const form = document.getElementById('add-item-form');
+  form.action = '/swap/group/' + currentGroupId + '/add/';
+  document.getElementById('add-item-product').value = productId;
+  form.submit();
+}
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){ closeCreateModal(); closeEditModal(); closeAddItemModal(); }
+});
+</script>
+</body>
+</html>

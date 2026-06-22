@@ -276,3 +276,41 @@ class RationSlot(models.Model):
         st = SLOT_LABELS.get(self.slot_type, self.slot_type) if self.slot_type else "без категории"
         pr = self.product.name if self.product_id else "пусто"
         return f"{mt} / {st} — {pr}"
+
+
+# ── Блюда на замену ──────────────────────────────────────────────────────────
+
+class SwapGroup(models.Model):
+    """Подгруппа блюд на замену, напр. «Завтраки на замену», «Супы на замену»."""
+    name = models.CharField(max_length=300, verbose_name="Название подгруппы")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Подгруппа на замену"
+        verbose_name_plural = "Блюда на замену"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class SwapItem(models.Model):
+    """Позиция в подгруппе на замену — ссылка на блюдо из каталога."""
+    swap_group = models.ForeignKey(
+        SwapGroup, on_delete=models.CASCADE,
+        related_name="items", verbose_name="Подгруппа"
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE,
+        related_name="swap_items", verbose_name="Блюдо"
+    )
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Позиция на замену"
+        verbose_name_plural = "Позиции на замену"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.swap_group.name} — {self.product.name}"
