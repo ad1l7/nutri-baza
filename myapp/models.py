@@ -274,6 +274,33 @@ class RationSlot(models.Model):
         return f"{mt} / {st} — {pr}"
 
 
+# ── Нормы КБЖУ по калорийности ───────────────────────────────────────────────
+
+class RationNorm(models.Model):
+    """Допустимые диапазоны КБЖУ для каждой категории калорийности.
+    Редактируется в админке. Используется на сборке рациона для подсветки."""
+    kcal_category = models.IntegerField(
+        choices=KCAL_CATEGORIES, unique=True,
+        verbose_name="Категория калорийности"
+    )
+    kcal_min    = models.PositiveIntegerField(verbose_name="Ккал — мин")
+    kcal_max    = models.PositiveIntegerField(verbose_name="Ккал — макс")
+    protein_min = models.PositiveIntegerField(verbose_name="Белки — мин, г")
+    protein_max = models.PositiveIntegerField(verbose_name="Белки — макс, г")
+    fat_min     = models.PositiveIntegerField(verbose_name="Жиры — мин, г")
+    fat_max     = models.PositiveIntegerField(verbose_name="Жиры — макс, г")
+    carbs_min   = models.PositiveIntegerField(verbose_name="Углеводы — мин, г")
+    carbs_max   = models.PositiveIntegerField(verbose_name="Углеводы — макс, г")
+
+    class Meta:
+        verbose_name = "Норма КБЖУ"
+        verbose_name_plural = "Нормы КБЖУ"
+        ordering = ["kcal_category"]
+
+    def __str__(self):
+        return f"Норма {self.kcal_category} ккал"
+
+
 # ── Блюда на замену ──────────────────────────────────────────────────────────
 
 class SwapGroup(models.Model):

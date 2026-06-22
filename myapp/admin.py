@@ -4,6 +4,7 @@ from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     RationTemplate, RationTemplateSlot,
+    RationNorm,
     SwapGroup, SwapItem,
     KCAL_CATEGORIES,
 )
@@ -110,6 +111,21 @@ class RationAdmin(admin.ModelAdmin):
     list_filter = ["group", "kcal_category"]
     search_fields = ["name"]
     inlines = [RationSlotInline]
+
+
+# ── Нормы КБЖУ ───────────────────────────────────────────────────────────────
+
+@admin.register(RationNorm)
+class RationNormAdmin(admin.ModelAdmin):
+    list_display = [
+        "kcal_category", "kcal_min", "kcal_max",
+        "protein_min", "protein_max", "fat_min", "fat_max",
+        "carbs_min", "carbs_max",
+    ]
+    list_editable = [
+        "kcal_min", "kcal_max", "protein_min", "protein_max",
+        "fat_min", "fat_max", "carbs_min", "carbs_max",
+    ]
 
 
 # ── Блюда на замену ──────────────────────────────────────────────────────────

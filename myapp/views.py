@@ -8,6 +8,7 @@ from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     RationTemplate, RationTemplateSlot,
+    RationNorm,
     SwapGroup, SwapItem,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
 )
@@ -471,6 +472,19 @@ def ration_edit(request, pk):
         for p in all_products
     ]
 
+    # Нормы КБЖУ для категории + флаги выхода за диапазон
+    norm = RationNorm.objects.filter(kcal_category=ration.kcal_category).first()
+    norm_flags = {}
+    if norm:
+        def _out(val, lo, hi):
+            return val < lo or val > hi
+        norm_flags = {
+            "kcal":    _out(total_kcal,    norm.kcal_min,    norm.kcal_max),
+            "protein": _out(total_protein, norm.protein_min, norm.protein_max),
+            "fat":     _out(total_fat,     norm.fat_min,     norm.fat_max),
+            "carbs":   _out(total_carbs,   norm.carbs_min,   norm.carbs_max),
+        }
+
     return render(request, "myapp/ration_edit.html", {
         "ration": ration,
         "meal_time_groups": list(meal_time_groups.values()),
@@ -479,6 +493,8 @@ def ration_edit(request, pk):
         "total_fat":     round(total_fat, 1),
         "total_carbs":   round(total_carbs, 1),
         "total_cost":    round(total_cost, 2),
+        "norm":          norm,
+        "norm_flags":    norm_flags,
         "slot_types":    SLOT_TYPES,
         "slot_icons":    SLOT_ICONS,
         "slot_colors":   SLOT_COLORS,

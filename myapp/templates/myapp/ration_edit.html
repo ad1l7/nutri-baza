@@ -63,12 +63,11 @@
   .ns-v.k{color:var(--green-mid);}
   .ns-l{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
   .ns-t{font-size:10px;color:var(--muted);font-weight:500;margin-top:1px;}
-
-  .prog-wrap{padding:10px 16px;border-bottom:1px solid var(--border-soft);}
-  .prog-bar-bg{height:6px;background:var(--border);border-radius:4px;overflow:hidden;}
-  .prog-bar{height:100%;border-radius:4px;background:var(--green);transition:width .4s;}
-  .prog-bar.over{background:var(--danger);}
-  .prog-txt{font-size:11px;color:var(--muted);font-weight:600;margin-top:5px;display:flex;justify-content:space-between;}
+  /* В норме / вне нормы */
+  .ns.ok  .ns-v{color:var(--green-mid);}
+  .ns.out{background:#fff1ee;}
+  .ns.out .ns-v{color:var(--danger);}
+  .ns.out .ns-t{color:var(--danger);font-weight:700;}
 
   .slots-wrap{flex:1;padding:12px 14px;display:flex;flex-direction:column;gap:14px;}
 
@@ -248,22 +247,23 @@
     </form>
 
     <div class="nutr-sum">
-      <div class="ns"><div class="ns-v k">{{ total_kcal|floatformat:0 }}</div><div class="ns-l">Ккал</div><div class="ns-t">/ {{ ration.kcal_category }}</div></div>
-      <div class="ns"><div class="ns-v">{{ total_protein|floatformat:1 }}</div><div class="ns-l">Белки г</div></div>
-      <div class="ns"><div class="ns-v">{{ total_fat|floatformat:1 }}</div><div class="ns-l">Жиры г</div></div>
-      <div class="ns"><div class="ns-v">{{ total_carbs|floatformat:1 }}</div><div class="ns-l">Углев. г</div></div>
+      <div class="ns {% if norm %}{% if norm_flags.kcal %}out{% else %}ok{% endif %}{% endif %}">
+        <div class="ns-v k">{{ total_kcal|floatformat:0 }}</div><div class="ns-l">Ккал</div>
+        <div class="ns-t">{% if norm %}норма {{ norm.kcal_min }}–{{ norm.kcal_max }}{% else %}/ {{ ration.kcal_category }}{% endif %}</div>
+      </div>
+      <div class="ns {% if norm %}{% if norm_flags.protein %}out{% else %}ok{% endif %}{% endif %}">
+        <div class="ns-v">{{ total_protein|floatformat:1 }}</div><div class="ns-l">Белки г</div>
+        {% if norm %}<div class="ns-t">норма {{ norm.protein_min }}–{{ norm.protein_max }}</div>{% endif %}
+      </div>
+      <div class="ns {% if norm %}{% if norm_flags.fat %}out{% else %}ok{% endif %}{% endif %}">
+        <div class="ns-v">{{ total_fat|floatformat:1 }}</div><div class="ns-l">Жиры г</div>
+        {% if norm %}<div class="ns-t">норма {{ norm.fat_min }}–{{ norm.fat_max }}</div>{% endif %}
+      </div>
+      <div class="ns {% if norm %}{% if norm_flags.carbs %}out{% else %}ok{% endif %}{% endif %}">
+        <div class="ns-v">{{ total_carbs|floatformat:1 }}</div><div class="ns-l">Углев. г</div>
+        {% if norm %}<div class="ns-t">норма {{ norm.carbs_min }}–{{ norm.carbs_max }}</div>{% endif %}
+      </div>
       <div class="ns"><div class="ns-v" style="color:#b8860b;">{{ total_cost|floatformat:0 }} ₸</div><div class="ns-l">Себест.</div></div>
-    </div>
-
-    <div class="prog-wrap">
-      <div class="prog-bar-bg">
-        <div class="prog-bar {% if total_kcal > ration.kcal_category %}over{% endif %}"
-             style="width:{% widthratio total_kcal ration.kcal_category 100 %}%"></div>
-      </div>
-      <div class="prog-txt">
-        <span>{{ total_kcal|floatformat:0 }} ккал набрано</span>
-        <span>цель: {{ ration.kcal_category }} ккал</span>
-      </div>
     </div>
 
     <div class="slots-wrap">
