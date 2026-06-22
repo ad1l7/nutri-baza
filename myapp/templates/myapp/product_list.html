@@ -39,9 +39,24 @@
     display: flex; align-items: center; gap: 20px;
     position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow);
   }
-  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; }
+  .logo-text { font-size: 18px; font-weight: 800; color: var(--green-dark); letter-spacing: -0.5px; flex-shrink:0; }
   .logo-text em { color: var(--green); font-style: normal; }
   .logo-sub { font-size: 11px; color: var(--muted); font-weight: 500; border-left: 1.5px solid var(--border); padding-left: 12px; }
+
+  /* Единая навигация (как в Рационах / Блюдах на замену) */
+  .nav-tabs { display:flex; gap:4px; margin-left:12px; flex-shrink:0; }
+  .nav-tab { padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; color:var(--muted); border:1.5px solid var(--border); transition:all .18s; white-space:nowrap; }
+  .nav-tab:hover { background:var(--light); color:var(--text-mid); }
+  .nav-tab.active { background:var(--green-dark); color:#fff; border-color:var(--green-dark); }
+  .topbar-right { margin-left:auto; display:flex; align-items:center; gap:10px; flex-shrink:0; }
+
+  /* Под-хедер — тулбар каталога */
+  .subbar {
+    background: var(--white); border-bottom: 1.5px solid var(--border);
+    padding: 0 28px; height: 58px; display: flex; align-items: center; gap: 12px;
+    position: sticky; top: 64px; z-index: 99; box-shadow: var(--shadow);
+  }
+  .subbar .count-badge { margin-left: auto; }
 
   .topbar-search { flex: 1; max-width: 480px; position: relative; }
   .topbar-search input {
@@ -69,7 +84,7 @@
   }
   .reset-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(214,75,42,.05); }
 
-  .layout { display: flex; height: calc(100vh - 64px); overflow: hidden; }
+  .layout { display: flex; height: calc(100vh - 122px); overflow: hidden; }
 
   /* Кнопка тоггла сайдбара */
   .sidebar-toggle {
@@ -394,15 +409,28 @@
 <body>
 
 <form method="get" id="filter-form">
-<!-- TOP BAR -->
+<!-- TOP BAR (единый во всех вкладках) -->
 <div class="topbar">
   <span class="logo-text">O-<em>Live</em></span>
-  <span class="logo-sub">Каталог продуктов</span>
-  <nav style="display:flex; gap:4px; flex-shrink:0;">
-    <a href="/" style="padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; background:var(--green-dark); color:#fff;">📦 Каталог</a>
-    <a href="/rations/" style="padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; color:var(--muted); border:1.5px solid var(--border);">🥗 Рационы</a>
-    <a href="/swap/" style="padding:7px 15px; border-radius:9px; font-size:13px; font-weight:700; text-decoration:none; color:var(--muted); border:1.5px solid var(--border);">🔄 Блюда на замену</a>
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab active">📦 Каталог</a>
+    <a href="/rations/" class="nav-tab">🥗 Рационы</a>
+    <a href="/swap/" class="nav-tab">🔄 Блюда на замену</a>
   </nav>
+  <div class="topbar-right">
+    <button type="button" class="logout-btn" title="Выйти из системы" onclick="doLogout()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Выйти
+    </button>
+  </div>
+</div>
+
+<!-- SUB BAR — тулбар каталога -->
+<div class="subbar">
   <div class="topbar-search">
     <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -417,7 +445,6 @@
     </svg>
     Фильтры
   </button>
-  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
   <button type="button" id="iiko-sync-btn" class="iiko-sync-btn" onclick="runIikoSync()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <polyline points="23 4 23 10 17 10"/>
@@ -433,19 +460,6 @@
               white-space:nowrap;cursor:default;">
     — / 5
   </div>
-<button type="button" class="logout-btn" title="Выйти из системы"
-    onclick="doLogout()">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-      <polyline points="16 17 21 12 16 7"/>
-      <line x1="21" y1="12" x2="9" y2="12"/>
-    </svg>
-    Выйти
-  </button>
-</div>
- 
-<!-- Тост-уведомление -->
-<div id="iiko-toast" class="iiko-toast"></div>
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
   <a href="?" class="reset-btn">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -454,6 +468,9 @@
     Сбросить
   </a>
 </div>
+
+<!-- Тост-уведомление -->
+<div id="iiko-toast" class="iiko-toast"></div>
 
 <div class="layout" id="layout">
 
