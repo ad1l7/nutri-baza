@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     # Каталог
     path("", views.product_list, name="product_list"),
+    path("export/", views.product_export, name="product_export"),
     path("product/<int:pk>/", views.product_detail, name="product_detail"),
 
     # Группы рационов

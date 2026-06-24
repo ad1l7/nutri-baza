@@ -15,10 +15,10 @@ from .models import (
 
 # ── Каталог продуктов ─────────────────────────────────────────────────────────
 
-def product_list(request):
+def get_filtered_products(request):
+    """Применяет все GET-фильтры каталога.
+    Возвращает (queryset, filters_dict, selected_meal_categories, selected_allergens)."""
     products = Product.objects.prefetch_related("meal_categories", "allergens").all()
-    all_meal_categories = MealCategory.objects.all()
-    all_allergens = Allergen.objects.all()
 
     search                   = request.GET.get("search", "").strip()
     selected_meal_categories = request.GET.getlist("meal_category")
@@ -86,6 +86,26 @@ def product_list(request):
         sort_field = f"-{sort_field}"
     products = products.order_by(sort_field)
 
+    filters = {
+        "search": search, "cost_min": cost_min, "cost_max": cost_max,
+        "kcal_min": kcal_min, "kcal_max": kcal_max,
+        "protein_min": protein_min, "protein_max": protein_max,
+        "fat_min": fat_min, "fat_max": fat_max,
+        "carbs_min": carbs_min, "carbs_max": carbs_max,
+        "kcal_s_min": kcal_s_min, "kcal_s_max": kcal_s_max,
+        "protein_s_min": protein_s_min, "protein_s_max": protein_s_max,
+        "fat_s_min": fat_s_min, "fat_s_max": fat_s_max,
+        "carbs_s_min": carbs_s_min, "carbs_s_max": carbs_s_max,
+        "packing": packing, "unused": unused, "sort": sort_by, "dir": sort_dir,
+    }
+    return products, filters, selected_meal_categories, selected_allergens
+
+
+def product_list(request):
+    products, filters, selected_meal_categories, selected_allergens = get_filtered_products(request)
+    all_meal_categories = MealCategory.objects.all()
+    all_allergens = Allergen.objects.all()
+
     total = products.count()
     packings = (
         Product.objects.values_list("packing", flat=True)
@@ -103,19 +123,97 @@ def product_list(request):
         "selected_allergens": selected_allergens,
         "selected_allergen_names": selected_allergen_names,
         "slot_labels": SLOT_LABELS,
-        "filters": {
-            "search": search, "cost_min": cost_min, "cost_max": cost_max,
-            "kcal_min": kcal_min, "kcal_max": kcal_max,
-            "protein_min": protein_min, "protein_max": protein_max,
-            "fat_min": fat_min, "fat_max": fat_max,
-            "carbs_min": carbs_min, "carbs_max": carbs_max,
-            "kcal_s_min": kcal_s_min, "kcal_s_max": kcal_s_max,
-            "protein_s_min": protein_s_min, "protein_s_max": protein_s_max,
-            "fat_s_min": fat_s_min, "fat_s_max": fat_s_max,
-            "carbs_s_min": carbs_s_min, "carbs_s_max": carbs_s_max,
-            "packing": packing, "unused": unused, "sort": sort_by, "dir": sort_dir,
-        },
+        "filters": filters,
     })
+
+
+def product_export(request):
+    """Экспорт каталога в Excel с учётом применённых фильтров."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    products, _, _, _ = get_filtered_products(request)
+    products = products.prefetch_related("meal_categories", "allergens")
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Каталог"
+
+    green_dark  = PatternFill("solid", fgColor="2E7D32")
+    green_light = PatternFill("solid", fgColor="E8F5E0")
+    title_font  = Font(bold=True, color="FFFFFF", size=14)
+    bold        = Font(bold=True, size=11)
+    thin        = Side(style="thin", color="DDDDDD")
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center      = Alignment(horizontal="center", vertical="center")
+    left_wrap   = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    headers = [
+        "Категория", "Наименование", "Артикул", "Кратность", "Масса, г", "Себест., ₸",
+        "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г", "КДж/100г",
+        "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
+        "Состав", "Аллергены",
+    ]
+    ncols = len(headers)
+
+    def num(val):
+        if val is None:
+            return None
+        try:
+            return round(float(val), 2)
+        except (TypeError, ValueError):
+            return None
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+    c = ws.cell(row=1, column=1, value="Каталог блюд")
+    c.font = title_font
+    c.fill = green_dark
+    c.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 26
+
+    for col, h in enumerate(headers, start=1):
+        c = ws.cell(row=2, column=col, value=h)
+        c.font = bold
+        c.fill = green_light
+        c.alignment = center
+        c.border = border
+
+    row = 3
+    for p in products:
+        cats = ", ".join(str(mc) for mc in p.meal_categories.all())
+        allergens = ", ".join(a.name for a in p.allergens.all())
+        weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
+        values = [
+            cats, p.name, p.article or "", p.packing or "", weight_g, num(p.cost),
+            num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100), num(p.kj_per_100),
+            num(p.protein_per_serving), num(p.fat_per_serving), num(p.carbs_per_serving),
+            num(p.kcal_per_serving), num(p.kj_per_serving),
+            p.composition or "", allergens,
+        ]
+        for col, val in enumerate(values, start=1):
+            c = ws.cell(row=row, column=col, value=val)
+            c.border = border
+            if col in (1, 2, 17, 18):
+                c.alignment = left_wrap
+            else:
+                c.alignment = center
+        row += 1
+
+    widths = [18, 32, 11, 12, 9, 10, 10, 9, 11, 10, 10, 11, 10, 12, 11, 11, 40, 22]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.freeze_panes = "A3"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = "attachment; filename*=UTF-8''" + quote("Каталог.xlsx")
+    wb.save(response)
+    return response
 
 
 def product_detail(request, pk):

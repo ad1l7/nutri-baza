@@ -83,6 +83,13 @@
     white-space: nowrap; text-decoration: none; display: flex; align-items: center; gap: 5px; flex-shrink: 0;
   }
   .reset-btn:hover { border-color: var(--danger); color: var(--danger); background: rgba(214,75,42,.05); }
+  .export-btn {
+    background: var(--green); color:#fff; border:none; border-radius:9px;
+    padding:8px 13px; font-family:var(--font); font-size:13px; font-weight:700;
+    cursor:pointer; display:flex; align-items:center; gap:6px; flex-shrink:0;
+    white-space:nowrap; transition:background .2s;
+  }
+  .export-btn:hover { background: var(--green-mid); }
 
   .layout { display: flex; height: calc(100vh - 122px); overflow: hidden; }
 
@@ -461,6 +468,9 @@
     — / 5
   </div>
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
+  <button type="button" class="export-btn" onclick="exportCatalog()" title="Скачать каталог в Excel (с учётом фильтров)">
+    ⬇ Excel
+  </button>
   <a href="?" class="reset-btn">
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -1046,6 +1056,13 @@ function submitForm() {
 function scheduleSearch() {
   clearTimeout(window._ss);
   window._ss = setTimeout(() => document.getElementById('filter-form').submit(), 600);
+}
+
+function exportCatalog() {
+  // Собираем текущее состояние фильтров из формы (галочки, поля, сортировка)
+  const form = document.getElementById('filter-form');
+  const params = new URLSearchParams(new FormData(form)).toString();
+  window.location.href = '/export/' + (params ? '?' + params : '');
 }
 
 function toggleSidebar() {
