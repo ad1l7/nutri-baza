@@ -42,6 +42,7 @@ def product_list(request):
     carbs_s_min   = request.GET.get("carbs_s_min", "")
     carbs_s_max   = request.GET.get("carbs_s_max", "")
     packing       = request.GET.get("packing", "").strip()
+    unused        = request.GET.get("unused", "")
     sort_by       = request.GET.get("sort", "name")
     sort_dir      = request.GET.get("dir", "asc")
 
@@ -70,6 +71,9 @@ def product_list(request):
     if carbs_s_min:    products = products.filter(carbs_per_serving__gte=carbs_s_min)
     if carbs_s_max:    products = products.filter(carbs_per_serving__lte=carbs_s_max)
     if packing:        products = products.filter(packing__icontains=packing)
+    # Только неиспользуемые: нет ни в одном рационе и ни в одной подгруппе на замену
+    if unused:
+        products = products.filter(ration_slots__isnull=True, swap_items__isnull=True)
 
     sort_map = {
         "name": "name", "article": "article", "net_weight": "net_weight", "cost": "cost",
@@ -109,7 +113,7 @@ def product_list(request):
             "protein_s_min": protein_s_min, "protein_s_max": protein_s_max,
             "fat_s_min": fat_s_min, "fat_s_max": fat_s_max,
             "carbs_s_min": carbs_s_min, "carbs_s_max": carbs_s_max,
-            "packing": packing, "sort": sort_by, "dir": sort_dir,
+            "packing": packing, "unused": unused, "sort": sort_by, "dir": sort_dir,
         },
     })
 

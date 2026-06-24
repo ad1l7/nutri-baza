@@ -477,6 +477,25 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
 
+    <!-- Статус использования -->
+    <div class="filter-group">
+      <div class="filter-title">Статус</div>
+      <div class="cat-list">
+        <label class="cat-item {% if filters.unused %}checked{% endif %}">
+          <input type="checkbox" name="unused" value="1"
+            {% if filters.unused %}checked{% endif %}
+            onchange="toggleCat(this); submitForm()">
+          <span class="cat-cb"></span>
+          <span class="cat-name">Только неиспользуемые</span>
+        </label>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;">
+        Блюда, которых нет ни в одном рационе и ни в одной подгруппе на замену
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
     <!-- Категория -->
     <div class="filter-group">
       <div class="filter-title">Категория блюда</div>
