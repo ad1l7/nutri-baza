@@ -603,6 +603,100 @@ def swap_item_remove(request, item_pk):
     return redirect("swap_list")
 
 
+def swap_group_export(request, group_pk):
+    """Экспорт одной подгруппы блюд на замену в Excel."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    group = get_object_or_404(SwapGroup, pk=group_pk)
+    items = list(group.items.select_related("product").prefetch_related("product__allergens"))
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Блюда на замену"
+
+    green_dark  = PatternFill("solid", fgColor="2E7D32")
+    green_light = PatternFill("solid", fgColor="E8F5E0")
+    title_font  = Font(bold=True, color="FFFFFF", size=14)
+    bold        = Font(bold=True, size=11)
+    thin        = Side(style="thin", color="DDDDDD")
+    border      = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center      = Alignment(horizontal="center", vertical="center")
+    left_wrap   = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+    headers = [
+        "Наименование", "Артикул", "Масса, г", "Себест., ₸",
+        "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
+        "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
+        "Аллергены",
+    ]
+    ncols = len(headers)
+
+    def num(val):
+        if val is None:
+            return None
+        try:
+            return round(float(val), 2)
+        except (TypeError, ValueError):
+            return None
+
+    # Заголовок подгруппы
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
+    c = ws.cell(row=1, column=1, value=f"Блюда на замену: {group.name}")
+    c.font = title_font
+    c.fill = green_dark
+    c.alignment = Alignment(horizontal="left", vertical="center")
+    ws.row_dimensions[1].height = 26
+
+    # Шапка таблицы
+    for col, h in enumerate(headers, start=1):
+        c = ws.cell(row=2, column=col, value=h)
+        c.font = bold
+        c.fill = green_light
+        c.alignment = center
+        c.border = border
+
+    row = 3
+    for it in items:
+        p = it.product
+        weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
+        allergens = ", ".join(a.name for a in p.allergens.all())
+        values = [
+            p.name, p.article or "", weight_g, num(p.cost),
+            num(p.protein_per_serving), num(p.fat_per_serving),
+            num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
+            num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
+            allergens,
+        ]
+        for col, val in enumerate(values, start=1):
+            c = ws.cell(row=row, column=col, value=val)
+            c.border = border
+            if col in (1, 14):
+                c.alignment = left_wrap
+            else:
+                c.alignment = center
+        row += 1
+
+    widths = [34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 24]
+    for i, w in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    ws.freeze_panes = "A3"
+
+    safe_name = "".join(ch for ch in group.name if ch.isalnum() or ch in " -_").strip() or "group"
+    filename = f"Замена_{safe_name}.xlsx"
+
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    wb.save(response)
+    return response
+
+
 # ── Экспорт группы рационов в Excel ───────────────────────────────────────────
 
 def ration_group_export(request, group_pk):

@@ -26,6 +26,7 @@ urlpatterns = [
     path("swap/group/create/", views.swap_group_create, name="swap_group_create"),
     path("swap/group/<int:group_pk>/edit/", views.swap_group_edit, name="swap_group_edit"),
     path("swap/group/<int:group_pk>/delete/", views.swap_group_delete, name="swap_group_delete"),
+    path("swap/group/<int:group_pk>/export/", views.swap_group_export, name="swap_group_export"),
     path("swap/group/<int:group_pk>/add/", views.swap_item_add, name="swap_item_add"),
     path("swap/item/<int:item_pk>/remove/", views.swap_item_remove, name="swap_item_remove"),
 
