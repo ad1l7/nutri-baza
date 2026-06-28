@@ -301,6 +301,29 @@ class RationNorm(models.Model):
         return f"Норма {self.kcal_category} ккал"
 
 
+# ── Сопоставление категорий iiko → категории сайта ───────────────────────────
+
+class IikoCategoryMap(models.Model):
+    """Соответствие названия категории/подгруппы из iiko → категория сайта.
+    Позволяет гибко реагировать на изменение категорий в iiko без правки кода."""
+    iiko_name = models.CharField(
+        max_length=300, unique=True,
+        verbose_name="Название категории в iiko"
+    )
+    slot_key = models.CharField(
+        max_length=50, choices=SLOT_TYPES,
+        verbose_name="Категория на сайте"
+    )
+
+    class Meta:
+        verbose_name = "Сопоставление категории iiko"
+        verbose_name_plural = "Сопоставление категорий iiko"
+        ordering = ["iiko_name"]
+
+    def __str__(self):
+        return f"{self.iiko_name} → {SLOT_LABELS.get(self.slot_key, self.slot_key)}"
+
+
 # ── Блюда на замену ──────────────────────────────────────────────────────────
 
 class SwapGroup(models.Model):

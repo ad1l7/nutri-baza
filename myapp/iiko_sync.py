@@ -73,11 +73,27 @@ _SLOT_LABEL_TO_KEY_NORM = {
 }
 
 
-def _pick_category(menu_info: dict) -> tuple:
+def _build_label_to_key() -> dict:
+    """Нормализованное сопоставление {название_категории_iiko: slot_key}.
+    Берёт встроенные значения из кода + редактируемые из админки (БД),
+    записи из БД имеют приоритет."""
+    result = dict(_SLOT_LABEL_TO_KEY_NORM)  # встроенные дефолты
+    try:
+        from .models import IikoCategoryMap
+        for row in IikoCategoryMap.objects.all():
+            result[_normalize_label(row.iiko_name)] = row.slot_key
+    except Exception as e:
+        logger.warning(f"Не удалось загрузить сопоставление категорий из БД: {e}")
+    return result
+
+
+def _pick_category(menu_info: dict, label_to_key: dict = None) -> tuple:
     """Блюдо может входить сразу в несколько категорий внешнего меню
     (например, ещё в техническую категорию типа 'ПП Упак').
     Возвращает (название_категории_для_отображения, slot_key_или_None) —
-    выбираем первую категорию, совпавшую с SLOT_TYPES, иначе первую попавшуюся."""
+    выбираем первую категорию, совпавшую с категорией сайта, иначе первую попавшуюся."""
+    if label_to_key is None:
+        label_to_key = _SLOT_LABEL_TO_KEY_NORM
     cat_names = menu_info.get("category_names") or []
     if not cat_names and menu_info.get("category_name"):
         cat_names = [menu_info["category_name"]]
@@ -86,7 +102,7 @@ def _pick_category(menu_info: dict) -> tuple:
         cn = (cn or "").strip()
         if not cn:
             continue
-        slot_key = _SLOT_LABEL_TO_KEY_NORM.get(_normalize_label(cn))
+        slot_key = label_to_key.get(_normalize_label(cn))
         if slot_key:
             return cn, slot_key
 
@@ -655,9 +671,18 @@ def sync_products_from_iiko(
         iiko_uuid_to_sku[uuid] = sku
 
     # ── Шаг 5: Удаление ──────────────────────────────────────────────────────
+    # Защита: блюда, используемые в рационах или подгруппах на замену, НЕ удаляем,
+    # даже если их артикул пропал из меню iiko.
+    from .models import RationSlot as _RationSlot, SwapItem as _SwapItem
+    used_product_ids = set(
+        _RationSlot.objects.filter(product__isnull=False).values_list("product_id", flat=True)
+    ) | set(
+        _SwapItem.objects.values_list("product_id", flat=True)
+    )
+
     products_to_delete = Product.objects.filter(
         iiko_sku__isnull=False
-    ).exclude(iiko_sku__in=iiko_skus_in_menu)
+    ).exclude(iiko_sku__in=iiko_skus_in_menu).exclude(pk__in=used_product_ids)
 
     deleted_count = products_to_delete.count()
     if deleted_count > 0:
@@ -695,6 +720,9 @@ def sync_products_from_iiko(
     cost_matched = 0
     cost_unmatched = []
 
+    # Сопоставление категорий: код + редактируемое из админки
+    label_to_key = _build_label_to_key()
+
     # ── Шаг 7: Создаём / обновляем ───────────────────────────────────────────
     for uuid, menu_info in menu_map.items():
         sku = iiko_uuid_to_sku.get(uuid, uuid)
@@ -703,7 +731,7 @@ def sync_products_from_iiko(
             product = existing_by_sku.get(sku) or existing_by_uuid.get(uuid)
             is_new = product is None
 
-            cat_display, matched_slot_key = _pick_category(menu_info)
+            cat_display, matched_slot_key = _pick_category(menu_info, label_to_key)
 
             # Артикул: сначала из меню, иначе из номенклатуры (num), но НЕ uuid
             article = menu_info.get("article") or ""

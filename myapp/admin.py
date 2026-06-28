@@ -4,7 +4,7 @@ from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     RationTemplate, RationTemplateSlot,
-    RationNorm,
+    RationNorm, IikoCategoryMap,
     SwapGroup, SwapItem,
     KCAL_CATEGORIES,
 )
@@ -126,6 +126,14 @@ class RationNormAdmin(admin.ModelAdmin):
         "kcal_min", "kcal_max", "protein_min", "protein_max",
         "fat_min", "fat_max", "carbs_min", "carbs_max",
     ]
+
+
+@admin.register(IikoCategoryMap)
+class IikoCategoryMapAdmin(admin.ModelAdmin):
+    list_display = ["iiko_name", "slot_key"]
+    list_editable = ["slot_key"]
+    search_fields = ["iiko_name"]
+    list_filter = ["slot_key"]
 
 
 # ── Блюда на замену ──────────────────────────────────────────────────────────
