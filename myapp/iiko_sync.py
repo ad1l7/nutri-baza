@@ -712,6 +712,32 @@ def sync_products_from_iiko(
         ).exclude(iiko_sku__isnull=False)
     }
 
+    # Индекс по АРТИКУЛУ — устойчивое сопоставление, даже если внутренний код iiko
+    # поменялся (напр. блюдо пересоздали в новой подгруппе с тем же артикулом).
+    # Берём только артикулы, уникальные И в меню, И в базе — чтобы не перепутать блюда.
+    from collections import Counter as _Counter
+    _menu_art_counts = _Counter(
+        (info.get("article") or "").strip()
+        for info in menu_map.values()
+        if (info.get("article") or "").strip()
+    )
+    _unique_menu_articles = {a for a, n in _menu_art_counts.items() if n == 1}
+    existing_by_article = {}
+    _dup_articles = set()
+    if _unique_menu_articles:
+        for p in Product.objects.filter(article__in=_unique_menu_articles):
+            a = (p.article or "").strip()
+            if not a:
+                continue
+            if a in existing_by_article:
+                _dup_articles.add(a)          # артикул задвоен в базе — не сопоставляем по нему
+            else:
+                existing_by_article[a] = p
+        for a in _dup_articles:
+            existing_by_article.pop(a, None)
+
+    article_matched = 0
+
     now = dj_timezone.now()
 
     # Нормализованные словари себестоимости для устойчивого сопоставления
@@ -731,7 +757,14 @@ def sync_products_from_iiko(
         sku = iiko_uuid_to_sku.get(uuid, uuid)
 
         try:
-            product = existing_by_sku.get(sku) or existing_by_uuid.get(uuid)
+            # 1) по артикулу (стабильно), 2) по коду iiko (запасной вариант)
+            _art = (menu_info.get("article") or "").strip()
+            product = None
+            if _art and _art in existing_by_article:
+                product = existing_by_article[_art]
+                article_matched += 1
+            if product is None:
+                product = existing_by_sku.get(sku) or existing_by_uuid.get(uuid)
             is_new = product is None
 
             cat_display, matched_slot_key = _pick_category(menu_info, label_to_key)
@@ -852,6 +885,7 @@ def sync_products_from_iiko(
             f"Без цены: {cost_unmatched[:15]}"
         )
 
+    logger.info(f"Сопоставлено по артикулу: {article_matched} блюд")
     logger.info(
         f"Готово — создано: {result['created']}, "
         f"обновлено: {result['updated']}, "
