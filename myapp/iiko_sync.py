@@ -680,22 +680,25 @@ def sync_products_from_iiko(
         _SwapItem.objects.values_list("product_id", flat=True)
     )
 
-    products_to_delete = Product.objects.filter(
+    # АВТО-УДАЛЕНИЕ ОТКЛЮЧЕНО.
+    # Раньше блюда, пропавшие из меню iiko, удалялись автоматически — это приводило
+    # к потере блюд в каталоге, обнулению слотов рационов и удалению позиций на замену
+    # (например, когда в iiko пересоздавали подгруппы и у блюд менялись ID).
+    # Теперь синхронизация НИЧЕГО не удаляет — только фиксирует «кандидатов» в лог.
+    # Удалять ненужные блюда можно вручную через админку.
+    delete_candidates = Product.objects.filter(
         iiko_sku__isnull=False
     ).exclude(iiko_sku__in=iiko_skus_in_menu).exclude(pk__in=used_product_ids)
 
-    deleted_count = products_to_delete.count()
-    if deleted_count > 0:
-        if deleted_count > 100:
-            result["errors"].append(
-                f"Попытка удалить {deleted_count} продуктов — превышен лимит 100. "
-                f"Проверь IIKO_EXTERNAL_MENU_ID."
-            )
-            return result
-        names = list(products_to_delete.values_list("name", flat=True))
-        logger.info(f"Удаляем {deleted_count}: {names}")
-        products_to_delete.delete()
-        result["deleted"] = deleted_count
+    cand_count = delete_candidates.count()
+    if cand_count > 0:
+        names = list(delete_candidates.values_list("name", flat=True))
+        logger.warning(
+            f"Кандидаты на удаление (НЕ удалены, авто-удаление отключено): "
+            f"{cand_count}: {names}"
+        )
+        result["delete_candidates"] = cand_count
+    result["deleted"] = 0
 
     # ── Шаг 6: Предзагружаем существующие продукты ───────────────────────────
     existing_by_sku = {
