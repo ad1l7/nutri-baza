@@ -360,3 +360,77 @@ class SwapItem(models.Model):
 
     def __str__(self):
         return f"{self.swap_group.name} — {self.product.name}"
+
+
+# ── Рационы Claude (отдельная система, изолированная от обычных рационов) ──────
+# Полная копия групп/рационов/слотов, но со своим набором данных и полем wishes.
+# Справочники (Product, MealTime, RationNorm, RationTemplate) — общие.
+
+class ClaudeRationGroup(models.Model):
+    name = models.CharField(max_length=300, verbose_name="Название группы")
+    description = models.TextField(null=True, blank=True, verbose_name="Описание")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Группа рационов Claude"
+        verbose_name_plural = "Группы рационов Claude"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class ClaudeRation(models.Model):
+    group = models.ForeignKey(
+        ClaudeRationGroup, on_delete=models.CASCADE,
+        related_name="rations", verbose_name="Группа",
+        null=True, blank=True,
+    )
+    name = models.CharField(max_length=300, verbose_name="Название рациона")
+    kcal_category = models.IntegerField(choices=KCAL_CATEGORIES, verbose_name="Категория калорийности")
+    wishes = models.TextField(blank=True, null=True, verbose_name="Пожелания для Claude")
+    notes = models.TextField(blank=True, null=True, verbose_name="Примечания")
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Рацион Claude"
+        verbose_name_plural = "Рационы Claude"
+        ordering = ["order", "-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class ClaudeRationSlot(models.Model):
+    ration = models.ForeignKey(
+        ClaudeRation, on_delete=models.CASCADE,
+        related_name="slots", verbose_name="Рацион"
+    )
+    meal_time = models.ForeignKey(
+        MealTime, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name="Приём пищи"
+    )
+    slot_type = models.CharField(
+        max_length=50, choices=SLOT_TYPES,
+        null=True, blank=True,
+        verbose_name="Категория блюда"
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="claude_ration_slots", verbose_name="Блюдо"
+    )
+    order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Слот рациона Claude"
+        verbose_name_plural = "Слоты рационов Claude"
+        ordering = ["order", "meal_time__order"]
+
+    def __str__(self):
+        mt = self.meal_time.name if self.meal_time_id else "—"
+        pr = self.product.name if self.product_id else "пусто"
+        return f"{mt} — {pr}"

@@ -49,6 +49,9 @@ IIKO_SERVER_URL       = "https://fudzavod.iiko.it/resto"
 IIKO_SERVER_LOGIN     = "buh2"
 IIKO_SERVER_PASSWORD  = "39babe20c3be152b70f15bb8383040d09852d1bb"
 
+# ── Claude (Anthropic API) ────────────────────────────────────────────────────
+ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default="")
+
 # ── Приложения ────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',

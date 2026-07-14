@@ -6,6 +6,7 @@ from .models import (
     RationTemplate, RationTemplateSlot,
     RationNorm, IikoCategoryMap,
     SwapGroup, SwapItem,
+    ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     KCAL_CATEGORIES,
 )
 
@@ -154,6 +155,40 @@ class SwapGroupAdmin(admin.ModelAdmin):
     def get_items_count(self, obj):
         return obj.items.count()
     get_items_count.short_description = "Позиций"
+
+
+# ── Рационы Claude ───────────────────────────────────────────────────────────
+
+class ClaudeRationInline(admin.TabularInline):
+    model = ClaudeRation
+    extra = 0
+    fields = ["name", "kcal_category"]
+    show_change_link = True
+
+
+@admin.register(ClaudeRationGroup)
+class ClaudeRationGroupAdmin(admin.ModelAdmin):
+    list_display = ["name", "get_rations_count", "created_at"]
+    search_fields = ["name"]
+    inlines = [ClaudeRationInline]
+
+    def get_rations_count(self, obj):
+        return obj.rations.count()
+    get_rations_count.short_description = "Рационов"
+
+
+class ClaudeRationSlotInline(admin.TabularInline):
+    model = ClaudeRationSlot
+    extra = 0
+    fields = ["meal_time", "slot_type", "product", "order"]
+
+
+@admin.register(ClaudeRation)
+class ClaudeRationAdmin(admin.ModelAdmin):
+    list_display = ["name", "group", "kcal_category"]
+    list_filter = ["group", "kcal_category"]
+    search_fields = ["name"]
+    inlines = [ClaudeRationSlotInline]
 
 
 # ── iiko Лог ─────────────────────────────────────────────────────────────────

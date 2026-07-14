@@ -1,4 +1,25 @@
-gunicorn==26.0.0
-packaging==26.2
-psycopg2-binary==2.9.12
+# Зафиксировано по реально установленным и протестированным версиям.
+# Веб-фреймворк и сервер
+Django==5.0.14
+gunicorn==23.0.0
+
+# База данных (продакшн — PostgreSQL)
+psycopg2-binary==2.9.10
+
+# Конфигурация из .env
 python-decouple==3.8
+
+# Claude / Anthropic API (вкладка «Рационы Claude»)
+anthropic==0.116.0
+
+# Работа с изображениями (Product.photo — ImageField)
+Pillow==12.2.0
+
+# Экспорт в Excel (каталог, рационы, замены)
+openpyxl==3.1.5
+
+# Синхронизация с iiko
+requests==2.32.3
+
+# Фильтры (myapp/filters.py)
+django-filter==24.3

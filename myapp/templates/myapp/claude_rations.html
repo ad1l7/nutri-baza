@@ -1,0 +1,183 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Рационы Claude</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
+  .logo-text em{color:var(--green);font-style:normal;}
+  .nav-tabs{display:flex;gap:4px;margin-left:12px;flex-wrap:wrap;}
+  .nav-tab{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;color:var(--muted);border:1.5px solid var(--border);transition:all .18s;white-space:nowrap;}
+  .nav-tab:hover{background:var(--light);color:var(--text-mid);}
+  .nav-tab.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;}
+  .logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
+
+  .main{max-width:900px;margin:0 auto;padding:32px 22px;}
+  .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
+  .page-sub{font-size:14px;color:var(--muted);margin-bottom:24px;}
+
+  .gen-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:24px;}
+  .gen-label{font-size:12px;font-weight:700;color:var(--text-mid);margin-bottom:8px;display:block;}
+  .gen-input{width:100%;min-height:90px;padding:13px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;resize:vertical;transition:border .15s;}
+  .gen-input:focus{border-color:var(--green);}
+  .gen-btn{margin-top:12px;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px 22px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .2s;}
+  .gen-btn:hover{background:var(--green-mid);}
+  .gen-btn:disabled{opacity:.7;cursor:default;}
+  .spin{width:15px;height:15px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:none;}
+  .gen-btn.loading .spin{display:inline-block;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .hint{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
+
+  .err-box{background:#fff1ee;border:1.5px solid #f3c0b3;color:var(--danger);border-radius:12px;padding:14px 16px;margin-bottom:20px;font-size:13px;font-weight:600;white-space:pre-wrap;}
+
+  /* Результат */
+  .res-head{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .res-badge{background:var(--green-dark);color:#fff;font-size:13px;font-weight:800;padding:6px 14px;border-radius:20px;}
+  .nutr-sum{display:grid;grid-template-columns:repeat(5,1fr);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;background:var(--white);margin-bottom:20px;}
+  .ns{padding:14px 8px;text-align:center;}
+  .ns+.ns{border-left:1px solid var(--border-soft);}
+  .ns-v{font-size:18px;font-weight:800;color:var(--text);}
+  .ns-l{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px;margin-top:2px;}
+  .ns-t{font-size:10px;color:var(--muted);font-weight:500;margin-top:1px;}
+  .ns.ok .ns-v{color:var(--green-mid);}
+  .ns.out{background:#fff1ee;}
+  .ns.out .ns-v,.ns.out .ns-t{color:var(--danger);font-weight:700;}
+
+  .meal{background:var(--white);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden;}
+  .meal-head{background:var(--light);padding:10px 16px;font-size:14px;font-weight:800;color:var(--green-dark);}
+  .meal-body{padding:8px 12px;display:flex;flex-direction:column;gap:6px;}
+  .dish{display:flex;align-items:center;gap:11px;padding:8px 10px;border:1.5px solid var(--border-soft);border-radius:10px;background:var(--off-white);}
+  .dish-thumb{width:40px;height:40px;border-radius:8px;object-fit:cover;background:var(--light);flex-shrink:0;}
+  .dish-ph{width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--light);font-size:17px;flex-shrink:0;}
+  .dish-info{flex:1;min-width:0;}
+  .dish-name{font-size:13px;font-weight:700;color:var(--text);}
+  .dish-art{color:var(--muted);font-weight:500;font-size:11px;}
+  .dish-nutr{font-size:11px;color:var(--muted);font-weight:600;margin-top:2px;}
+  .dish-nutr .cost{color:#b8860b;font-weight:700;}
+
+  .reason{background:#f0f7ec;border:1.5px solid var(--green-light);border-radius:12px;padding:16px 18px;margin-top:8px;}
+  .reason-title{font-size:12px;font-weight:800;color:var(--green-dark);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+  .reason-text{font-size:13.5px;line-height:1.6;color:var(--text-mid);white-space:pre-wrap;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="/" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
+    <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
+    <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
+  </nav>
+  <div class="topbar-right">
+    <form method="post" action="{% url 'logout' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
+    </form>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">🤖 Рационы Claude</div>
+  <div class="page-sub">Опиши пожелания — Claude соберёт рацион из блюд каталога под нормы КБЖУ и объяснит свой выбор. Работает отдельно и не трогает твои обычные рационы.</div>
+
+  <form method="post" id="gen-form">
+    {% csrf_token %}
+    <div class="gen-card">
+      <label class="gen-label" for="wishes">Пожелания к рациону</label>
+      <textarea class="gen-input" id="wishes" name="wishes" placeholder="Например: рацион на 1800 ккал, побольше белка, без рыбы и грибов, уложиться в бюджет по себестоимости">{{ wishes }}</textarea>
+      <button type="submit" class="gen-btn" id="gen-btn">
+        <span class="spin"></span>
+        <span class="gen-btn-label">✨ Сформировать</span>
+      </button>
+      <div class="hint">Сборка занимает 10–30 секунд. Можно указать калорийность, аллергены, предпочтения, бюджет — Claude учтёт.</div>
+    </div>
+  </form>
+
+  {% if error %}
+  <div class="err-box">⚠️ Ошибка генерации: {{ error }}</div>
+  {% endif %}
+
+  {% if result %}
+  <div class="res-head">
+    <span class="res-badge">Рацион на {{ result.kcal_category }} ккал</span>
+  </div>
+
+  {% with t=result.totals f=result.flags n=result.norm %}
+  <div class="nutr-sum">
+    <div class="ns {% if n %}{% if f.kcal %}out{% else %}ok{% endif %}{% endif %}">
+      <div class="ns-v">{{ t.kcal }}</div><div class="ns-l">Ккал</div>
+      {% if n %}<div class="ns-t">норма {{ n.kcal_min }}–{{ n.kcal_max }}</div>{% endif %}
+    </div>
+    <div class="ns {% if n %}{% if f.protein %}out{% else %}ok{% endif %}{% endif %}">
+      <div class="ns-v">{{ t.protein }}</div><div class="ns-l">Белки г</div>
+      {% if n %}<div class="ns-t">норма {{ n.protein_min }}–{{ n.protein_max }}</div>{% endif %}
+    </div>
+    <div class="ns {% if n %}{% if f.fat %}out{% else %}ok{% endif %}{% endif %}">
+      <div class="ns-v">{{ t.fat }}</div><div class="ns-l">Жиры г</div>
+      {% if n %}<div class="ns-t">норма {{ n.fat_min }}–{{ n.fat_max }}</div>{% endif %}
+    </div>
+    <div class="ns {% if n %}{% if f.carbs %}out{% else %}ok{% endif %}{% endif %}">
+      <div class="ns-v">{{ t.carbs }}</div><div class="ns-l">Углев. г</div>
+      {% if n %}<div class="ns-t">норма {{ n.carbs_min }}–{{ n.carbs_max }}</div>{% endif %}
+    </div>
+    <div class="ns"><div class="ns-v" style="color:#b8860b;">{{ t.cost }} ₸</div><div class="ns-l">Себест.</div></div>
+  </div>
+  {% endwith %}
+
+  {% for meal in result.meals %}
+  <div class="meal">
+    <div class="meal-head">{{ meal.name }}</div>
+    <div class="meal-body">
+      {% for d in meal.dishes %}
+      <div class="dish">
+        {% if d.photo %}<img src="{{ d.photo }}" class="dish-thumb" alt="">
+        {% else %}<div class="dish-ph">🥗</div>{% endif %}
+        <div class="dish-info">
+          <div class="dish-name">{{ d.name }}{% if d.article %} <span class="dish-art">· {{ d.article }}</span>{% endif %}</div>
+          <div class="dish-nutr">Ккал: {{ d.kcal }} · Б {{ d.protein }} · Ж {{ d.fat }} · У {{ d.carbs }}{% if d.cost %} · <span class="cost">💰 {{ d.cost }} ₸</span>{% endif %}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if result.reasoning %}
+  <div class="reason">
+    <div class="reason-title">🤖 Обоснование Claude</div>
+    <div class="reason-text">{{ result.reasoning }}</div>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>
+
+<script>
+document.getElementById('gen-form').addEventListener('submit', function () {
+  const btn = document.getElementById('gen-btn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  btn.querySelector('.gen-btn-label').textContent = 'Собираю рацион…';
+});
+</script>
+</body>
+</html>

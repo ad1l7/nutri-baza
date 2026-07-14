@@ -211,12 +211,53 @@
   .pf-chip:hover{border-color:var(--green);}
   .pf-chip.active{background:#fff1ee;border-color:#f3c0b3;color:var(--danger);font-weight:700;}
   @media (max-width:920px){ .pf-panel{grid-template-columns:1fr;} }
+
+  /* 🤖 Claude-панель */
+  .cl-wrap{padding:12px 14px 0;display:flex;flex-direction:column;gap:12px;}
+  .cl-gen{background:#f0f7ec;border:1.5px solid var(--green-light);border-radius:12px;padding:12px;}
+  .cl-label{display:block;font-size:12px;font-weight:800;color:var(--green-dark);margin-bottom:8px;}
+  .cl-input{width:100%;min-height:60px;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--font);font-size:13px;color:var(--text);outline:none;resize:vertical;background:var(--white);}
+  .cl-input:focus{border-color:var(--green);}
+  .cl-btn{margin-top:9px;width:100%;background:var(--green);color:#fff;border:none;border-radius:9px;padding:10px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s;}
+  .cl-btn:hover{background:var(--green-mid);}
+  .cl-btn:disabled{opacity:.7;cursor:default;}
+  .cl-spin{width:14px;height:14px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:clsp .7s linear infinite;display:none;}
+  .cl-btn.loading .cl-spin{display:inline-block;}
+  @keyframes clsp{to{transform:rotate(360deg);}}
+  .cl-hint{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  .cl-err{background:#fff1ee;border:1.5px solid #f3c0b3;color:var(--danger);border-radius:10px;padding:11px 13px;font-size:12.5px;font-weight:600;white-space:pre-wrap;}
+  .cl-preview{background:var(--white);border:1.5px solid var(--green-light);border-radius:12px;padding:12px;}
+  .cl-prev-head{margin-bottom:10px;}
+  .cl-badge{background:var(--green-dark);color:#fff;font-size:12px;font-weight:800;padding:5px 12px;border-radius:16px;}
+  .cl-sum{display:grid;grid-template-columns:repeat(5,1fr);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .cl-s{padding:8px 4px;text-align:center;}
+  .cl-s+.cl-s{border-left:1px solid var(--border-soft);}
+  .cl-s b{display:block;font-size:14px;font-weight:800;color:var(--text);}
+  .cl-s i{font-size:9px;font-style:normal;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;}
+  .cl-s.ok b{color:var(--green-mid);}
+  .cl-s.out{background:#fff1ee;} .cl-s.out b{color:var(--danger);}
+  .cl-meal{border:1.5px solid var(--border-soft);border-radius:10px;overflow:hidden;margin-bottom:8px;}
+  .cl-meal-h{background:var(--light);padding:7px 11px;font-size:12px;font-weight:800;color:var(--green-dark);}
+  .cl-dish{display:flex;align-items:center;gap:9px;padding:7px 10px;border-top:1px solid var(--border-soft);}
+  .cl-th{width:32px;height:32px;border-radius:7px;object-fit:cover;flex-shrink:0;background:var(--light);}
+  .cl-ph{display:flex;align-items:center;justify-content:center;font-size:15px;}
+  .cl-di{flex:1;min-width:0;}
+  .cl-dn{font-size:12.5px;font-weight:700;color:var(--text);}
+  .cl-du{font-size:10.5px;color:var(--muted);font-weight:600;margin-top:1px;}
+  .cl-reason{background:#f0f7ec;border-radius:9px;padding:10px 12px;font-size:12px;line-height:1.55;color:var(--text-mid);margin-bottom:10px;white-space:pre-wrap;}
+  .cl-reason b{color:var(--green-dark);}
+  .cl-actions{display:flex;gap:8px;}
+  .cl-apply{width:100%;background:var(--green-dark);color:#fff;border:none;border-radius:9px;padding:10px;font-family:var(--font);font-size:12.5px;font-weight:800;cursor:pointer;}
+  .cl-apply:hover{background:var(--green-mid);}
+  .cl-discard{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--text-mid);border-radius:9px;padding:10px;font-family:var(--font);font-size:12.5px;font-weight:700;cursor:pointer;}
+  .cl-discard:hover{border-color:var(--danger);color:var(--danger);}
+  .cl-warn{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:center;}
 </style>
 </head>
 <body>
 
 <div class="topbar">
-  <a href="{% url 'ration_group_list' %}" class="back-btn">← Рационы</a>
+  <a href="{% url 'claude_rations' %}" class="back-btn">← Рационы Claude</a>
   <span class="topbar-name">{{ ration.name }}</span>
   <div class="topbar-nutr">
     <div class="tpill kcal">⚡ <strong>{{ total_kcal|floatformat:0 }}</strong> / {{ ration.kcal_category }} ккал</div>
@@ -290,6 +331,64 @@
         {% if norm %}<div class="ns-t">норма {{ norm.carbs_min }}–{{ norm.carbs_max }}</div>{% endif %}
       </div>
       <div class="ns"><div class="ns-v" style="color:#b8860b;">{{ total_cost|floatformat:0 }} ₸</div><div class="ns-l">Себест.</div></div>
+    </div>
+
+    <!-- 🤖 Claude: сборка рациона -->
+    <div class="cl-wrap">
+      <form method="post" class="cl-gen" id="cl-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="claude_generate">
+        <label class="cl-label">🤖 Собрать рацион через Claude</label>
+        <textarea class="cl-input" name="wishes" placeholder="Пожелания: больше белка, без рыбы и грибов, уложиться в бюджет по себестоимости…">{{ ration.wishes|default:'' }}</textarea>
+        <button type="submit" class="cl-btn" id="cl-btn">
+          <span class="cl-spin"></span>
+          <span class="cl-btn-label">✨ Собрать через Claude</span>
+        </button>
+        <div class="cl-hint">Строго {{ ration.kcal_category }} ккал. Сборка ~15–30 сек. Блюда из других рационов этой калорийности исключаются.</div>
+      </form>
+
+      {% if claude_error %}
+      <div class="cl-err">⚠️ {{ claude_error }}</div>
+      {% endif %}
+
+      {% if claude_result %}
+      <div class="cl-preview">
+        <div class="cl-prev-head">
+          <span class="cl-badge">Предложение · {{ claude_result.totals.kcal }} ккал</span>
+        </div>
+        {% with t=claude_result.totals f=claude_result.flags n=claude_result.norm %}
+        <div class="cl-sum">
+          <div class="cl-s {% if n %}{% if f.kcal %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.kcal }}</b><i>ккал</i></div>
+          <div class="cl-s {% if n %}{% if f.protein %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.protein }}</b><i>Б</i></div>
+          <div class="cl-s {% if n %}{% if f.fat %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.fat }}</b><i>Ж</i></div>
+          <div class="cl-s {% if n %}{% if f.carbs %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.carbs }}</b><i>У</i></div>
+          <div class="cl-s"><b style="color:#b8860b;">{{ t.cost }}₸</b><i>себест.</i></div>
+        </div>
+        {% endwith %}
+        {% for meal in claude_result.meals %}
+        <div class="cl-meal">
+          <div class="cl-meal-h">{{ meal.name }}</div>
+          {% for d in meal.dishes %}
+          <div class="cl-dish">
+            {% if d.photo %}<img src="{{ d.photo }}" class="cl-th" alt="">{% else %}<span class="cl-th cl-ph">🥗</span>{% endif %}
+            <div class="cl-di">
+              <div class="cl-dn">{{ d.name }}</div>
+              <div class="cl-du">{{ d.kcal }} кк · Б{{ d.protein }} Ж{{ d.fat }} У{{ d.carbs }}{% if d.cost %} · 💰{{ d.cost }}₸{% endif %}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+        {% if claude_result.reasoning %}
+        <div class="cl-reason"><b>🤖 Обоснование:</b> {{ claude_result.reasoning }}</div>
+        {% endif %}
+        <div class="cl-actions">
+          <form method="post" style="flex:1">{% csrf_token %}<input type="hidden" name="action" value="claude_apply"><button type="submit" class="cl-apply">✓ Применить в рацион</button></form>
+          <form method="post" style="flex:1">{% csrf_token %}<input type="hidden" name="action" value="claude_discard"><button type="submit" class="cl-discard">Отклонить</button></form>
+        </div>
+        <div class="cl-warn">⚠️ «Применить» заменит текущие слоты рациона на этот состав.</div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="slots-wrap">
@@ -486,7 +585,7 @@
     <p>«{{ ration.name }}» будет удалён вместе со всеми слотами.</p>
     <div class="del-btns">
       <button class="btn-cancel" onclick="closeDelModal()">Отмена</button>
-      <form method="post" action="{% url 'ration_delete' ration.pk %}" style="flex:1">
+      <form method="post" action="{% url 'claude_ration_delete' ration.pk %}" style="flex:1">
         {% csrf_token %}
         <button type="submit" class="btn-del" style="width:100%">Удалить</button>
       </form>
@@ -722,6 +821,14 @@ function getCsrf() {
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeCatModal(); closeDelModal(); }
+});
+
+// 🤖 Индикатор загрузки при сборке рациона через Claude
+document.getElementById('cl-form')?.addEventListener('submit', function () {
+  const b = document.getElementById('cl-btn');
+  b.classList.add('loading');
+  b.disabled = true;
+  b.querySelector('.cl-btn-label').textContent = 'Собираю рацион…';
 });
 </script>
 </body>

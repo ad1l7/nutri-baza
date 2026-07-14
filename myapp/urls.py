@@ -22,6 +22,15 @@ urlpatterns = [
     path("rations/<int:pk>/edit/", views.ration_edit, name="ration_edit"),
     path("rations/<int:pk>/delete/", views.ration_delete, name="ration_delete"),
 
+    # Рационы Claude (отдельная система групп/рационов + сборка Claude)
+    path("claude/", views.claude_group_list, name="claude_rations"),
+    path("claude/group/create/", views.claude_group_create, name="claude_group_create"),
+    path("claude/group/<int:group_pk>/edit/", views.claude_group_edit, name="claude_group_edit"),
+    path("claude/group/<int:group_pk>/delete/", views.claude_group_delete, name="claude_group_delete"),
+    path("claude/group/<int:group_pk>/create-ration/", views.claude_ration_create, name="claude_ration_create"),
+    path("claude/ration/<int:pk>/edit/", views.claude_ration_edit, name="claude_ration_edit"),
+    path("claude/ration/<int:pk>/delete/", views.claude_ration_delete, name="claude_ration_delete"),
+
     # Блюда на замену
     path("swap/", views.swap_list, name="swap_list"),
     path("swap/group/create/", views.swap_group_create, name="swap_group_create"),

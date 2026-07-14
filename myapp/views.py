@@ -10,6 +10,7 @@ from .models import (
     RationTemplate, RationTemplateSlot,
     RationNorm,
     SwapGroup, SwapItem,
+    ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
 )
 
@@ -240,6 +241,30 @@ SLOT_COLORS = {
     'dessert': 'pink',
     'smoothie': 'purple',  'sandwich': 'amber',
 }
+
+
+def _product_picker_dict(p, with_category=False):
+    """Данные блюда для пикера в редакторе рациона (КБЖУ на порцию и на 100 г,
+    себестоимость, аллергены) — для фильтров и отображения."""
+    d = {
+        "id": p.pk, "name": p.name, "article": p.article or "",
+        # на порцию
+        "kcal":    float(p.kcal_per_serving or 0),
+        "protein": float(p.protein_per_serving or 0),
+        "fat":     float(p.fat_per_serving or 0),
+        "carbs":   float(p.carbs_per_serving or 0),
+        # на 100 г
+        "kcal100":    float(p.kcal_per_100 or 0),
+        "protein100": float(p.protein or 0),
+        "fat100":     float(p.fat or 0),
+        "carbs100":   float(p.carbs or 0),
+        "cost":      float(p.cost or 0),
+        "allergens": [a.name for a in p.allergens.all()],
+        "photo":     p.photo.url if p.photo else "",
+    }
+    if with_category:
+        d["category"] = " / ".join(str(c) for c in p.meal_categories.all())
+    return d
 
 
 # ── Группы рационов ───────────────────────────────────────────────────────────
@@ -536,43 +561,21 @@ def ration_edit(request, pk):
             Product.objects
             .filter(meal_categories__key=key)
             .exclude(pk__in=occupied_ids)
+            .prefetch_related("allergens")
             .order_by("name")
         )
-        meal_cat_map[key] = [
-            {
-                "id": p.pk, "name": p.name, "article": p.article or "",
-                "kcal":    float(p.kcal_per_serving or 0),
-                "protein": float(p.protein_per_serving or 0),
-                "fat":     float(p.fat_per_serving or 0),
-                "carbs":   float(p.carbs_per_serving or 0),
-                "cost":    float(p.cost or 0),
-                "photo":   p.photo.url if p.photo else "",
-            }
-            for p in prods
-        ]
+        meal_cat_map[key] = [_product_picker_dict(p) for p in prods]
 
     # Все приёмы пищи для модала добавления слота
     all_meal_times = list(MealTime.objects.order_by("order", "name"))
-        # Добавь перед return render:
     all_products = list(
         Product.objects
-        .prefetch_related("meal_categories")
+        .prefetch_related("meal_categories", "allergens")
         .exclude(pk__in=occupied_ids)
         .order_by("name")
     )
-    all_products_json = [
-        {
-            "id": p.pk, "name": p.name, "article": p.article or "",
-            "category": " / ".join(str(c) for c in p.meal_categories.all()),
-            "kcal":    float(p.kcal_per_serving or 0),
-            "protein": float(p.protein_per_serving or 0),
-            "fat":     float(p.fat_per_serving or 0),
-            "carbs":   float(p.carbs_per_serving or 0),
-            "cost":    float(p.cost or 0),
-            "photo":   p.photo.url if p.photo else "",
-        }
-        for p in all_products
-    ]
+    all_products_json = [_product_picker_dict(p, with_category=True) for p in all_products]
+    all_allergens = list(Allergen.objects.order_by("name"))
 
     # Нормы КБЖУ для категории + флаги выхода за диапазон
     norm = RationNorm.objects.filter(kcal_category=ration.kcal_category).first()
@@ -608,6 +611,7 @@ def ration_edit(request, pk):
         "slot_labels_json":   json.dumps(SLOT_LABELS, ensure_ascii=False),
         "occupied_count": len(occupied_ids),
         "all_products_json":  json.dumps(all_products_json, ensure_ascii=False),
+        "all_allergens": all_allergens,
     })
 
 
@@ -797,6 +801,436 @@ def swap_group_export(request, group_pk):
     response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
     return response
+
+
+# ── Рационы Claude (генерация через Anthropic API) ────────────────────────────
+
+def _resolve_ration_proposal(proposal):
+    """Разбирает ответ Claude в данные для превью: блюда, суммы КБЖУ, нормы, флаги."""
+    all_ids = [
+        did
+        for meal in proposal.get("meals", [])
+        for did in meal.get("dish_ids", [])
+    ]
+    by_id = {p.pk: p for p in Product.objects.filter(pk__in=all_ids)}
+
+    kcal_cat = proposal.get("kcal_category")
+    norm = RationNorm.objects.filter(kcal_category=kcal_cat).first()
+
+    meals = []
+    tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
+    for meal in proposal.get("meals", []):
+        dishes = []
+        for did in meal.get("dish_ids", []):
+            p = by_id.get(did)
+            if not p:
+                continue
+            kcal = float(p.kcal_per_serving or 0)
+            prot = float(p.protein_per_serving or 0)
+            fat  = float(p.fat_per_serving or 0)
+            carb = float(p.carbs_per_serving or 0)
+            cost = float(p.cost or 0)
+            tot_kcal += kcal; tot_p += prot; tot_f += fat; tot_c += carb; tot_cost += cost
+            dishes.append({
+                "id": p.pk,
+                "name": p.name, "article": p.article or "",
+                "kcal": round(kcal), "protein": round(prot, 1),
+                "fat": round(fat, 1), "carbs": round(carb, 1),
+                "cost": round(cost),
+                "photo": p.photo.url if p.photo else "",
+            })
+        meals.append({"name": meal.get("meal_name", ""), "dishes": dishes})
+
+    def _flag(val, lo, hi):
+        return None if not norm else (val < lo or val > hi)
+
+    return {
+        "kcal_category": kcal_cat,
+        "meals": meals,
+        "reasoning": proposal.get("reasoning", ""),
+        "norm": norm,
+        "totals": {
+            "kcal": round(tot_kcal), "protein": round(tot_p, 1),
+            "fat": round(tot_f, 1), "carbs": round(tot_c, 1),
+            "cost": round(tot_cost),
+        },
+        "flags": {
+            "kcal":    _flag(tot_kcal, norm.kcal_min, norm.kcal_max) if norm else None,
+            "protein": _flag(tot_p, norm.protein_min, norm.protein_max) if norm else None,
+            "fat":     _flag(tot_f, norm.fat_min, norm.fat_max) if norm else None,
+            "carbs":   _flag(tot_c, norm.carbs_min, norm.carbs_max) if norm else None,
+        },
+    }
+
+
+def _claude_generate(request, ration):
+    """Просит Claude собрать рацион под калорийность и пожелания; результат — в сессию."""
+    from .claude_rations import generate_ration
+
+    wishes = request.POST.get("wishes", "").strip()
+    ration.wishes = wishes or None
+    ration.save(update_fields=["wishes"])
+
+    # Каталог без блюд, занятых в других рационах Claude той же калорийности этой группы
+    occupied_ids = set()
+    if ration.group_id:
+        occupied_ids = set(
+            ClaudeRationSlot.objects.filter(
+                ration__group_id=ration.group_id,
+                ration__kcal_category=ration.kcal_category,
+                product__isnull=False,
+            ).exclude(ration=ration).values_list("product_id", flat=True)
+        )
+    products = (
+        Product.objects.prefetch_related("meal_categories")
+        .exclude(pk__in=occupied_ids).order_by("name")
+    )
+    norms = RationNorm.objects.filter(kcal_category=ration.kcal_category)
+
+    full_wishes = (
+        f"Категория калорийности строго {ration.kcal_category} ккал.\n"
+        + (wishes or "(без особых пожеланий)")
+    )
+    try:
+        proposal = generate_ration(full_wishes, products, norms)
+        request.session[f"claude_proposal_{ration.pk}"] = proposal
+        request.session.pop(f"claude_error_{ration.pk}", None)
+    except Exception as e:
+        request.session[f"claude_error_{ration.pk}"] = str(e)
+        request.session.pop(f"claude_proposal_{ration.pk}", None)
+
+
+def _apply_proposal_to_ration(ration, proposal):
+    """Заменяет слоты рациона Claude на предложенный состав.
+
+    Изоляция: не создаёт общих справочников (MealTime) — только читает их.
+    Правило «без повторяющихся блюд в рационе» соблюдается при раскладке.
+    (Повторы между рационами одной калорийности группы уже отсечены на этапе
+    генерации и в пикере через occupied_ids.)
+    """
+    # Приёмы пищи — только для сопоставления по имени (чтение, ничего не создаём)
+    meal_times = {mt.name.strip().lower(): mt for mt in MealTime.objects.all()}
+    # Приёмы пищи самого рациона (из шаблона) — фолбэк, если имя не совпало
+    existing_mts = [
+        s.meal_time for s in ration.slots.select_related("meal_time") if s.meal_time_id
+    ]
+    fallback_mt = existing_mts[0] if existing_mts else next(iter(meal_times.values()), None)
+
+    ration.slots.all().delete()
+    order = 0
+    used_product_ids = set()  # без повторяющихся блюд в одном рационе
+    for meal in proposal.get("meals", []):
+        meal_name = (meal.get("meal_name") or "").strip()
+        key = meal_name.lower()
+        mt = meal_times.get(key)
+        if mt is None:  # частичное совпадение: "Завтрак" ↔ "Завтрак-1"
+            mt = next(
+                (v for k, v in meal_times.items() if k and (k in key or key in k)),
+                None,
+            )
+        if mt is None:  # не нашли — берём приём пищи самого рациона, НЕ создаём новый
+            mt = fallback_mt
+
+        dish_ids = meal.get("dish_ids", [])
+        prods = {
+            p.pk: p
+            for p in Product.objects.filter(pk__in=dish_ids).prefetch_related("meal_categories")
+        }
+        for did in dish_ids:
+            p = prods.get(did)
+            if not p or p.pk in used_product_ids:  # пропускаем повтор блюда
+                continue
+            used_product_ids.add(p.pk)
+            cats = list(p.meal_categories.all())
+            ClaudeRationSlot.objects.create(
+                ration=ration,
+                meal_time=mt,
+                slot_type=cats[0].key if cats else None,
+                product=p,
+                order=order,
+            )
+            order += 1
+
+
+def _claude_apply(request, ration):
+    proposal = request.session.get(f"claude_proposal_{ration.pk}")
+    if proposal:
+        _apply_proposal_to_ration(ration, proposal)
+    request.session.pop(f"claude_proposal_{ration.pk}", None)
+    request.session.pop(f"claude_error_{ration.pk}", None)
+
+
+# ── Вкладка «Рационы Claude»: группы ──────────────────────────────────────────
+
+def claude_group_list(request):
+    """Лендинг вкладки: список групп рационов Claude (аналог ration_group_list)."""
+    groups = ClaudeRationGroup.objects.prefetch_related("rations__slots__product").all()
+    groups_data = []
+    for g in groups:
+        rations = list(g.rations.all())
+        rations_info = []
+        group_cost = 0
+        for r in rations:
+            slots = list(r.slots.select_related("product", "meal_time").order_by("order", "meal_time__order"))
+            filled_slots = [s for s in slots if s.product_id]
+            total_kcal = sum(float(s.product.kcal_per_serving or 0) for s in filled_slots)
+            total_cost = sum(float(s.product.cost or 0) for s in filled_slots)
+            group_cost += total_cost
+            rations_info.append({
+                "ration": r,
+                "slots": filled_slots,
+                "total_kcal": round(total_kcal, 1),
+                "total_cost": round(total_cost, 2),
+                "filled_count": len(filled_slots),
+            })
+        groups_data.append({
+            "group": g,
+            "rations_info": rations_info,
+            "count": len(rations),
+            "group_cost": round(group_cost, 2),
+        })
+
+    tmpl_data = {}
+    for kcal, _ in KCAL_CATEGORIES:
+        try:
+            tmpl = RationTemplate.objects.prefetch_related("slots__meal_time").get(kcal_category=kcal)
+            tmpl_data[kcal] = [
+                {"name": s.meal_time.name, "icon": s.meal_time.icon}
+                for s in tmpl.slots.order_by("order")
+            ]
+        except RationTemplate.DoesNotExist:
+            tmpl_data[kcal] = []
+
+    return render(request, "myapp/claude_group_list.html", {
+        "groups_data": groups_data,
+        "ration_kcal_choices": KCAL_CATEGORIES,
+        "slot_icons": SLOT_ICONS,
+        "tmpl_data_json": json.dumps(tmpl_data, ensure_ascii=False),
+        "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
+    })
+
+
+def claude_group_create(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        if name:
+            ClaudeRationGroup.objects.create(name=name, description=description or None)
+    return redirect("claude_rations")
+
+
+def claude_group_edit(request, group_pk):
+    group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        if name:
+            group.name = name
+            group.description = description or None
+            group.save()
+    return redirect("claude_rations")
+
+
+def claude_group_delete(request, group_pk):
+    group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if request.method == "POST":
+        group.delete()
+    return redirect("claude_rations")
+
+
+def claude_ration_create(request, group_pk):
+    group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        kcal_category = request.POST.get("kcal_category", "")
+        wishes = request.POST.get("wishes", "").strip()
+        if name and kcal_category:
+            ration = ClaudeRation.objects.create(
+                group=group, name=name,
+                kcal_category=int(kcal_category),
+                wishes=wishes or None,
+            )
+            # Слоты по шаблону приёмов пищи (общий RationTemplate)
+            try:
+                tmpl = RationTemplate.objects.get(kcal_category=int(kcal_category))
+                for i, tslot in enumerate(tmpl.slots.order_by("order")):
+                    ClaudeRationSlot.objects.create(
+                        ration=ration,
+                        meal_time=tslot.meal_time,
+                        order=tslot.order if tslot.order else i,
+                    )
+            except RationTemplate.DoesNotExist:
+                pass
+            return redirect("claude_ration_edit", pk=ration.pk)
+    return redirect("claude_rations")
+
+
+def claude_ration_delete(request, pk):
+    ration = get_object_or_404(ClaudeRation, pk=pk)
+    if request.method == "POST":
+        ration.delete()
+    return redirect("claude_rations")
+
+
+def claude_ration_edit(request, pk):
+    """Полный редактор рациона Claude: слоты + пикер блюд + панель сборки Claude."""
+    ration = get_object_or_404(ClaudeRation, pk=pk)
+
+    if request.method == "POST":
+        action = request.POST.get("action", "")
+
+        if action == "update_meta":
+            ration.name = request.POST.get("name", ration.name).strip()
+            ration.kcal_category = int(request.POST.get("kcal_category", ration.kcal_category))
+            ration.notes = request.POST.get("notes", "").strip() or None
+            ration.save()
+
+        elif action == "add_slot_with_category":
+            meal_time_id = request.POST.get("meal_time_id")
+            slot_type    = request.POST.get("slot_type") or None
+            if meal_time_id:
+                last_order = ration.slots.count()
+                ClaudeRationSlot.objects.create(
+                    ration=ration,
+                    meal_time_id=meal_time_id,
+                    slot_type=slot_type,
+                    order=last_order,
+                )
+
+        elif action == "update_slot_category":
+            slot_id = request.POST.get("slot_id")
+            slot_type = request.POST.get("slot_type") or None
+            try:
+                slot = ClaudeRationSlot.objects.get(pk=slot_id, ration=ration)
+                slot.slot_type = slot_type
+                slot.product = None
+                slot.save()
+            except ClaudeRationSlot.DoesNotExist:
+                pass
+
+        elif action == "update_slot":
+            slot_id = request.POST.get("slot_id")
+            product_id = request.POST.get("product_id") or None
+            try:
+                slot = ClaudeRationSlot.objects.get(pk=slot_id, ration=ration)
+                slot.product_id = product_id
+                slot.save()
+            except ClaudeRationSlot.DoesNotExist:
+                pass
+
+        elif action == "delete_slot":
+            slot_id = request.POST.get("slot_id")
+            ClaudeRationSlot.objects.filter(pk=slot_id, ration=ration).delete()
+
+        elif action == "claude_generate":
+            _claude_generate(request, ration)
+
+        elif action == "claude_apply":
+            _claude_apply(request, ration)
+
+        elif action == "claude_discard":
+            request.session.pop(f"claude_proposal_{ration.pk}", None)
+            request.session.pop(f"claude_error_{ration.pk}", None)
+
+        return redirect("claude_ration_edit", pk=pk)
+
+    # GET
+    slots = list(
+        ration.slots.select_related("product", "meal_time").order_by("order", "meal_time__order")
+    )
+
+    meal_time_groups = {}
+    total_kcal = total_protein = total_fat = total_carbs = total_cost = 0
+    for slot in slots:
+        mt_id = slot.meal_time_id
+        if mt_id not in meal_time_groups:
+            meal_time_groups[mt_id] = {"meal_time": slot.meal_time, "slots": []}
+        p = slot.product
+        kcal    = float(p.kcal_per_serving or 0) if p else 0
+        protein = float(p.protein_per_serving or 0) if p else 0
+        fat     = float(p.fat_per_serving or 0) if p else 0
+        carbs   = float(p.carbs_per_serving or 0) if p else 0
+        cost    = float(p.cost or 0) if p else 0
+        total_kcal += kcal; total_protein += protein; total_fat += fat
+        total_carbs += carbs; total_cost += cost
+        meal_time_groups[mt_id]["slots"].append({
+            "slot": slot,
+            "label": SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else None,
+            "icon":  SLOT_ICONS.get(slot.slot_type, "🍴") if slot.slot_type else "❓",
+            "color": SLOT_COLORS.get(slot.slot_type, "green") if slot.slot_type else "green",
+            "kcal": round(kcal, 1), "protein": round(protein, 1),
+            "fat": round(fat, 1), "carbs": round(carbs, 1),
+        })
+
+    occupied_ids = set()
+    if ration.group_id:
+        occupied_ids = set(
+            ClaudeRationSlot.objects.filter(
+                ration__group_id=ration.group_id,
+                ration__kcal_category=ration.kcal_category,
+                product__isnull=False,
+            ).exclude(ration=ration).values_list("product_id", flat=True)
+        )
+
+    meal_cat_map = {}
+    for key, _ in SLOT_TYPES:
+        prods = list(
+            Product.objects.filter(meal_categories__key=key)
+            .exclude(pk__in=occupied_ids)
+            .prefetch_related("allergens").order_by("name")
+        )
+        meal_cat_map[key] = [_product_picker_dict(p) for p in prods]
+
+    all_meal_times = list(MealTime.objects.order_by("order", "name"))
+    all_products = list(
+        Product.objects.prefetch_related("meal_categories", "allergens")
+        .exclude(pk__in=occupied_ids).order_by("name")
+    )
+    all_products_json = [_product_picker_dict(p, with_category=True) for p in all_products]
+    all_allergens = list(Allergen.objects.order_by("name"))
+
+    norm = RationNorm.objects.filter(kcal_category=ration.kcal_category).first()
+    norm_flags = {}
+    if norm:
+        def _out(val, lo, hi):
+            return val < lo or val > hi
+        norm_flags = {
+            "kcal":    _out(total_kcal, norm.kcal_min, norm.kcal_max),
+            "protein": _out(total_protein, norm.protein_min, norm.protein_max),
+            "fat":     _out(total_fat, norm.fat_min, norm.fat_max),
+            "carbs":   _out(total_carbs, norm.carbs_min, norm.carbs_max),
+        }
+
+    # Превью предложения Claude (если сгенерировано и ещё не применено)
+    claude_proposal = request.session.get(f"claude_proposal_{ration.pk}")
+    claude_result = _resolve_ration_proposal(claude_proposal) if claude_proposal else None
+    claude_error = request.session.get(f"claude_error_{ration.pk}")
+
+    return render(request, "myapp/claude_ration_edit.html", {
+        "ration": ration,
+        "claude_result": claude_result,
+        "claude_error": claude_error,
+        "meal_time_groups": list(meal_time_groups.values()),
+        "total_kcal": round(total_kcal, 1),
+        "total_protein": round(total_protein, 1),
+        "total_fat": round(total_fat, 1),
+        "total_carbs": round(total_carbs, 1),
+        "total_cost": round(total_cost, 2),
+        "norm": norm,
+        "norm_flags": norm_flags,
+        "slot_types": SLOT_TYPES,
+        "slot_icons": SLOT_ICONS,
+        "slot_colors": SLOT_COLORS,
+        "slot_labels": SLOT_LABELS,
+        "kcal_categories": KCAL_CATEGORIES,
+        "all_meal_times": all_meal_times,
+        "meal_cat_map_json": json.dumps(meal_cat_map, ensure_ascii=False),
+        "slot_icons_json": json.dumps(SLOT_ICONS, ensure_ascii=False),
+        "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
+        "occupied_count": len(occupied_ids),
+        "all_products_json": json.dumps(all_products_json, ensure_ascii=False),
+        "all_allergens": all_allergens,
+    })
 
 
 # ── Экспорт группы рационов в Excel ───────────────────────────────────────────
