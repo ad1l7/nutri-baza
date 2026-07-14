@@ -863,8 +863,31 @@ def _resolve_ration_proposal(proposal):
     }
 
 
+def _ration_fixed_meal_times(ration):
+    """Фиксированные приёмы пищи рациона — из шаблона калорийности
+    (fallback: текущие приёмы пищи рациона). Список MealTime в нужном порядке.
+    Структура приёмов пищи задаётся настройками и не меняется Claude."""
+    result, seen = [], set()
+    try:
+        tmpl = RationTemplate.objects.get(kcal_category=ration.kcal_category)
+        for ts in tmpl.slots.select_related("meal_time").order_by("order"):
+            if ts.meal_time_id and ts.meal_time_id not in seen:
+                seen.add(ts.meal_time_id)
+                result.append(ts.meal_time)
+    except RationTemplate.DoesNotExist:
+        pass
+    if result:
+        return result
+    for s in ration.slots.select_related("meal_time").order_by("order", "meal_time__order"):
+        if s.meal_time_id and s.meal_time_id not in seen:
+            seen.add(s.meal_time_id)
+            result.append(s.meal_time)
+    return result
+
+
 def _claude_generate(request, ration):
-    """Просит Claude собрать рацион под калорийность и пожелания; результат — в сессию."""
+    """Просит Claude собрать рацион под калорийность, пожелания и ФИКСИРОВАННЫЕ
+    приёмы пищи рациона; результат — в сессию."""
     from .claude_rations import generate_ration
 
     wishes = request.POST.get("wishes", "").strip()
@@ -886,13 +909,14 @@ def _claude_generate(request, ration):
         .exclude(pk__in=occupied_ids).order_by("name")
     )
     norms = RationNorm.objects.filter(kcal_category=ration.kcal_category)
+    meal_names = [mt.name for mt in _ration_fixed_meal_times(ration)]
 
     full_wishes = (
         f"Категория калорийности строго {ration.kcal_category} ккал.\n"
         + (wishes or "(без особых пожеланий)")
     )
     try:
-        proposal = generate_ration(full_wishes, products, norms)
+        proposal = generate_ration(full_wishes, products, norms, meal_times=meal_names)
         request.session[f"claude_proposal_{ration.pk}"] = proposal
         request.session.pop(f"claude_error_{ration.pk}", None)
     except Exception as e:
@@ -901,41 +925,40 @@ def _claude_generate(request, ration):
 
 
 def _apply_proposal_to_ration(ration, proposal):
-    """Заменяет слоты рациона Claude на предложенный состав.
+    """Наполняет ФИКСИРОВАННЫЕ приёмы пищи рациона блюдами от Claude.
 
-    Изоляция: не создаёт общих справочников (MealTime) — только читает их.
-    Правило «без повторяющихся блюд в рационе» соблюдается при раскладке.
-    (Повторы между рационами одной калорийности группы уже отсечены на этапе
-    генерации и в пикере через occupied_ids.)
+    Структура приёмов пищи задаётся настройками (шаблоном) и НЕ меняется:
+    все фиксированные приёмы всегда сохраняются — даже те, что Claude не заполнил
+    (для них остаётся пустой слот, чтобы приём не исчез). Общих справочников
+    (MealTime) не создаём — только читаем. Повторов блюд в рационе не допускаем.
+    (Повторы между рационами одной калорийности группы уже отсечены при генерации.)
     """
-    # Приёмы пищи — только для сопоставления по имени (чтение, ничего не создаём)
-    meal_times = {mt.name.strip().lower(): mt for mt in MealTime.objects.all()}
-    # Приёмы пищи самого рациона (из шаблона) — фолбэк, если имя не совпало
-    existing_mts = [
-        s.meal_time for s in ration.slots.select_related("meal_time") if s.meal_time_id
-    ]
-    fallback_mt = existing_mts[0] if existing_mts else next(iter(meal_times.values()), None)
+    fixed_mts = _ration_fixed_meal_times(ration)
+
+    # Предложение Claude: имя приёма пищи (lower) → список id блюд
+    by_meal = {}
+    for meal in proposal.get("meals", []):
+        name = (meal.get("meal_name") or "").strip().lower()
+        by_meal.setdefault(name, []).extend(meal.get("dish_ids", []))
+
+    all_ids = [did for ids in by_meal.values() for did in ids]
+    prods = {
+        p.pk: p
+        for p in Product.objects.filter(pk__in=all_ids).prefetch_related("meal_categories")
+    }
 
     ration.slots.all().delete()
     order = 0
     used_product_ids = set()  # без повторяющихся блюд в одном рационе
-    for meal in proposal.get("meals", []):
-        meal_name = (meal.get("meal_name") or "").strip()
-        key = meal_name.lower()
-        mt = meal_times.get(key)
-        if mt is None:  # частичное совпадение: "Завтрак" ↔ "Завтрак-1"
-            mt = next(
-                (v for k, v in meal_times.items() if k and (k in key or key in k)),
-                None,
+    for mt in fixed_mts:
+        key = mt.name.strip().lower()
+        dish_ids = by_meal.get(key)
+        if dish_ids is None:  # запасное частичное совпадение имени
+            dish_ids = next(
+                (v for k, v in by_meal.items() if k and (k in key or key in k)),
+                [],
             )
-        if mt is None:  # не нашли — берём приём пищи самого рациона, НЕ создаём новый
-            mt = fallback_mt
-
-        dish_ids = meal.get("dish_ids", [])
-        prods = {
-            p.pk: p
-            for p in Product.objects.filter(pk__in=dish_ids).prefetch_related("meal_categories")
-        }
+        placed = 0
         for did in dish_ids:
             p = prods.get(did)
             if not p or p.pk in used_product_ids:  # пропускаем повтор блюда
@@ -949,6 +972,10 @@ def _apply_proposal_to_ration(ration, proposal):
                 product=p,
                 order=order,
             )
+            order += 1
+            placed += 1
+        if placed == 0:  # Claude не заполнил приём — оставляем пустой слот, чтобы не исчез
+            ClaudeRationSlot.objects.create(ration=ration, meal_time=mt, order=order)
             order += 1
 
 

@@ -5,6 +5,7 @@ Claude ТОЛЬКО читает каталог блюд и нормы КБЖУ 
 Ничего в базе он не меняет — это делает наш код по его ответу (в отдельной вкладке).
 """
 
+import copy
 import json
 import anthropic
 from django.conf import settings
@@ -44,7 +45,9 @@ _SYSTEM = (
     "попасть в нормы КБЖУ для этой категории.\n"
     "3. Не повторяй одно и то же блюдо в рационе.\n"
     "4. Учитывай пожелания пользователя (аллергены, предпочтения, бюджет и т.п.).\n"
-    "5. Разбей рацион на приёмы пищи (Завтрак, Обед, Ужин, Перекус — на твоё усмотрение).\n"
+    "5. Приёмы пищи ФИКСИРОВАНЫ пользователем. Раскладывай блюда РОВНО по приёмам, "
+    "которые указаны в задании, используя их точные названия. Не придумывай своих "
+    "приёмов пищи и не пропускай ни один.\n"
     "6. В поле reasoning кратко и по-русски объясни, почему выбрал именно такой состав: "
     "как попал в нормы КБЖУ, чем руководствовался, какие пожелания учёл."
 )
@@ -81,8 +84,12 @@ def _build_norms(norms) -> list:
     ]
 
 
-def generate_ration(wishes: str, products, norms) -> dict:
-    """Возвращает предложение Claude в виде dict согласно _OUTPUT_SCHEMA.
+def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
+    """Возвращает предложение Claude в виде dict согласно схеме.
+
+    meal_times — список названий фиксированных приёмов пищи рациона. Если задан,
+    Claude обязан разложить блюда РОВНО по ним (структура приёмов не меняется):
+    названия форсируются через enum в схеме.
     Бросает исключение при ошибке API."""
     if not settings.ANTHROPIC_API_KEY:
         raise RuntimeError("Не задан ANTHROPIC_API_KEY в настройках/.env")
@@ -92,12 +99,26 @@ def generate_ration(wishes: str, products, norms) -> dict:
     catalog = _build_catalog(products)
     norms_data = _build_norms(norms)
 
+    # Если приёмы пищи фиксированы — форсируем их названия через enum в схеме
+    schema = _OUTPUT_SCHEMA
+    meals_line = "Собери один суточный рацион. Верни строго JSON по заданной схеме."
+    if meal_times:
+        schema = copy.deepcopy(_OUTPUT_SCHEMA)
+        schema["properties"]["meals"]["items"]["properties"]["meal_name"]["enum"] = list(meal_times)
+        meals_line = (
+            "ВАЖНО: приёмы пищи ФИКСИРОВАНЫ и менять их нельзя. Разложи блюда РОВНО по "
+            "этим приёмам пищи, используя эти точные названия и не придумывая других:\n"
+            + ", ".join(meal_times) + ".\n"
+            "Каждый приём пищи должен присутствовать ровно один раз и содержать хотя бы "
+            "одно блюдо. Верни строго JSON по заданной схеме."
+        )
+
     user_prompt = (
         f"Пожелания пользователя:\n{wishes.strip() or '(без особых пожеланий)'}\n\n"
         f"Нормы КБЖУ по категориям (мин–макс):\n{json.dumps(norms_data, ensure_ascii=False)}\n\n"
         f"Каталог блюд (КБЖУ и себестоимость — на порцию):\n"
         f"{json.dumps(catalog, ensure_ascii=False)}\n\n"
-        "Собери один суточный рацион. Верни строго JSON по заданной схеме."
+        + meals_line
     )
 
     response = client.messages.create(
@@ -107,7 +128,7 @@ def generate_ration(wishes: str, products, norms) -> dict:
         # effort=medium ускоряет сборку (меньше "размышлений") при сохранении Opus 4.8.
         # При необходимости качества верни "high"; для скорости — "low".
         output_config={
-            "format": {"type": "json_schema", "schema": _OUTPUT_SCHEMA},
+            "format": {"type": "json_schema", "schema": schema},
             "effort": "medium",
         },
         system=_SYSTEM,
