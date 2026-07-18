@@ -137,7 +137,7 @@ def product_export(request):
     from urllib.parse import quote
 
     products, _, _, _ = get_filtered_products(request)
-    products = products.prefetch_related("meal_categories", "allergens")
+    products = products.prefetch_related("meal_categories")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -156,7 +156,7 @@ def product_export(request):
         "Категория", "Наименование", "Артикул", "Кратность", "Масса, г", "Себест., ₸",
         "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г", "КДж/100г",
         "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
-        "Состав", "Аллергены",
+        "Состав",
     ]
     ncols = len(headers)
 
@@ -185,25 +185,24 @@ def product_export(request):
     row = 3
     for p in products:
         cats = ", ".join(str(mc) for mc in p.meal_categories.all())
-        allergens = ", ".join(a.name for a in p.allergens.all())
         weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
         values = [
             cats, p.name, p.article or "", p.packing or "", weight_g, num(p.cost),
             num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100), num(p.kj_per_100),
             num(p.protein_per_serving), num(p.fat_per_serving), num(p.carbs_per_serving),
             num(p.kcal_per_serving), num(p.kj_per_serving),
-            p.composition or "", allergens,
+            p.composition or "",
         ]
         for col, val in enumerate(values, start=1):
             c = ws.cell(row=row, column=col, value=val)
             c.border = border
-            if col in (1, 2, 17, 18):
+            if col in (1, 2, 17):
                 c.alignment = left_wrap
             else:
                 c.alignment = center
         row += 1
 
-    widths = [18, 32, 11, 12, 9, 10, 10, 9, 11, 10, 10, 11, 10, 12, 11, 11, 40, 22]
+    widths = [18, 32, 11, 12, 9, 10, 10, 9, 11, 10, 10, 11, 10, 12, 11, 11, 40]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -1280,7 +1279,7 @@ def ration_group_export(request, group_pk):
         return [int(p) if p.isdigit() else p for p in parts]
 
     rations = sorted(
-        group.rations.prefetch_related("slots__product__allergens", "slots__meal_time"),
+        group.rations.prefetch_related("slots__product", "slots__meal_time"),
         key=natural_key,
     )
 
@@ -1307,7 +1306,7 @@ def ration_group_export(request, group_pk):
         "Масса, г", "Себест., ₸",
         "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
         "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
-        "Аллергены",
+        "Состав",
     ]
     ncols = len(headers)
 
@@ -1380,7 +1379,6 @@ def ration_group_export(request, group_pk):
             meal = slot.meal_time.name if slot.meal_time_id else "—"
             cat  = SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else "—"
             if p:
-                allergens = ", ".join(a.name for a in p.allergens.all())
                 weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
                 values = [
                     meal, cat, p.name, p.article or "",
@@ -1388,7 +1386,7 @@ def ration_group_export(request, group_pk):
                     num(p.protein_per_serving), num(p.fat_per_serving),
                     num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
                     num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
-                    allergens,
+                    p.composition or "",
                 ]
                 tot_kcal += float(p.kcal_per_serving or 0)
                 tot_p    += float(p.protein_per_serving or 0)
@@ -1426,7 +1424,7 @@ def ration_group_export(request, group_pk):
         row += 2
 
     # Ширина колонок
-    widths = [16, 20, 34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 24]
+    widths = [16, 20, 34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 40]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
