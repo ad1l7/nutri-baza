@@ -218,17 +218,64 @@ def _clean_ingredient(name: str) -> str:
     return _INGR_PREFIX_RE.sub('', (name or '').strip()).strip()
 
 
-def _composition_from_prepared(items: list, products_by_id: dict) -> str:
-    """Собирает строку состава из items prepared-техкарты.
+def _tree_leaves(root_pid: str, charts: list) -> list:
+    """Рекурсивно обходит дерево ТК (getTree) от корневого блюда и возвращает
+    список листьев [(productId, effective_amount)] — конечное сырьё.
 
-    items — конечное сырьё (iiko уже раскрыл дерево ТК до листьев),
-    поэтому цепочки «П* Морковь кубиками → П* Морковь → С* Морковь»
-    приходят одной строкой сырья. Сортируем по количеству (как на этикетках —
-    основной ингредиент первым), дубли по нормализованному имени убираем.
+    Лист = продукт, у которого в дереве нет своего узла-сборки. Так мы обходим
+    ограничение getPrepared: если полуфабрикат-основа (Б*/П*) списывается
+    напрямую (DIRECT), getPrepared в него не заходит и теряет ингредиенты,
+    а в дереве узел есть — и мы раскрываем его сами.
     """
-    entries = []
-    for it in items or []:
-        p = products_by_id.get(it.get("productId"))
+    # На один продукт может быть несколько карт (разные периоды действия) —
+    # берём актуальную: сначала действующую (dateTo=None), затем с поздней dateFrom.
+    node_by_product = {}
+    for c in charts or []:
+        apid = c.get("assembledProductId")
+        if not apid:
+            continue
+        cur = node_by_product.get(apid)
+        if cur is None:
+            node_by_product[apid] = c
+        elif (c.get("dateTo") is None and cur.get("dateTo") is not None) or \
+             (str(c.get("dateFrom") or "") > str(cur.get("dateFrom") or "")):
+            node_by_product[apid] = c
+
+    leaves = []
+    visited = set()
+
+    def walk(pid, amount):
+        if pid in visited:
+            return
+        visited.add(pid)
+        node = node_by_product.get(pid)
+        if not node:  # нет своей сборки → лист (конечное сырьё)
+            leaves.append((pid, amount))
+            return
+        for it in node.get("items") or []:
+            sub = it.get("productId")
+            if not sub:
+                continue
+            try:
+                a = float(it.get("amountOut") or it.get("amountMiddle")
+                          or it.get("amountIn") or 0)
+            except (TypeError, ValueError):
+                a = 0.0
+            walk(sub, (amount * a) if amount else a)
+
+    walk(root_pid, 1.0)
+    return leaves
+
+
+def _composition_from_tree(root_pid: str, charts: list, products_by_id: dict) -> str:
+    """Строка состава из дерева ТК: раскрываем до сырья, убираем упаковку (У*)
+    и «Смесь газ», срезаем префиксы (С*/П*/Б*/...), суммируем количества
+    одинакового сырья и сортируем по убыванию (основной ингредиент первым),
+    дубли по нормализованному имени схлопываем.
+    """
+    agg = {}  # normalized_name -> [display_name, total_amount]
+    for pid, amount in _tree_leaves(root_pid, charts):
+        p = products_by_id.get(pid)
         if not p:
             continue
         nm = p.get("name") or ""
@@ -237,22 +284,13 @@ def _composition_from_prepared(items: list, products_by_id: dict) -> str:
         cn = _clean_ingredient(nm)
         if not cn:
             continue
-        try:
-            amount = float(it.get("amount") or 0)
-        except (TypeError, ValueError):
-            amount = 0.0
-        entries.append((cn, amount))
-
-    entries.sort(key=lambda e: -e[1])
-
-    seen, out = set(), []
-    for cn, _amt in entries:
         k = re.sub(r'\s+', ' ', cn).lower()
-        if k in seen:
-            continue
-        seen.add(k)
-        out.append(cn)
-    return ", ".join(out)
+        if k not in agg:
+            agg[k] = [cn, 0.0]
+        agg[k][1] += (amount or 0.0)
+
+    ordered = sorted(agg.values(), key=lambda x: -x[1])
+    return ", ".join(name for name, _amt in ordered)
 
 
 def _download_photo(url: str) -> tuple:
@@ -401,12 +439,13 @@ class IikoServerClient:
         resp.raise_for_status()
         return resp.json()
 
-    def get_prepared_chart_items(self, product_id: str) -> list:
-        """Items разложенной (prepared) техкарты блюда — конечное сырьё.
-        iiko сам раскрывает дерево ТК до листьев. Пустой список = карты нет."""
+    def get_assembly_tree(self, product_id: str) -> list:
+        """Полное дерево техкарт блюда (getTree) — список узлов assemblyCharts.
+        В отличие от getPrepared, содержит и полуфабрикаты со списанием DIRECT,
+        поэтому состав раскрывается до сырья без потерь. Пусто = карты нет."""
         from datetime import date
         resp = _request_with_retry(
-            "get", f"{self.base}/api/v2/assemblyCharts/getPrepared",
+            "get", f"{self.base}/api/v2/assemblyCharts/getTree",
             params=self._params({
                 "date": date.today().strftime("%Y-%m-%d"),
                 "productId": product_id,
@@ -415,8 +454,7 @@ class IikoServerClient:
         resp.raise_for_status()
         if not resp.text.strip():
             return []
-        charts = resp.json().get("preparedCharts") or []
-        return (charts[0].get("items") or []) if charts else []
+        return resp.json().get("assemblyCharts") or []
 
     def get_cost_report(self) -> dict:
         """OLAP-отчёт себестоимости за текущий месяц.
@@ -738,8 +776,8 @@ def sync_products_from_iiko(
                     continue
                 comp = ""
                 try:
-                    chart_items = server.get_prepared_chart_items(pid)
-                    comp = _composition_from_prepared(chart_items, products_by_id)
+                    charts = server.get_assembly_tree(pid)
+                    comp = _composition_from_tree(pid, charts, products_by_id)
                 except Exception as e:
                     logger.debug(f"Техкарта {menu_map[pid].get('name', pid)}: {e}")
                 if comp:
