@@ -1465,6 +1465,8 @@ def iiko_sync_view(request):
     server_url       = getattr(settings, "IIKO_SERVER_URL", "")
     server_login     = getattr(settings, "IIKO_SERVER_LOGIN", "")
     server_password  = getattr(settings, "IIKO_SERVER_PASSWORD", "")
+    cloud_app_id        = getattr(settings, "IIKO_APP_ID", "")
+    cloud_client_secret = getattr(settings, "IIKO_CLIENT_SECRET", "")
 
     if not cloud_api_key or not org_id or not external_menu_id:
         return JsonResponse({
@@ -1480,6 +1482,8 @@ def iiko_sync_view(request):
             server_url=server_url,
             server_login=server_login,
             server_password=server_password,
+            cloud_app_id=cloud_app_id,
+            cloud_client_secret=cloud_client_secret,
         )
 
         IikoSyncLog.objects.create(

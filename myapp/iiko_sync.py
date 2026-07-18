@@ -9,6 +9,11 @@ iiko_sync.py — умная синхронизация продуктов из i
   - Фото → скачиваем только если URL изменился или фото нет
   - Аллергены → берём из item.allergens, get_or_create по имени
   - Удалённые из iiko → удаляем из БД
+
+Состав блюда — из технологической карты iiko Server
+(/api/v2/assemblyCharts/getPrepared): iiko сам раскрывает дерево ТК до конечного
+сырья. Из списка убираем упаковку (У*) и «Смесь газ», срезаем префиксы (С*, П*
+и т.п.), убираем дубли. Если prepared-карты нет — фолбэк на description продукта.
 """
 
 import re
@@ -192,6 +197,64 @@ def _parse_description(desc) -> str:
     return str(desc).strip()
 
 
+# ── Состав из технологической карты ──────────────────────────────────────────
+
+# Префикс вида "С* ", "П* ", "Б* ", "ПП* " в начале названия продукта iiko
+_INGR_PREFIX_RE = re.compile(r'^[А-ЯЁA-Z]{1,3}\*\s*')
+
+
+def _ingredient_excluded(name: str) -> bool:
+    """Упаковка (У*) и техпозиции типа «Смесь газ» — не еда, в состав не идут."""
+    n = (name or '').strip()
+    if n.startswith('У*'):
+        return True
+    if 'смесь газ' in n.lower():
+        return True
+    return False
+
+
+def _clean_ingredient(name: str) -> str:
+    """Срезает префикс 'С* '/'П* '/... и лишние пробелы."""
+    return _INGR_PREFIX_RE.sub('', (name or '').strip()).strip()
+
+
+def _composition_from_prepared(items: list, products_by_id: dict) -> str:
+    """Собирает строку состава из items prepared-техкарты.
+
+    items — конечное сырьё (iiko уже раскрыл дерево ТК до листьев),
+    поэтому цепочки «П* Морковь кубиками → П* Морковь → С* Морковь»
+    приходят одной строкой сырья. Сортируем по количеству (как на этикетках —
+    основной ингредиент первым), дубли по нормализованному имени убираем.
+    """
+    entries = []
+    for it in items or []:
+        p = products_by_id.get(it.get("productId"))
+        if not p:
+            continue
+        nm = p.get("name") or ""
+        if _ingredient_excluded(nm):
+            continue
+        cn = _clean_ingredient(nm)
+        if not cn:
+            continue
+        try:
+            amount = float(it.get("amount") or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        entries.append((cn, amount))
+
+    entries.sort(key=lambda e: -e[1])
+
+    seen, out = set(), []
+    for cn, _amt in entries:
+        k = re.sub(r'\s+', ' ', cn).lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(cn)
+    return ", ".join(out)
+
+
 def _download_photo(url: str) -> tuple:
     if not url or not url.startswith("http"):
         return None, None
@@ -232,15 +295,31 @@ def _photo_url_changed(product, new_url: str) -> bool:
 class IikoCloudClient:
     BASE = "https://api-ru.iiko.services"
 
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, app_id: str = "", client_secret: str = ""):
         self.api_key = api_key
+        self.app_id = app_id
+        self.client_secret = client_secret
         self._token = None
 
     def _get_token(self) -> str:
-        resp = _request_with_retry(
-            "post", f"{self.BASE}/api/1/access_token",
-            json={"apiLogin": self.api_key}, timeout=20,
-        )
+        # Новая схема авторизации (iikoTransport): если задано зарегистрированное
+        # приложение (appId + clientSecret) — используем эндпоинт /api/v2/access_token.
+        # Старый /api/1/access_token отключается iiko (~29.08.2026), оставлен только
+        # как запасной вариант, если приложение ещё не настроено.
+        if self.app_id and self.client_secret:
+            resp = _request_with_retry(
+                "post", f"{self.BASE}/api/v2/access_token",
+                json={
+                    "apiLogin": self.api_key,
+                    "appId": self.app_id,
+                    "clientSecret": self.client_secret,
+                }, timeout=20,
+            )
+        else:
+            resp = _request_with_retry(
+                "post", f"{self.BASE}/api/1/access_token",
+                json={"apiLogin": self.api_key}, timeout=20,
+            )
         resp.raise_for_status()
         self._token = resp.json()["token"]
         return self._token
@@ -321,6 +400,23 @@ class IikoServerClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def get_prepared_chart_items(self, product_id: str) -> list:
+        """Items разложенной (prepared) техкарты блюда — конечное сырьё.
+        iiko сам раскрывает дерево ТК до листьев. Пустой список = карты нет."""
+        from datetime import date
+        resp = _request_with_retry(
+            "get", f"{self.base}/api/v2/assemblyCharts/getPrepared",
+            params=self._params({
+                "date": date.today().strftime("%Y-%m-%d"),
+                "productId": product_id,
+            }), timeout=60,
+        )
+        resp.raise_for_status()
+        if not resp.text.strip():
+            return []
+        charts = resp.json().get("preparedCharts") or []
+        return (charts[0].get("items") or []) if charts else []
 
     def get_cost_report(self) -> dict:
         """OLAP-отчёт себестоимости за текущий месяц.
@@ -552,6 +648,8 @@ def sync_products_from_iiko(
     server_url: str = "",
     server_login: str = "",
     server_password: str = "",
+    cloud_app_id: str = "",
+    cloud_client_secret: str = "",
 ) -> dict:
     global _last_sync_time
 
@@ -571,7 +669,7 @@ def sync_products_from_iiko(
         "deleted": 0, "unchanged": 0, "errors": []
     }
 
-    cloud = IikoCloudClient(cloud_api_key)
+    cloud = IikoCloudClient(cloud_api_key, cloud_app_id, cloud_client_secret)
 
     # ── Шаг 1: Внешнее меню ──────────────────────────────────────────────────
     try:
@@ -628,18 +726,34 @@ def sync_products_from_iiko(
         try:
             server = IikoServerClient(server_url, server_login, server_password)
 
-            # Состав блюд
+            # Состав блюд — из технологических карт (prepared: дерево ТК,
+            # раскрытое iiko до конечного сырья). Фолбэк — description продукта.
             server_products = server.get_products()
+            products_by_id = {sp.get("id"): sp for sp in server_products if sp.get("id")}
             menu_ids = set(menu_map.keys())
-            for sp in server_products:
-                pid = sp.get("id") or ""
-                if pid not in menu_ids:
+            comp_from_chart = 0
+            for pid in menu_ids:
+                sp = products_by_id.get(pid)
+                if sp is None:
                     continue
-                desc = _parse_description(sp.get("description"))
-                if desc:
-                    server_composition[pid] = desc
+                comp = ""
+                try:
+                    chart_items = server.get_prepared_chart_items(pid)
+                    comp = _composition_from_prepared(chart_items, products_by_id)
+                except Exception as e:
+                    logger.debug(f"Техкарта {menu_map[pid].get('name', pid)}: {e}")
+                if comp:
+                    comp_from_chart += 1
+                else:
+                    comp = _parse_description(sp.get("description"))
+                if comp:
+                    server_composition[pid] = comp
                 time.sleep(RATE_LIMIT_DELAY)
-            logger.info(f"iiko Server: состав для {len(server_composition)} блюд")
+            logger.info(
+                f"iiko Server: состав для {len(server_composition)} блюд "
+                f"(из техкарт: {comp_from_chart}, из description: "
+                f"{len(server_composition) - comp_from_chart})"
+            )
 
             # Себестоимость из OLAP-отчёта
             try:

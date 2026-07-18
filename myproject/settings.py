@@ -45,6 +45,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 IIKO_CLOUD_API_KEY    = "5ee9c3345f694fb7b08b24e488b4a141"
 IIKO_ORG_ID           = "ce7007f2-fabd-4beb-886e-5e077f9aff66"
 IIKO_EXTERNAL_MENU_ID = "78054"
+# Новая схема авторизации Cloud API (iikoTransport) — приложение из кабинета
+# разработчика iiko. Старый метод /api/1/access_token отключается ~29.08.2026.
+IIKO_APP_ID           = config("IIKO_APP_ID", default="d9e17d54-9353-457e-9d84-28a0c6a70e5c")
+IIKO_CLIENT_SECRET    = config("IIKO_CLIENT_SECRET", default="B_O_QbHdGtTz9C7uzqIGtipSHOHISTj0KiUQhMFXoTI=")
 IIKO_SERVER_URL       = "https://fudzavod.iiko.it/resto"
 IIKO_SERVER_LOGIN     = "buh2"
 IIKO_SERVER_PASSWORD  = "39babe20c3be152b70f15bb8383040d09852d1bb"
