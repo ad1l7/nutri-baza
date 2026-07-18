@@ -23,6 +23,7 @@ import requests
 import logging
 import json as _json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from django.utils import timezone as dj_timezone
 from django.core.files.base import ContentFile
 
@@ -33,6 +34,7 @@ RATE_LIMIT_DELAY  = 0.2
 MAX_RETRIES       = 3
 RETRY_DELAY       = 5
 MIN_SYNC_INTERVAL = 5  # временно уменьшено для тестирования категорий
+COMPOSITION_WORKERS = 8  # параллельных запросов техкарт к iiko Server
 
 _last_sync_time = 0
 
@@ -764,29 +766,32 @@ def sync_products_from_iiko(
         try:
             server = IikoServerClient(server_url, server_login, server_password)
 
-            # Состав блюд — из технологических карт (prepared: дерево ТК,
-            # раскрытое iiko до конечного сырья). Фолбэк — description продукта.
+            # Состав блюд — из технологических карт (getTree, раскрытых до сырья).
+            # Фолбэк — description продукта. Запросы техкарт независимы и I/O-bound,
+            # поэтому тянем их пулом потоков: последовательно ~269 запросов не
+            # укладываются в таймаут веб-сервера.
             server_products = server.get_products()
             products_by_id = {sp.get("id"): sp for sp in server_products if sp.get("id")}
-            menu_ids = set(menu_map.keys())
-            comp_from_chart = 0
-            for pid in menu_ids:
-                sp = products_by_id.get(pid)
-                if sp is None:
-                    continue
-                comp = ""
+            dish_ids = [pid for pid in menu_map if pid in products_by_id]
+
+            def _fetch_composition(pid):
                 try:
                     charts = server.get_assembly_tree(pid)
-                    comp = _composition_from_tree(pid, charts, products_by_id)
+                    return pid, _composition_from_tree(pid, charts, products_by_id)
                 except Exception as e:
-                    logger.debug(f"Техкарта {menu_map[pid].get('name', pid)}: {e}")
-                if comp:
-                    comp_from_chart += 1
-                else:
-                    comp = _parse_description(sp.get("description"))
-                if comp:
-                    server_composition[pid] = comp
-                time.sleep(RATE_LIMIT_DELAY)
+                    logger.debug(f"Техкарта {menu_map.get(pid, {}).get('name', pid)}: {e}")
+                    return pid, ""
+
+            comp_from_chart = 0
+            with ThreadPoolExecutor(max_workers=COMPOSITION_WORKERS) as ex:
+                for pid, comp in ex.map(_fetch_composition, dish_ids):
+                    if comp:
+                        comp_from_chart += 1
+                    else:
+                        sp = products_by_id.get(pid)
+                        comp = _parse_description(sp.get("description")) if sp else ""
+                    if comp:
+                        server_composition[pid] = comp
             logger.info(
                 f"iiko Server: состав для {len(server_composition)} блюд "
                 f"(из техкарт: {comp_from_chart}, из description: "
