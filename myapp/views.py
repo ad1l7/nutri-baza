@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 import json
+import logging
 from django.conf import settings
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
@@ -13,6 +14,8 @@ from .models import (
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
 )
+
+logger = logging.getLogger(__name__)
 
 # ── Каталог продуктов ─────────────────────────────────────────────────────────
 
@@ -919,6 +922,9 @@ def _claude_generate(request, ration):
         request.session[f"claude_proposal_{ration.pk}"] = proposal
         request.session.pop(f"claude_error_{ration.pk}", None)
     except Exception as e:
+        # Логируем со стеком: раньше ошибка была видна только пользователю
+        # в интерфейсе и не попадала в journalctl.
+        logger.exception("claude: сборка рациона #%s провалилась: %s", ration.pk, e)
         request.session[f"claude_error_{ration.pk}"] = str(e)
         request.session.pop(f"claude_proposal_{ration.pk}", None)
 

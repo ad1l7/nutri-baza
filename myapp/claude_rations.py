@@ -7,8 +7,12 @@ Claude ТОЛЬКО читает каталог блюд и нормы КБЖУ 
 
 import copy
 import json
+import logging
+import time
 import anthropic
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 MODEL = "claude-opus-4-8"
 
@@ -121,6 +125,14 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         + meals_line
     )
 
+    # Замер: если сборка снова начнёт тормозить — причина будет видна в логах,
+    # а не в догадках. Читать: journalctl -u gunicorn -f | grep claude
+    started = time.monotonic()
+    logger.info(
+        "claude: старт | блюд в каталоге=%d | приёмов=%d | схема с enum=%s",
+        len(catalog), len(meal_times or []), bool(meal_times),
+    )
+
     # Стримим, а не ждём ответ целиком: при большом max_tokens неблокирующий
     # запрос упирается в HTTP-таймаут SDK. get_final_message() собирает ответ.
     with client.messages.stream(
@@ -140,6 +152,22 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         messages=[{"role": "user", "content": user_prompt}],
     ) as stream:
         response = stream.get_final_message()
+
+    elapsed = time.monotonic() - started
+    usage = response.usage
+    # Выход = размышления + JSON. Именно он, а не размер каталога, определяет
+    # время: замеры показали ~9000 токенов выхода ≈ 2 минуты.
+    logger.info(
+        "claude: готово за %.1f сек | вход=%d | выход=%d | stop_reason=%s",
+        elapsed, usage.input_tokens, usage.output_tokens, response.stop_reason,
+    )
+    if elapsed > 90:
+        logger.warning(
+            "claude: сборка заняла %.0f сек — это ненормально долго. "
+            "Проверьте выход в токенах выше: если он мал, тормозил сам API, "
+            "если велик — модель много «размышляла» (лечится output_config.effort).",
+            elapsed,
+        )
 
     if response.stop_reason == "refusal":
         raise RuntimeError("Claude отклонил запрос (safety).")

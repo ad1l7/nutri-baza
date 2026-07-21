@@ -57,6 +57,23 @@ IIKO_SERVER_PASSWORD  = config("IIKO_SERVER_PASSWORD")
 # ── Claude (Anthropic API) ────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default="")
 
+# ── Логи ──────────────────────────────────────────────────────────────────────
+# Пишем в stdout: gunicorn его перехватывает, читать через
+#   journalctl -u gunicorn -f | grep claude
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {"format": "[{asctime}] {levelname} {name}: {message}", "style": "{"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+    },
+    "loggers": {
+        "myapp": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+
 # ── Приложения ────────────────────────────────────────────────────────────────
 INSTALLED_APPS = [
     'django.contrib.admin',
