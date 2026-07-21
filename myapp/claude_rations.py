@@ -121,9 +121,14 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         + meals_line
     )
 
-    response = client.messages.create(
+    # Стримим, а не ждём ответ целиком: при большом max_tokens неблокирующий
+    # запрос упирается в HTTP-таймаут SDK. get_final_message() собирает ответ.
+    with client.messages.stream(
         model=MODEL,
-        max_tokens=16000,
+        # Бюджет общий на "размышления" + JSON. При 16000 адаптивное мышление
+        # успевало съесть весь лимит и текстовый блок не возвращался вовсе —
+        # отсюда была "Пустой ответ от Claude".
+        max_tokens=32000,
         thinking={"type": "adaptive"},
         # effort=medium ускоряет сборку (меньше "размышлений") при сохранении Opus 4.8.
         # При необходимости качества верни "high"; для скорости — "low".
@@ -133,13 +138,21 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         },
         system=_SYSTEM,
         messages=[{"role": "user", "content": user_prompt}],
-    )
+    ) as stream:
+        response = stream.get_final_message()
 
     if response.stop_reason == "refusal":
         raise RuntimeError("Claude отклонил запрос (safety).")
 
     text = next((b.text for b in response.content if b.type == "text"), "")
     if not text:
-        raise RuntimeError("Пустой ответ от Claude.")
+        # Без деталей эту ошибку невозможно диагностировать — показываем причину.
+        usage = response.usage
+        raise RuntimeError(
+            f"Claude не вернул JSON (stop_reason={response.stop_reason}, "
+            f"выдано {usage.output_tokens} из {32000} токенов). "
+            "Если stop_reason=max_tokens — рацион слишком сложный: упростите "
+            "пожелания, сократите число приёмов пищи или поднимите max_tokens."
+        )
 
     return json.loads(text)
