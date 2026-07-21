@@ -216,6 +216,7 @@
         {% with r=ri.ration %}
         <div class="ration-item" id="ri-{{ r.pk }}" data-ration-id="{{ r.pk }}" data-kcal="{{ r.kcal_category }}">
           <div class="ration-row">
+            <span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
             {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
@@ -389,21 +390,21 @@ function toggleGroup(pk) {
   card.classList.toggle('collapsed');
   // Запоминаем состояние свёрнутых групп в браузере
   try {
-    const collapsed = JSON.parse(localStorage.getItem('collapsedGroups') || '[]');
+    const collapsed = JSON.parse(localStorage.getItem('collapsedClaudeGroups') || '[]');
     const idx = collapsed.indexOf(pk);
     if (card.classList.contains('collapsed')) {
       if (idx === -1) collapsed.push(pk);
     } else if (idx !== -1) {
       collapsed.splice(idx, 1);
     }
-    localStorage.setItem('collapsedGroups', JSON.stringify(collapsed));
+    localStorage.setItem('collapsedClaudeGroups', JSON.stringify(collapsed));
   } catch (e) {}
 }
 
 // Восстанавливаем свёрнутые группы при загрузке
 document.addEventListener('DOMContentLoaded', function () {
   try {
-    const collapsed = JSON.parse(localStorage.getItem('collapsedGroups') || '[]');
+    const collapsed = JSON.parse(localStorage.getItem('collapsedClaudeGroups') || '[]');
     collapsed.forEach(pk => {
       const card = document.getElementById('group-' + pk);
       if (card) card.classList.add('collapsed');
@@ -465,6 +466,66 @@ function closeDel() { document.getElementById('del-modal').classList.remove('ope
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeGroupModal(); closeRationModal(); closeDel(); }
+});
+</script>
+
+<!-- Перетаскивание рационов Claude (drag & drop).
+     Своя Sortable-группа 'claude-rations' и свой эндпоинт — с обычными
+     рационами не пересекается. -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+function getCookie(name) {
+  const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return m ? m.pop() : '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof Sortable === 'undefined') return;
+
+  document.querySelectorAll('.rations-list').forEach(function (list) {
+    new Sortable(list, {
+      group: 'claude-rations',
+      handle: '.drag-handle',
+      draggable: '.ration-item',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function (evt) {
+        const crossGroup = evt.from !== evt.to;
+        const item = evt.item;
+        const toList = evt.to;
+        const rationId = item.dataset.rationId;
+        const targetGroupId = toList.dataset.groupId;
+        const orderedIds = [...toList.querySelectorAll('.ration-item')]
+          .map(el => el.dataset.rationId);
+
+        fetch('/claude/rations/reorder/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            ration_id: rationId,
+            target_group_id: targetGroupId,
+            ordered_ids: orderedIds,
+          }),
+        })
+          .then(r => r.json().then(d => ({ ok: r.ok, d })))
+          .then(({ d }) => {
+            if (!d.ok) {
+              alert(d.message || 'Не удалось переместить рацион');
+              location.reload();
+              return;
+            }
+            // Перемещение между группами — перезагружаем, чтобы обновить счётчики и себестоимость
+            if (crossGroup) location.reload();
+          })
+          .catch(() => location.reload());
+      },
+    });
+  });
 });
 </script>
 </body>
