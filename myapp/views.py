@@ -12,7 +12,7 @@ from .models import (
     RationNorm,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
-    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES,
+    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES, RATION_SLOT_TYPES,
 )
 
 logger = logging.getLogger(__name__)
@@ -233,6 +233,7 @@ SLOT_ICONS = {
     'salad': '🥗',
     'dessert': '🍰',
     'smoothie': '🥤',  'sandwich': '🥪',
+    'extra': '🛒',
 }
 
 SLOT_COLORS = {
@@ -242,6 +243,7 @@ SLOT_COLORS = {
     'salad': 'teal',
     'dessert': 'pink',
     'smoothie': 'purple',  'sandwich': 'amber',
+    'extra': 'green',
 }
 
 
@@ -556,9 +558,9 @@ def ration_edit(request, pk):
             .values_list("product_id", flat=True)
         )
 
-    # Блюда по категориям для пикера
+    # Блюда по категориям для пикера (каталог-онли категории тут не нужны)
     meal_cat_map = {}
-    for key, _ in SLOT_TYPES:
+    for key, _ in RATION_SLOT_TYPES:
         prods = list(
             Product.objects
             .filter(meal_categories__key=key)
@@ -602,7 +604,7 @@ def ration_edit(request, pk):
         "total_cost":    round(total_cost, 2),
         "norm":          norm,
         "norm_flags":    norm_flags,
-        "slot_types":    SLOT_TYPES,
+        "slot_types":    RATION_SLOT_TYPES,
         "slot_icons":    SLOT_ICONS,
         "slot_colors":   SLOT_COLORS,
         "slot_labels":   SLOT_LABELS,
@@ -1266,7 +1268,7 @@ def claude_ration_edit(request, pk):
         )
 
     meal_cat_map = {}
-    for key, _ in SLOT_TYPES:
+    for key, _ in RATION_SLOT_TYPES:
         prods = list(
             Product.objects.filter(meal_categories__key=key)
             .exclude(pk__in=occupied_ids)
@@ -1311,7 +1313,7 @@ def claude_ration_edit(request, pk):
         "total_cost": round(total_cost, 2),
         "norm": norm,
         "norm_flags": norm_flags,
-        "slot_types": SLOT_TYPES,
+        "slot_types": RATION_SLOT_TYPES,
         "slot_icons": SLOT_ICONS,
         "slot_colors": SLOT_COLORS,
         "slot_labels": SLOT_LABELS,

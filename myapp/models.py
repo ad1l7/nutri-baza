@@ -23,10 +23,19 @@ SLOT_TYPES = [
     ('dessert',   'Выпечка/Десерт'),
     ('smoothie',  'Смузи'),
     ('sandwich',  'Сэндвичи'),
+    ('extra',     'Доп. товары'),
 ]
 
 SLOT_ORDER = {k: i for i, (k, _) in enumerate(SLOT_TYPES)}
 SLOT_LABELS = dict(SLOT_TYPES)
+
+# Категории только для каталога — НЕ участвуют в сборке рационов.
+# «Доп. товары» синхронизируются и фильтруются в каталоге, но не предлагаются
+# как слот при составлении рациона.
+CATALOG_ONLY_KEYS = {'extra'}
+
+# Категории, доступные в конструкторе рационов (обычный и Claude).
+RATION_SLOT_TYPES = [(k, v) for k, v in SLOT_TYPES if k not in CATALOG_ONLY_KEYS]
 
 
 class MealCategory(models.Model):
