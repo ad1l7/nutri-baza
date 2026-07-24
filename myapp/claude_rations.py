@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 MODEL = "claude-opus-4-8"
 
+# Бюджет токенов на ОДИН запрос сборки рациона (размышления + итоговый JSON).
+# Чтобы увеличить — поменяйте только это число, потом перезапустите gunicorn.
+# Потолок Opus 4.8 — 128000. Больше = меньше риск обрыва на сложных рационах;
+# на СКОРОСТЬ не влияет (её определяет output_config.effort ниже).
+MAX_TOKENS = 64000
+
 # Строгая схема ответа — Claude обязан вернуть ровно такую структуру
 _OUTPUT_SCHEMA = {
     "type": "object",
@@ -139,8 +145,8 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         model=MODEL,
         # Бюджет общий на "размышления" + JSON. При 16000 адаптивное мышление
         # успевало съесть весь лимит и текстовый блок не возвращался вовсе —
-        # отсюда была "Пустой ответ от Claude".
-        max_tokens=32000,
+        # отсюда была "Пустой ответ от Claude". Значение — в MAX_TOKENS вверху файла.
+        max_tokens=MAX_TOKENS,
         thinking={"type": "adaptive"},
         # effort=medium ускоряет сборку (меньше "размышлений") при сохранении Opus 4.8.
         # При необходимости качества верни "high"; для скорости — "low".
@@ -178,7 +184,7 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
         usage = response.usage
         raise RuntimeError(
             f"Claude не вернул JSON (stop_reason={response.stop_reason}, "
-            f"выдано {usage.output_tokens} из {32000} токенов). "
+            f"выдано {usage.output_tokens} из {MAX_TOKENS} токенов). "
             "Если stop_reason=max_tokens — рацион слишком сложный: упростите "
             "пожелания, сократите число приёмов пищи или поднимите max_tokens."
         )
