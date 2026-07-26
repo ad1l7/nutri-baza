@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.product_list, name="product_list"),
     path("export/", views.product_export, name="product_export"),
     path("product/<int:pk>/", views.product_detail, name="product_detail"),
+    path("product/<int:pk>/sale-price/", views.product_set_sale_price, name="product_set_sale_price"),
 
     # Группы рационов
     path("rations/", views.ration_group_list, name="ration_group_list"),

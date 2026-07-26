@@ -925,6 +925,7 @@ const PD = {
     weight: "{{ p.net_weight|default:'' }}",
     pack:   "{{ p.packing|default:''|escapejs }}",
     cost:   "{{ p.cost|smart_num }}",
+    sale:   "{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}",
     photo:  "{% if p.photo %}{{ p.photo.url }}{% endif %}",
     comp:   `{{ p.composition|default:''|escapejs }}`,
     allergens: [{% for a in p.allergens.all %}"{{ a.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
@@ -983,6 +984,17 @@ function showDetail(pk) {
         <div class="meta-label">Себестоимость ФЗ</div>
         <div class="meta-val cost-val">${v(d.cost) !== '—' ? v(d.cost) + ' ₸' : '—'}</div>
       </div>
+      <div class="meta-card">
+        <div class="meta-label">Цена продажи с ФЗ</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
+          <input id="sale-input" type="number" min="0" step="1" value="${d.sale || ''}"
+                 placeholder="—" onkeydown="if(event.key==='Enter')saveSalePrice(${pk})"
+                 style="width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:7px;font-family:var(--font);font-size:14px;font-weight:700;color:var(--text);">
+          <button type="button" onclick="saveSalePrice(${pk})" title="Сохранить"
+                  style="border:none;background:var(--green-mid);color:#fff;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0;">💾</button>
+        </div>
+        <div id="sale-msg" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
+      </div>
     </div>
 
     ${d.comp ? `
@@ -1019,6 +1031,39 @@ function showDetail(pk) {
     </div>`;
 
   document.getElementById('modal').classList.add('open');
+}
+
+function saveSalePrice(pk) {
+  const input = document.getElementById('sale-input');
+  const msg   = document.getElementById('sale-msg');
+  if (!input) return;
+  const val = input.value.trim();
+  msg.textContent = 'Сохранение…';
+  msg.style.color = 'var(--muted)';
+  fetch(`/product/${pk}/sale-price/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCsrfToken(),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'sale_price=' + encodeURIComponent(val),
+  })
+    .then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok || !d.ok) {
+        msg.textContent = d.message || 'Не удалось сохранить';
+        msg.style.color = 'var(--danger)';
+        return;
+      }
+      // Обновляем кэш, чтобы при повторном открытии показалось новое значение
+      PD[pk].sale = (d.sale_price !== null && d.sale_price !== undefined) ? String(d.sale_price) : '';
+      msg.textContent = 'Сохранено ✓';
+      msg.style.color = 'var(--green-mid)';
+    })
+    .catch(() => {
+      msg.textContent = 'Сеть недоступна';
+      msg.style.color = 'var(--danger)';
+    });
 }
 
 function closeModal(e) { if (e.target === document.getElementById('modal')) closeModalDirect(); }

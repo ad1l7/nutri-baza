@@ -56,6 +56,8 @@ class Product(models.Model):
     name = models.CharField(max_length=300, verbose_name="Наименование")
     photo = models.ImageField(upload_to="products/", null=True, blank=True, verbose_name="Фото")
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Себестоимость ФЗ")
+    # Вносится вручную в каталоге; синхронизация с iiko это поле не трогает.
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Цена продажи с ФЗ")
     net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
     packing = models.CharField(max_length=100, null=True, blank=True, verbose_name="Кратность / Фасовка")
     composition = models.TextField(null=True, blank=True, verbose_name="Состав")

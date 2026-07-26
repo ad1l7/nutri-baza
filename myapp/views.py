@@ -224,6 +224,30 @@ def product_detail(request, pk):
     return render(request, "myapp/product_detail.html", {"product": product})
 
 
+@require_POST
+def product_set_sale_price(request, pk):
+    """Сохраняет «Цену продажи с ФЗ» блюда из каталога (модалка).
+    Пустое значение очищает поле. iiko-синхронизация это поле не трогает."""
+    from decimal import Decimal, InvalidOperation
+    product = get_object_or_404(Product, pk=pk)
+    raw = (request.POST.get("sale_price") or "").strip().replace(",", ".").replace(" ", "")
+    if raw == "":
+        product.sale_price = None
+    else:
+        try:
+            val = Decimal(raw)
+        except (InvalidOperation, ValueError):
+            return JsonResponse({"ok": False, "message": "Некорректное число"}, status=400)
+        if val < 0:
+            return JsonResponse({"ok": False, "message": "Цена не может быть отрицательной"}, status=400)
+        product.sale_price = val
+    product.save(update_fields=["sale_price"])
+    return JsonResponse({
+        "ok": True,
+        "sale_price": float(product.sale_price) if product.sale_price is not None else None,
+    })
+
+
 # ── Вспомогательные константы ─────────────────────────────────────────────────
 
 SLOT_ICONS = {
@@ -1374,11 +1398,14 @@ def _export_ration_group_xlsx(group):
     headers = [
         "Приём пищи", "Категория блюда", "Наименование", "Артикул",
         "Масса, г", "Себест., ₸",
+        "Цена продажи с ФЗ", "Наценка ФЗ, ₸", "Наценка ФЗ, %", "Маржа ФЗ, %",
         "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
         "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
         "Состав",
     ]
     ncols = len(headers)
+    PCT_COLS = (9, 10)   # «Наценка %» и «Маржа %» — формат ячейки в проценты
+    COMP_COL = ncols     # последняя колонка — «Состав» (перенос текста)
 
     def num(val):
         if val is None:
@@ -1443,16 +1470,29 @@ def _export_ration_group_xlsx(group):
                     and s.meal_time_id in filled_meal_times)
         ]
 
-        tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
+        tot_kcal = tot_p = tot_f = tot_c = tot_cost = tot_sale = 0
         for slot in slots:
             p = slot.product
             meal = slot.meal_time.name if slot.meal_time_id else "—"
             cat  = SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else "—"
             if p:
                 weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
+                # Продажная цена, наценка и маржа фудзавода.
+                # Наценка ₸ = цена − себест.; Наценка % = наценка/себест.;
+                # Маржа % = наценка/цена. Проценты хранятся как доли (0.67),
+                # ячейкам ниже задаётся формат "0%".
+                cost_f = float(p.cost) if p.cost is not None else None
+                sale_f = float(p.sale_price) if p.sale_price is not None else None
+                if sale_f is not None and cost_f is not None:
+                    markup = sale_f - cost_f
+                    markup_pct = (markup / cost_f) if cost_f else None
+                    margin_pct = (markup / sale_f) if sale_f else None
+                else:
+                    markup = markup_pct = margin_pct = None
                 values = [
                     meal, cat, p.name, p.article or "",
                     weight_g, num(p.cost),
+                    num(sale_f), num(markup), markup_pct, margin_pct,
                     num(p.protein_per_serving), num(p.fat_per_serving),
                     num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
                     num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
@@ -1463,13 +1503,16 @@ def _export_ration_group_xlsx(group):
                 tot_f    += float(p.fat_per_serving or 0)
                 tot_c    += float(p.carbs_per_serving or 0)
                 tot_cost += float(p.cost or 0)
+                tot_sale += float(p.sale_price or 0)
             else:
                 values = [meal, cat, "— блюдо не выбрано —", ""] + [None] * (ncols - 5) + [""]
 
             for col, val in enumerate(values, start=1):
                 c = ws.cell(row=row, column=col, value=val)
                 c.border = border
-                if col in (3, 16):
+                if col in PCT_COLS:
+                    c.number_format = "0%"
+                if col in (3, COMP_COL):
                     c.alignment = left_wrap
                 elif col <= 2:
                     c.alignment = Alignment(horizontal="left", vertical="center")
@@ -1477,16 +1520,25 @@ def _export_ration_group_xlsx(group):
                     c.alignment = center
             row += 1
 
-        # Итого по рациону
+        # Итого по рациону. Проценты — из СУММ (не сумма процентов):
+        # общая наценка/маржа фудзавода по рациону.
+        tot_markup = tot_sale - tot_cost
+        tot_markup_pct = (tot_markup / tot_cost) if tot_cost else None
+        tot_margin_pct = (tot_markup / tot_sale) if tot_sale else None
         c = ws.cell(row=row, column=3, value="ИТОГО по рациону:")
         c.font = bold
         c.alignment = Alignment(horizontal="right", vertical="center")
-        totals = {5: None, 6: round(tot_cost, 2), 7: round(tot_p, 1),
-                  8: round(tot_f, 1), 9: round(tot_c, 1), 10: round(tot_kcal, 1)}
+        totals = {5: None, 6: round(tot_cost, 2),
+                  7: round(tot_sale, 2), 8: round(tot_markup, 2),
+                  9: tot_markup_pct, 10: tot_margin_pct,
+                  11: round(tot_p, 1), 12: round(tot_f, 1),
+                  13: round(tot_c, 1), 14: round(tot_kcal, 1)}
         for col in range(1, ncols + 1):
             c = ws.cell(row=row, column=col)
             c.fill = grey_light
             c.border = border
+            if col in PCT_COLS:
+                c.number_format = "0%"
             if col in totals and totals[col] is not None:
                 c.value = totals[col]
                 c.font = bold
@@ -1494,7 +1546,7 @@ def _export_ration_group_xlsx(group):
         row += 2
 
     # Ширина колонок
-    widths = [16, 20, 34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 40]
+    widths = [16, 20, 34, 12, 9, 10, 14, 13, 13, 12, 11, 10, 12, 11, 11, 11, 10, 12, 10, 40]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
