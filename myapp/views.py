@@ -1330,15 +1330,16 @@ def claude_ration_edit(request, pk):
 
 # ── Экспорт группы рационов в Excel ───────────────────────────────────────────
 
-def ration_group_export(request, group_pk):
+def _export_ration_group_xlsx(group):
+    """Excel-выгрузка группы рационов. Общий код для обычных рационов и
+    рационов Claude — у обеих групп .rations со слотами одинаковой структуры
+    (meal_time / slot_type / product), поэтому логика не зависит от модели."""
     import re
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.utils import get_column_letter
     from django.http import HttpResponse
     from urllib.parse import quote
-
-    group = get_object_or_404(RationGroup, pk=group_pk)
 
     # Естественная сортировка: "Рацион 2" раньше "Рацион 10".
     # Чистим лишние пробелы, чтобы названия с пробелом в начале не вылезали вперёд.
@@ -1511,6 +1512,16 @@ def ration_group_export(request, group_pk):
     return response
 
 
+def ration_group_export(request, group_pk):
+    group = get_object_or_404(RationGroup, pk=group_pk)
+    return _export_ration_group_xlsx(group)
+
+
+def claude_group_export(request, group_pk):
+    group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    return _export_ration_group_xlsx(group)
+
+
 # ── iiko синхронизация ────────────────────────────────────────────────────────
 
 @require_POST
@@ -1596,9 +1607,10 @@ def iiko_sync_status(request):
 
 # Замени ration_group_detail в views.py на эту версию
 
-def ration_group_detail(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-
+def _render_group_detail(request, group, back_url_name, back_label, edit_url_name):
+    """Общая страница просмотра группы рационов (обычной и Claude).
+    back_url_name / back_label / edit_url_name задают ссылки под конкретную
+    вкладку, чтобы шаблон group_detail.html не дублировать."""
     rations = list(
         group.rations
         .prefetch_related(
@@ -1666,9 +1678,28 @@ def ration_group_detail(request, group_pk):
         "total_slots":  total_slots,
         "filled_slots": filled_slots,
         "group_cost":   round(group_cost, 2),
+        "back_url_name": back_url_name,
+        "back_label":    back_label,
+        "edit_url_name": edit_url_name,
     })
-# ── 2. Добавь в urls.py ───────────────────────────────────────────────────────
-# path("rations/group/<int:group_pk>/detail/", views.ration_group_detail, name="ration_group_detail"),
+
+
+def ration_group_detail(request, group_pk):
+    group = get_object_or_404(RationGroup, pk=group_pk)
+    return _render_group_detail(
+        request, group,
+        back_url_name="ration_group_list", back_label="Рационы",
+        edit_url_name="ration_edit",
+    )
+
+
+def claude_group_detail(request, group_pk):
+    group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    return _render_group_detail(
+        request, group,
+        back_url_name="claude_rations", back_label="Рационы Claude",
+        edit_url_name="claude_ration_edit",
+    )
 
 
 # ── 3. В ration_group_list.html найди шапку группы и добавь кнопку 👁️ ────────

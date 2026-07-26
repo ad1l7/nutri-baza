@@ -208,6 +208,10 @@
         {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
         <button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>
+        <a href="{% url 'claude_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
+   title="Просмотр группы" style="text-decoration:none;">👁️</a>
+        <a href="{% url 'claude_group_export' g.pk %}" class="grp-export-btn"
+   title="Скачать Excel">⬇ Excel</a>
         <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
       </div>
 
