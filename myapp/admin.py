@@ -68,7 +68,7 @@ class CalorieCategoryMealInline(admin.TabularInline):
 
 @admin.register(CalorieCategory)
 class CalorieCategoryAdmin(admin.ModelAdmin):
-    list_display = ["name", "kcal", "kcal_tolerance", "protein", "fat", "carbs", "get_meals_count", "order"]
+    list_display = ["name", "kcal", "kcal_min", "kcal_max", "protein_max", "fat_max", "carbs_max", "get_meals_count", "order"]
     inlines = [CalorieCategoryMealInline]
     readonly_fields = ["created_at", "updated_at"]
     ordering = ["order", "kcal"]

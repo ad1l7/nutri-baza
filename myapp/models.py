@@ -164,14 +164,18 @@ class MealTime(models.Model):
 class CalorieCategory(models.Model):
     name = models.CharField(max_length=100, verbose_name="Название")
     kcal = models.PositiveIntegerField(unique=True, verbose_name="Калорийность, ккал")
-    kcal_tolerance = models.PositiveIntegerField(default=50, verbose_name="Погрешность ккал, ±")
 
-    protein = models.PositiveIntegerField(default=0, verbose_name="Белки, г")
-    protein_tolerance = models.PositiveIntegerField(default=5, verbose_name="Погрешность белков, ±г")
-    fat = models.PositiveIntegerField(default=0, verbose_name="Жиры, г")
-    fat_tolerance = models.PositiveIntegerField(default=5, verbose_name="Погрешность жиров, ±г")
-    carbs = models.PositiveIntegerField(default=0, verbose_name="Углеводы, г")
-    carbs_tolerance = models.PositiveIntegerField(default=10, verbose_name="Погрешность углеводов, ±г")
+    # Границы нормы задаются вручную «от … до …» — произвольные, не обязательно
+    # симметричные относительно kcal. Имена совпадают с прежней моделью RationNorm,
+    # поэтому шаблоны и проверки сборки рационов не менялись.
+    kcal_min = models.PositiveIntegerField(default=0, verbose_name="Ккал — от")
+    kcal_max = models.PositiveIntegerField(default=0, verbose_name="Ккал — до")
+    protein_min = models.PositiveIntegerField(default=0, verbose_name="Белки — от, г")
+    protein_max = models.PositiveIntegerField(default=0, verbose_name="Белки — до, г")
+    fat_min = models.PositiveIntegerField(default=0, verbose_name="Жиры — от, г")
+    fat_max = models.PositiveIntegerField(default=0, verbose_name="Жиры — до, г")
+    carbs_min = models.PositiveIntegerField(default=0, verbose_name="Углеводы — от, г")
+    carbs_max = models.PositiveIntegerField(default=0, verbose_name="Углеводы — до, г")
 
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -184,40 +188,6 @@ class CalorieCategory(models.Model):
 
     def __str__(self):
         return self.name or f"{self.kcal} ккал"
-
-    # Границы нормы — цель ± погрешность. Имена min/max совпадают с прежней
-    # моделью RationNorm, поэтому шаблоны сборки рационов не менялись.
-    @property
-    def kcal_min(self):
-        return max(0, self.kcal - self.kcal_tolerance)
-
-    @property
-    def kcal_max(self):
-        return self.kcal + self.kcal_tolerance
-
-    @property
-    def protein_min(self):
-        return max(0, self.protein - self.protein_tolerance)
-
-    @property
-    def protein_max(self):
-        return self.protein + self.protein_tolerance
-
-    @property
-    def fat_min(self):
-        return max(0, self.fat - self.fat_tolerance)
-
-    @property
-    def fat_max(self):
-        return self.fat + self.fat_tolerance
-
-    @property
-    def carbs_min(self):
-        return max(0, self.carbs - self.carbs_tolerance)
-
-    @property
-    def carbs_max(self):
-        return self.carbs + self.carbs_tolerance
 
     @property
     def kcal_category(self):

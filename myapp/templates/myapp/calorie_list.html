@@ -73,21 +73,33 @@
   .mo{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:200;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
   .mo.open{display:flex;}
   .mbox{background:var(--white);border-radius:20px;width:100%;max-width:560px;box-shadow:var(--shadow-md);overflow:hidden;display:flex;flex-direction:column;max-height:88vh;}
+  .mbox form{display:flex;flex-direction:column;min-height:0;flex:1;}
   .mhead{background:var(--green-dark);padding:18px 22px 14px;position:relative;flex-shrink:0;}
   .mht{font-size:17px;font-weight:800;color:#fff;}
   .mhs{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;}
   .mcl{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;}
-  .mbody{padding:20px 22px;overflow-y:auto;}
+  .mbody{padding:20px 22px;overflow-y:auto;flex:1;min-height:0;}
+  /* Кнопка сохранения — отдельный подвал, не уезжает вместе со скроллом формы */
+  .mfoot{flex-shrink:0;padding:14px 22px;border-top:1.5px solid var(--border-soft);background:var(--white);display:flex;gap:10px;}
+  .fcancel{background:var(--off-white);color:var(--text-mid);border:1.5px solid var(--border);border-radius:10px;padding:12px 18px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:all .18s;}
+  .fcancel:hover{border-color:var(--muted);background:var(--light);}
   .ff{margin-bottom:14px;}
   .fl{display:block;font-size:12px;font-weight:700;color:var(--text-mid);margin-bottom:6px;}
   .fi{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;transition:border .15s;}
   .fi:focus{border-color:var(--green);}
-  .fsub{width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s;}
+  .fsub{flex:1;background:var(--green);color:#fff;border:none;border-radius:10px;padding:13px;font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer;transition:background .2s;box-shadow:0 2px 10px rgba(90,170,60,.3);}
   .fsub:hover{background:var(--green-mid);}
   .fhint{font-size:11px;color:var(--muted);margin-top:5px;font-weight:600;}
 
   .nutr-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-bottom:11px;}
   .nutr-row .fl{margin-bottom:5px;}
+
+  /* Диапазон «от — до» */
+  .rng{margin-bottom:12px;}
+  .rng .fl{margin-bottom:5px;}
+  .rng-inputs{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;}
+  .rng-dash{color:var(--muted);font-weight:800;font-size:14px;}
+  .rng .fi{text-align:center;}
   .sub-head{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:20px 0 11px;padding-top:16px;border-top:1.5px solid var(--border-soft);}
   .sub-head:first-child{margin-top:0;padding-top:0;border-top:none;}
 
@@ -120,7 +132,7 @@
 
 <div class="main">
   <div class="page-title">Калоражи</div>
-  <div class="page-sub">Категории калорийности для сборки рационов: целевые КБЖУ с погрешностью и набор приёмов пищи. Новый калораж сразу появляется при создании рациона.</div>
+  <div class="page-sub">Категории калорийности для сборки рационов: диапазоны КБЖУ «от и до» и набор приёмов пищи. Новый калораж сразу появляется при создании рациона.</div>
 
   {% if categories_data %}
   <div class="cards">
@@ -145,27 +157,24 @@
       </div>
 
       <div class="cal-body">
-        <div class="sec-label">Нормы — цель ± погрешность</div>
+        <div class="sec-label">Нормы — от и до</div>
         <div class="norms">
           <div class="norm">
             <div class="norm-name">Калорийность</div>
-            <div class="norm-val">{{ c.kcal }} <span>± {{ c.kcal_tolerance }}</span></div>
-            <div class="norm-range">{{ c.kcal_min }}–{{ c.kcal_max }} ккал</div>
+            <div class="norm-val">{{ c.kcal_min }}–{{ c.kcal_max }} <span>ккал</span></div>
+            <div class="norm-range">цель {{ c.kcal }} ккал</div>
           </div>
           <div class="norm">
             <div class="norm-name">Белки</div>
-            <div class="norm-val">{{ c.protein }} <span>± {{ c.protein_tolerance }}</span></div>
-            <div class="norm-range">{{ c.protein_min }}–{{ c.protein_max }} г</div>
+            <div class="norm-val">{{ c.protein_min }}–{{ c.protein_max }} <span>г</span></div>
           </div>
           <div class="norm">
             <div class="norm-name">Жиры</div>
-            <div class="norm-val">{{ c.fat }} <span>± {{ c.fat_tolerance }}</span></div>
-            <div class="norm-range">{{ c.fat_min }}–{{ c.fat_max }} г</div>
+            <div class="norm-val">{{ c.fat_min }}–{{ c.fat_max }} <span>г</span></div>
           </div>
           <div class="norm">
             <div class="norm-name">Углеводы</div>
-            <div class="norm-val">{{ c.carbs }} <span>± {{ c.carbs_tolerance }}</span></div>
-            <div class="norm-range">{{ c.carbs_min }}–{{ c.carbs_max }} г</div>
+            <div class="norm-val">{{ c.carbs_min }}–{{ c.carbs_max }} <span>г</span></div>
           </div>
         </div>
 
@@ -205,7 +214,7 @@
     <div class="mhead">
       <button class="mcl" onclick="closeModal()">✕</button>
       <div class="mht" id="modal-title">Новый калораж</div>
-      <div class="mhs">Норма считается как цель ± погрешность</div>
+      <div class="mhs">Границы нормы задаются вручную: от и до</div>
     </div>
     <form method="post" id="cal-form" action="{% url 'calorie_create' %}">
       {% csrf_token %}
@@ -218,21 +227,45 @@
 
         <div class="sub-head">Калорийность и БЖУ</div>
 
-        <div class="nutr-row">
-          <div><label class="fl">Калорийность, ккал</label><input class="fi" type="number" min="1" name="kcal" id="f-kcal" required></div>
-          <div><label class="fl">Погрешность, ±ккал</label><input class="fi" type="number" min="0" name="kcal_tolerance" id="f-kcal_tolerance" value="50" required></div>
+        <div class="ff">
+          <label class="fl">Калорийность, ккал</label>
+          <input class="fi" type="number" min="1" name="kcal" id="f-kcal" placeholder="1500" required>
+          <div class="fhint">Основное значение калоража — по нему рационы находят свою норму.</div>
         </div>
-        <div class="nutr-row">
-          <div><label class="fl">Белки, г</label><input class="fi" type="number" min="0" name="protein" id="f-protein" value="0" required></div>
-          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="protein_tolerance" id="f-protein_tolerance" value="5" required></div>
+
+        <div class="rng">
+          <label class="fl">Норма по калориям, ккал</label>
+          <div class="rng-inputs">
+            <input class="fi" type="number" min="0" name="kcal_min" id="f-kcal_min" placeholder="от" required>
+            <span class="rng-dash">—</span>
+            <input class="fi" type="number" min="0" name="kcal_max" id="f-kcal_max" placeholder="до" required>
+          </div>
+          <div class="fhint">Любые границы, не обязательно симметричные: хоть 900 — 1800.</div>
         </div>
-        <div class="nutr-row">
-          <div><label class="fl">Жиры, г</label><input class="fi" type="number" min="0" name="fat" id="f-fat" value="0" required></div>
-          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="fat_tolerance" id="f-fat_tolerance" value="5" required></div>
+
+        <div class="rng">
+          <label class="fl">Белки, г</label>
+          <div class="rng-inputs">
+            <input class="fi" type="number" min="0" name="protein_min" id="f-protein_min" placeholder="от" value="0" required>
+            <span class="rng-dash">—</span>
+            <input class="fi" type="number" min="0" name="protein_max" id="f-protein_max" placeholder="до" value="0" required>
+          </div>
         </div>
-        <div class="nutr-row">
-          <div><label class="fl">Углеводы, г</label><input class="fi" type="number" min="0" name="carbs" id="f-carbs" value="0" required></div>
-          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="carbs_tolerance" id="f-carbs_tolerance" value="10" required></div>
+        <div class="rng">
+          <label class="fl">Жиры, г</label>
+          <div class="rng-inputs">
+            <input class="fi" type="number" min="0" name="fat_min" id="f-fat_min" placeholder="от" value="0" required>
+            <span class="rng-dash">—</span>
+            <input class="fi" type="number" min="0" name="fat_max" id="f-fat_max" placeholder="до" value="0" required>
+          </div>
+        </div>
+        <div class="rng">
+          <label class="fl">Углеводы, г</label>
+          <div class="rng-inputs">
+            <input class="fi" type="number" min="0" name="carbs_min" id="f-carbs_min" placeholder="от" value="0" required>
+            <span class="rng-dash">—</span>
+            <input class="fi" type="number" min="0" name="carbs_max" id="f-carbs_max" placeholder="до" value="0" required>
+          </div>
         </div>
 
         <div class="sub-head">Приёмы пищи</div>
@@ -249,9 +282,11 @@
         {% else %}
         <div class="fhint">Приёмы пищи ещё не заведены — добавьте их в админке (раздел «Приёмы пищи»).</div>
         {% endif %}
+      </div>
 
-        <br>
-        <button type="submit" class="fsub" id="modal-submit">Создать</button>
+      <div class="mfoot">
+        <button type="button" class="fcancel" onclick="closeModal()">Отмена</button>
+        <button type="submit" class="fsub" id="modal-submit">Создать калораж</button>
       </div>
     </form>
   </div>
@@ -260,8 +295,8 @@
 <script>
 const CATEGORIES = {{ categories_json|safe }};
 const CREATE_URL = "{% url 'calorie_create' %}";
-const NUM_FIELDS = ['kcal','kcal_tolerance','protein','protein_tolerance','fat','fat_tolerance','carbs','carbs_tolerance'];
-const DEFAULTS = {kcal:'', kcal_tolerance:50, protein:0, protein_tolerance:5, fat:0, fat_tolerance:5, carbs:0, carbs_tolerance:10};
+const NUM_FIELDS = ['kcal','kcal_min','kcal_max','protein_min','protein_max','fat_min','fat_max','carbs_min','carbs_max'];
+const DEFAULTS = {kcal:'', kcal_min:'', kcal_max:'', protein_min:0, protein_max:0, fat_min:0, fat_max:0, carbs_min:0, carbs_max:0};
 
 function setMealTimes(ids){
   document.querySelectorAll('.mt-opt').forEach(opt => {
@@ -273,7 +308,7 @@ function setMealTimes(ids){
 
 function openCreate(){
   document.getElementById('modal-title').textContent = 'Новый калораж';
-  document.getElementById('modal-submit').textContent = 'Создать';
+  document.getElementById('modal-submit').textContent = 'Создать калораж';
   document.getElementById('cal-form').action = CREATE_URL;
   document.getElementById('f-name').value = '';
   NUM_FIELDS.forEach(f => document.getElementById('f-' + f).value = DEFAULTS[f]);
@@ -286,7 +321,7 @@ function openEdit(pk){
   const c = CATEGORIES.find(x => x.id === pk);
   if(!c) return;
   document.getElementById('modal-title').textContent = 'Изменить калораж';
-  document.getElementById('modal-submit').textContent = 'Сохранить';
+  document.getElementById('modal-submit').textContent = 'Сохранить изменения';
   document.getElementById('cal-form').action = '/calories/' + pk + '/edit/';
   document.getElementById('f-name').value = c.name || '';
   NUM_FIELDS.forEach(f => document.getElementById('f-' + f).value = c[f]);
@@ -295,6 +330,16 @@ function openEdit(pk){
 }
 
 function closeModal(){ document.getElementById('cal-modal').classList.remove('open'); }
+
+// Подсказка при создании: пустые границы подставляются как ккал ± 50 —
+// дальше их можно переписать как угодно.
+document.getElementById('f-kcal').addEventListener('input', function(){
+  const kcal = parseInt(this.value, 10);
+  if(!kcal) return;
+  const lo = document.getElementById('f-kcal_min'), hi = document.getElementById('f-kcal_max');
+  if(!lo.value) lo.value = Math.max(0, kcal - 50);
+  if(!hi.value) hi.value = kcal + 50;
+});
 
 function toggleCard(pk){
   const card = document.getElementById('cal-' + pk);

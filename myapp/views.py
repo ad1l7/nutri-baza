@@ -327,20 +327,33 @@ def _parse_calorie_form(request):
         except (TypeError, ValueError):
             return default
 
+    def _range(prefix, fallback_lo=0, fallback_hi=0):
+        """Пара «от, до». Если пользователь перепутал поля местами — меняем их
+        обратно, чтобы диапазон всегда был корректным."""
+        lo = _int(f"{prefix}_min", fallback_lo)
+        hi = _int(f"{prefix}_max", fallback_hi)
+        return (hi, lo) if hi < lo else (lo, hi)
+
     kcal = _int("kcal")
     if not kcal:
         return None, None
 
+    kcal_min, kcal_max = _range("kcal", max(0, kcal - 50), kcal + 50)
+    protein_min, protein_max = _range("protein")
+    fat_min, fat_max = _range("fat")
+    carbs_min, carbs_max = _range("carbs")
+
     fields = {
         "name": request.POST.get("name", "").strip() or f"{kcal} ккал",
         "kcal": kcal,
-        "kcal_tolerance": _int("kcal_tolerance"),
-        "protein": _int("protein"),
-        "protein_tolerance": _int("protein_tolerance"),
-        "fat": _int("fat"),
-        "fat_tolerance": _int("fat_tolerance"),
-        "carbs": _int("carbs"),
-        "carbs_tolerance": _int("carbs_tolerance"),
+        "kcal_min": kcal_min,
+        "kcal_max": kcal_max,
+        "protein_min": protein_min,
+        "protein_max": protein_max,
+        "fat_min": fat_min,
+        "fat_max": fat_max,
+        "carbs_min": carbs_min,
+        "carbs_max": carbs_max,
     }
     meal_time_ids = [int(i) for i in request.POST.getlist("meal_times") if str(i).isdigit()]
     return fields, meal_time_ids
@@ -380,13 +393,14 @@ def calorie_list(request):
             "id": c.pk,
             "name": c.name,
             "kcal": c.kcal,
-            "kcal_tolerance": c.kcal_tolerance,
-            "protein": c.protein,
-            "protein_tolerance": c.protein_tolerance,
-            "fat": c.fat,
-            "fat_tolerance": c.fat_tolerance,
-            "carbs": c.carbs,
-            "carbs_tolerance": c.carbs_tolerance,
+            "kcal_min": c.kcal_min,
+            "kcal_max": c.kcal_max,
+            "protein_min": c.protein_min,
+            "protein_max": c.protein_max,
+            "fat_min": c.fat_min,
+            "fat_max": c.fat_max,
+            "carbs_min": c.carbs_min,
+            "carbs_max": c.carbs_max,
             "meal_time_ids": [m.meal_time_id for m in c.meals.all()],
         }
         for c in categories
