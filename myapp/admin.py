@@ -3,11 +3,10 @@ from .models import (
     IikoSyncLog,
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
-    RationTemplate, RationTemplateSlot,
-    RationNorm, IikoCategoryMap,
+    CalorieCategory, CalorieCategoryMeal,
+    IikoCategoryMap,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
-    KCAL_CATEGORIES,
 )
 
 
@@ -56,28 +55,27 @@ class ProductAdmin(admin.ModelAdmin):
     get_categories.short_description = "Категории"
 
 
-# ── Шаблоны рационов ─────────────────────────────────────────────────────────
+# ── Калоражи ─────────────────────────────────────────────────────────────────
+# Основное место работы с калоражами — вкладка «Калоражи» на сайте.
+# Админка оставлена как запасной вариант.
 
-class RationTemplateSlotInline(admin.TabularInline):
-    model = RationTemplateSlot
+class CalorieCategoryMealInline(admin.TabularInline):
+    model = CalorieCategoryMeal
     extra = 1
-    fields = ["order", "meal_time"]  # meal_time вместо slot_type
+    fields = ["order", "meal_time"]
     ordering = ["order"]
 
 
-@admin.register(RationTemplate)
-class RationTemplateAdmin(admin.ModelAdmin):
-    list_display = ["__str__", "kcal_category", "get_slots_count", "updated_at"]
-    inlines = [RationTemplateSlotInline]
-    readonly_fields = ["updated_at"]
+@admin.register(CalorieCategory)
+class CalorieCategoryAdmin(admin.ModelAdmin):
+    list_display = ["name", "kcal", "kcal_tolerance", "protein", "fat", "carbs", "get_meals_count", "order"]
+    inlines = [CalorieCategoryMealInline]
+    readonly_fields = ["created_at", "updated_at"]
+    ordering = ["order", "kcal"]
 
-    def get_slots_count(self, obj):
-        return obj.slots.count()
-    get_slots_count.short_description = "Приёмов пищи"
-
-    def has_add_permission(self, request):
-        existing = RationTemplate.objects.count()
-        return existing < len(KCAL_CATEGORIES)
+    def get_meals_count(self, obj):
+        return obj.meals.count()
+    get_meals_count.short_description = "Приёмов пищи"
 
 
 # ── Группы и рационы ─────────────────────────────────────────────────────────
@@ -112,21 +110,6 @@ class RationAdmin(admin.ModelAdmin):
     list_filter = ["group", "kcal_category"]
     search_fields = ["name"]
     inlines = [RationSlotInline]
-
-
-# ── Нормы КБЖУ ───────────────────────────────────────────────────────────────
-
-@admin.register(RationNorm)
-class RationNormAdmin(admin.ModelAdmin):
-    list_display = [
-        "kcal_category", "kcal_min", "kcal_max",
-        "protein_min", "protein_max", "fat_min", "fat_max",
-        "carbs_min", "carbs_max",
-    ]
-    list_editable = [
-        "kcal_min", "kcal_max", "protein_min", "protein_max",
-        "fat_min", "fat_max", "carbs_min", "carbs_max",
-    ]
 
 
 @admin.register(IikoCategoryMap)

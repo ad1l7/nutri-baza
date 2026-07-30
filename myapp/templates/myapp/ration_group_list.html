@@ -133,7 +133,8 @@
   .fsub{background:var(--green-dark);color:#fff;border:none;border-radius:11px;padding:12px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s;}
   .fsub:hover{background:var(--green-mid);}
 
-  .kcal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  /* auto-fill: количество калоражей задаётся во вкладке «Калоражи» и не фиксировано */
+  .kcal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;}
   .ko{padding:10px 6px;text-align:center;border-radius:10px;border:2px solid var(--border);background:var(--off-white);cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);transition:all .15s;}
   .ko:hover{border-color:var(--green-light);color:var(--green-mid);}
   .ko.sel{border-color:var(--green);background:var(--light);color:var(--green-mid);}
@@ -165,6 +166,7 @@
     <a href="{% url 'ration_group_list' %}" class="nav-tab active">🥗 Рационы</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
+    {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
     {% if not is_reader %}
@@ -357,8 +359,12 @@
             {% for val, label in ration_kcal_choices %}
             <label class="ko" id="ko-{{ val }}">
               <input type="radio" name="kcal_category" value="{{ val }}" required onchange="selKcal({{ val }})">
-              {{ val }}<br><span style="font-size:10px;font-weight:500;opacity:.7;">ккал</span>
+              {{ label }}
             </label>
+            {% empty %}
+            <div style="grid-column:1/-1;font-size:12px;color:var(--muted);font-weight:600;">
+              Калоражи ещё не созданы — добавьте их во вкладке «⚖️ Калоражи».
+            </div>
             {% endfor %}
           </div>
           <!-- Превью шаблона -->

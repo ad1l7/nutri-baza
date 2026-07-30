@@ -8,6 +8,12 @@ urlpatterns = [
     path("product/<int:pk>/", views.product_detail, name="product_detail"),
     path("product/<int:pk>/sale-price/", views.product_set_sale_price, name="product_set_sale_price"),
 
+    # Калоражи (только для редакторов)
+    path("calories/", views.calorie_list, name="calorie_list"),
+    path("calories/create/", views.calorie_create, name="calorie_create"),
+    path("calories/<int:pk>/edit/", views.calorie_edit, name="calorie_edit"),
+    path("calories/<int:pk>/delete/", views.calorie_delete, name="calorie_delete"),
+
     # Группы рационов
     path("rations/", views.ration_group_list, name="ration_group_list"),
     path("rations/group/create/", views.ration_group_create, name="ration_group_create"),

@@ -154,55 +154,117 @@ class MealTime(models.Model):
         return self.name
 
 
-# ── Шаблоны рационов ─────────────────────────────────────────────────────────
-
-KCAL_CATEGORIES = [
-    (1200, '1200 ккал'),
-    (1500, '1500 ккал'),
-    (1800, '1800 ккал'),
-    (2500, '2500 ккал'),
-]
+# ── Калоражи ─────────────────────────────────────────────────────────────────
+# Единый справочник категорий калорийности: целевые КБЖУ с погрешностью
+# (норма = цель ± погрешность) и набор приёмов пищи. Заменил собой прежние
+# RationTemplate (приёмы пищи) и RationNorm (диапазоны КБЖУ), которые
+# редактировались только в админке. Теперь всё в отдельной вкладке «Калоражи».
 
 
-class RationTemplate(models.Model):
-    kcal_category = models.IntegerField(
-        choices=KCAL_CATEGORIES, unique=True,
-        verbose_name="Категория калорийности"
-    )
+class CalorieCategory(models.Model):
+    name = models.CharField(max_length=100, verbose_name="Название")
+    kcal = models.PositiveIntegerField(unique=True, verbose_name="Калорийность, ккал")
+    kcal_tolerance = models.PositiveIntegerField(default=50, verbose_name="Погрешность ккал, ±")
+
+    protein = models.PositiveIntegerField(default=0, verbose_name="Белки, г")
+    protein_tolerance = models.PositiveIntegerField(default=5, verbose_name="Погрешность белков, ±г")
+    fat = models.PositiveIntegerField(default=0, verbose_name="Жиры, г")
+    fat_tolerance = models.PositiveIntegerField(default=5, verbose_name="Погрешность жиров, ±г")
+    carbs = models.PositiveIntegerField(default=0, verbose_name="Углеводы, г")
+    carbs_tolerance = models.PositiveIntegerField(default=10, verbose_name="Погрешность углеводов, ±г")
+
+    order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+    created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Шаблон рациона"
-        verbose_name_plural = "Шаблоны рационов"
-        ordering = ["kcal_category"]
+        verbose_name = "Калораж"
+        verbose_name_plural = "Калоражи"
+        ordering = ["order", "kcal"]
 
     def __str__(self):
-        return f"Шаблон {self.kcal_category} ккал"
+        return self.name or f"{self.kcal} ккал"
+
+    # Границы нормы — цель ± погрешность. Имена min/max совпадают с прежней
+    # моделью RationNorm, поэтому шаблоны сборки рационов не менялись.
+    @property
+    def kcal_min(self):
+        return max(0, self.kcal - self.kcal_tolerance)
+
+    @property
+    def kcal_max(self):
+        return self.kcal + self.kcal_tolerance
+
+    @property
+    def protein_min(self):
+        return max(0, self.protein - self.protein_tolerance)
+
+    @property
+    def protein_max(self):
+        return self.protein + self.protein_tolerance
+
+    @property
+    def fat_min(self):
+        return max(0, self.fat - self.fat_tolerance)
+
+    @property
+    def fat_max(self):
+        return self.fat + self.fat_tolerance
+
+    @property
+    def carbs_min(self):
+        return max(0, self.carbs - self.carbs_tolerance)
+
+    @property
+    def carbs_max(self):
+        return self.carbs + self.carbs_tolerance
+
+    @property
+    def kcal_category(self):
+        """Ration.kcal_category хранит именно значение ккал — этот алиас
+        позволяет отдавать калораж туда, где раньше ждали норму."""
+        return self.kcal
+
+    @classmethod
+    def choices(cls):
+        """Пары (ккал, название) для выпадающих списков выбора калоража."""
+        return [(c.kcal, str(c)) for c in cls.objects.all()]
+
+    @classmethod
+    def norm_for(cls, kcal_category):
+        """Калораж по числовому значению ккал рациона (или None)."""
+        return cls.objects.filter(kcal=kcal_category).first()
+
+    def meal_times(self):
+        """Приёмы пищи калоража в заданном порядке."""
+        return [
+            m.meal_time
+            for m in self.meals.select_related("meal_time").order_by("order")
+            if m.meal_time_id
+        ]
 
 
-class RationTemplateSlot(models.Model):
-    """
-    Слот шаблона — привязывает приём пищи (MealTime) к шаблону рациона.
-    Например: Шаблон 1200 ккал → [Завтрак, Обед, Ужин]
-    """
-    template = models.ForeignKey(
-        RationTemplate, on_delete=models.CASCADE,
-        related_name="slots", verbose_name="Шаблон"
+class CalorieCategoryMeal(models.Model):
+    """Приём пищи в составе калоража: 1500 ккал → [Завтрак, Обед, Ужин]."""
+    category = models.ForeignKey(
+        CalorieCategory, on_delete=models.CASCADE,
+        related_name="meals", verbose_name="Калораж"
     )
     meal_time = models.ForeignKey(
-        MealTime, on_delete=models.SET_NULL,
-        null=True, blank=True,
-        verbose_name="Приём пищи"
+        MealTime, on_delete=models.CASCADE,
+        related_name="calorie_meals", verbose_name="Приём пищи"
     )
     order = models.PositiveSmallIntegerField(default=0, verbose_name="Порядок")
 
     class Meta:
-        verbose_name = "Слот шаблона"
-        verbose_name_plural = "Слоты шаблона"
-        ordering = ["order"]
+        verbose_name = "Приём пищи калоража"
+        verbose_name_plural = "Приёмы пищи калоража"
+        ordering = ["order", "id"]
+        unique_together = [("category", "meal_time")]
 
     def __str__(self):
-        return f"{self.template} / {self.meal_time}"
+        return f"{self.category} / {self.meal_time}"
+
 
 
 # ── Группы рационов ──────────────────────────────────────────────────────────
@@ -230,7 +292,9 @@ class Ration(models.Model):
         null=True, blank=True,
     )
     name = models.CharField(max_length=300, verbose_name="Название рациона")
-    kcal_category = models.IntegerField(choices=KCAL_CATEGORIES, verbose_name="Категория калорийности")
+    # Значение ккал калоража (CalorieCategory.kcal), а не FK — чтобы удаление
+    # калоража не утаскивало за собой рационы.
+    kcal_category = models.IntegerField(verbose_name="Категория калорийности")
     notes = models.TextField(blank=True, null=True, verbose_name="Примечания")
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -283,33 +347,6 @@ class RationSlot(models.Model):
         st = SLOT_LABELS.get(self.slot_type, self.slot_type) if self.slot_type else "без категории"
         pr = self.product.name if self.product_id else "пусто"
         return f"{mt} / {st} — {pr}"
-
-
-# ── Нормы КБЖУ по калорийности ───────────────────────────────────────────────
-
-class RationNorm(models.Model):
-    """Допустимые диапазоны КБЖУ для каждой категории калорийности.
-    Редактируется в админке. Используется на сборке рациона для подсветки."""
-    kcal_category = models.IntegerField(
-        choices=KCAL_CATEGORIES, unique=True,
-        verbose_name="Категория калорийности"
-    )
-    kcal_min    = models.PositiveIntegerField(verbose_name="Ккал — мин")
-    kcal_max    = models.PositiveIntegerField(verbose_name="Ккал — макс")
-    protein_min = models.PositiveIntegerField(verbose_name="Белки — мин, г")
-    protein_max = models.PositiveIntegerField(verbose_name="Белки — макс, г")
-    fat_min     = models.PositiveIntegerField(verbose_name="Жиры — мин, г")
-    fat_max     = models.PositiveIntegerField(verbose_name="Жиры — макс, г")
-    carbs_min   = models.PositiveIntegerField(verbose_name="Углеводы — мин, г")
-    carbs_max   = models.PositiveIntegerField(verbose_name="Углеводы — макс, г")
-
-    class Meta:
-        verbose_name = "Норма КБЖУ"
-        verbose_name_plural = "Нормы КБЖУ"
-        ordering = ["kcal_category"]
-
-    def __str__(self):
-        return f"Норма {self.kcal_category} ккал"
 
 
 # ── Сопоставление категорий iiko → категории сайта ───────────────────────────
@@ -375,7 +412,7 @@ class SwapItem(models.Model):
 
 # ── Рационы Claude (отдельная система, изолированная от обычных рационов) ──────
 # Полная копия групп/рационов/слотов, но со своим набором данных и полем wishes.
-# Справочники (Product, MealTime, RationNorm, RationTemplate) — общие.
+# Справочники (Product, MealTime, CalorieCategory) — общие.
 
 class ClaudeRationGroup(models.Model):
     name = models.CharField(max_length=300, verbose_name="Название группы")
@@ -398,7 +435,9 @@ class ClaudeRation(models.Model):
         null=True, blank=True,
     )
     name = models.CharField(max_length=300, verbose_name="Название рациона")
-    kcal_category = models.IntegerField(choices=KCAL_CATEGORIES, verbose_name="Категория калорийности")
+    # Значение ккал калоража (CalorieCategory.kcal), а не FK — чтобы удаление
+    # калоража не утаскивало за собой рационы.
+    kcal_category = models.IntegerField(verbose_name="Категория калорийности")
     wishes = models.TextField(blank=True, null=True, verbose_name="Пожелания для Claude")
     notes = models.TextField(blank=True, null=True, verbose_name="Примечания")
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")

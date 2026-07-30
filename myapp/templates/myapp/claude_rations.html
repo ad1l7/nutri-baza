@@ -87,6 +87,7 @@
     <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
+    {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
     <form method="post" action="{% url 'logout' %}" style="display:contents">

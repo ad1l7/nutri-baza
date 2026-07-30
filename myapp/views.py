@@ -8,12 +8,12 @@ from django.views.decorators.http import require_POST, require_GET
 from .models import (
     Product, Allergen, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
-    RationTemplate, RationTemplateSlot,
-    RationNorm,
+    CalorieCategory, CalorieCategoryMeal,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
-    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, KCAL_CATEGORIES, RATION_SLOT_TYPES,
+    SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, RATION_SLOT_TYPES,
 )
+from .roles import editor_required
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +295,150 @@ def _product_picker_dict(p, with_category=False):
     return d
 
 
+# ── Калоражи ──────────────────────────────────────────────────────────────────
+
+def _calorie_meals_preview():
+    """{ккал: [{name, icon}, …]} — превью приёмов пищи калоража для модала
+    создания рациона (обычного и Claude)."""
+    preview = {}
+    for category in CalorieCategory.objects.prefetch_related("meals__meal_time"):
+        preview[category.kcal] = [
+            {"name": mt.name, "icon": mt.icon}
+            for mt in category.meal_times()
+        ]
+    return preview
+
+
+def _seed_slots_from_calorie_category(ration, kcal_category, slot_model):
+    """Создаёт слоты нового рациона по приёмам пищи его калоража."""
+    category = CalorieCategory.norm_for(kcal_category)
+    if not category:
+        return
+    for i, meal_time in enumerate(category.meal_times()):
+        slot_model.objects.create(ration=ration, meal_time=meal_time, order=i)
+
+
+def _parse_calorie_form(request):
+    """Разбирает форму калоража. Возвращает (поля, id приёмов пищи) или (None, None)
+    если калорийность не задана."""
+    def _int(name, default=0):
+        try:
+            return max(0, int(request.POST.get(name, default) or default))
+        except (TypeError, ValueError):
+            return default
+
+    kcal = _int("kcal")
+    if not kcal:
+        return None, None
+
+    fields = {
+        "name": request.POST.get("name", "").strip() or f"{kcal} ккал",
+        "kcal": kcal,
+        "kcal_tolerance": _int("kcal_tolerance"),
+        "protein": _int("protein"),
+        "protein_tolerance": _int("protein_tolerance"),
+        "fat": _int("fat"),
+        "fat_tolerance": _int("fat_tolerance"),
+        "carbs": _int("carbs"),
+        "carbs_tolerance": _int("carbs_tolerance"),
+    }
+    meal_time_ids = [int(i) for i in request.POST.getlist("meal_times") if str(i).isdigit()]
+    return fields, meal_time_ids
+
+
+def _save_calorie_meals(category, meal_time_ids):
+    """Переписывает набор приёмов пищи калоража, сохраняя порядок MealTime."""
+    category.meals.all().delete()
+    ordered = MealTime.objects.filter(pk__in=meal_time_ids).order_by("order", "name")
+    for i, meal_time in enumerate(ordered):
+        CalorieCategoryMeal.objects.create(category=category, meal_time=meal_time, order=i)
+
+
+@editor_required
+def calorie_list(request):
+    """Вкладка «Калоражи» — только для редакторов."""
+    categories = list(
+        CalorieCategory.objects.prefetch_related("meals__meal_time")
+    )
+
+    # Сколько рационов уже используют калораж — показываем при удалении
+    usage = {}
+    for c in categories:
+        usage[c.pk] = (
+            Ration.objects.filter(kcal_category=c.kcal).count()
+            + ClaudeRation.objects.filter(kcal_category=c.kcal).count()
+        )
+
+    categories_data = [
+        {"category": c, "meal_times": c.meal_times(), "usage": usage[c.pk]}
+        for c in categories
+    ]
+
+    # Данные для модала редактирования — заполняются из JS
+    categories_json = [
+        {
+            "id": c.pk,
+            "name": c.name,
+            "kcal": c.kcal,
+            "kcal_tolerance": c.kcal_tolerance,
+            "protein": c.protein,
+            "protein_tolerance": c.protein_tolerance,
+            "fat": c.fat,
+            "fat_tolerance": c.fat_tolerance,
+            "carbs": c.carbs,
+            "carbs_tolerance": c.carbs_tolerance,
+            "meal_time_ids": [m.meal_time_id for m in c.meals.all()],
+        }
+        for c in categories
+    ]
+
+    return render(request, "myapp/calorie_list.html", {
+        "categories_data": categories_data,
+        "all_meal_times": list(MealTime.objects.order_by("order", "name")),
+        "categories_json": json.dumps(categories_json, ensure_ascii=False),
+    })
+
+
+@editor_required
+def calorie_create(request):
+    if request.method == "POST":
+        fields, meal_time_ids = _parse_calorie_form(request)
+        if fields and not CalorieCategory.objects.filter(kcal=fields["kcal"]).exists():
+            fields["order"] = CalorieCategory.objects.count()
+            category = CalorieCategory.objects.create(**fields)
+            _save_calorie_meals(category, meal_time_ids)
+    return redirect("calorie_list")
+
+
+@editor_required
+def calorie_edit(request, pk):
+    category = get_object_or_404(CalorieCategory, pk=pk)
+    if request.method == "POST":
+        fields, meal_time_ids = _parse_calorie_form(request)
+        if fields:
+            taken = CalorieCategory.objects.filter(kcal=fields["kcal"]).exclude(pk=category.pk)
+            if not taken.exists():
+                old_kcal = category.kcal
+                for name, value in fields.items():
+                    setattr(category, name, value)
+                category.save()
+                _save_calorie_meals(category, meal_time_ids)
+                # Рационы ссылаются на калораж числом ккал — переносим их следом,
+                # иначе они остались бы без нормы КБЖУ.
+                if old_kcal != category.kcal:
+                    Ration.objects.filter(kcal_category=old_kcal).update(kcal_category=category.kcal)
+                    ClaudeRation.objects.filter(kcal_category=old_kcal).update(kcal_category=category.kcal)
+    return redirect("calorie_list")
+
+
+@editor_required
+def calorie_delete(request, pk):
+    category = get_object_or_404(CalorieCategory, pk=pk)
+    if request.method == "POST":
+        category.delete()
+    return redirect("calorie_list")
+
+
 # ── Группы рационов ───────────────────────────────────────────────────────────
 
 def ration_group_list(request):
@@ -325,23 +469,11 @@ def ration_group_list(request):
             "group_cost": round(group_cost, 2),
         })
 
-    # Превью шаблонов для модала создания рациона
-    tmpl_data = {}
-    for kcal, _ in KCAL_CATEGORIES:
-        try:
-            tmpl = RationTemplate.objects.prefetch_related("slots__meal_time").get(kcal_category=kcal)
-            tmpl_data[kcal] = [
-                {"name": s.meal_time.name, "icon": s.meal_time.icon}
-                for s in tmpl.slots.order_by("order")
-            ]
-        except RationTemplate.DoesNotExist:
-            tmpl_data[kcal] = []
-
     return render(request, "myapp/ration_group_list.html", {
         "groups_data": groups_data,
-        "ration_kcal_choices": KCAL_CATEGORIES,
+        "ration_kcal_choices": CalorieCategory.choices(),
         "slot_icons": SLOT_ICONS,
-        "tmpl_data_json": json.dumps(tmpl_data, ensure_ascii=False),
+        "tmpl_data_json": json.dumps(_calorie_meals_preview(), ensure_ascii=False),
         "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
     })
 
@@ -450,17 +582,8 @@ def ration_create(request, group_pk):
                 kcal_category=int(kcal_category),
                 notes=notes or None,
             )
-            # Автоматически создаём слоты из шаблона (по приёмам пищи)
-            try:
-                tmpl = RationTemplate.objects.get(kcal_category=int(kcal_category))
-                for i, tslot in enumerate(tmpl.slots.order_by("order")):
-                    RationSlot.objects.create(
-                        ration=ration,
-                        meal_time=tslot.meal_time,
-                        order=tslot.order if tslot.order else i,
-                    )
-            except RationTemplate.DoesNotExist:
-                pass
+            # Автоматически создаём слоты по приёмам пищи калоража
+            _seed_slots_from_calorie_category(ration, int(kcal_category), RationSlot)
             return redirect("ration_edit", pk=ration.pk)
     return redirect("ration_group_list")
 
@@ -606,7 +729,7 @@ def ration_edit(request, pk):
     all_allergens = list(Allergen.objects.order_by("name"))
 
     # Нормы КБЖУ для категории + флаги выхода за диапазон
-    norm = RationNorm.objects.filter(kcal_category=ration.kcal_category).first()
+    norm = CalorieCategory.norm_for(ration.kcal_category)
     norm_flags = {}
     if norm:
         def _out(val, lo, hi):
@@ -632,7 +755,7 @@ def ration_edit(request, pk):
         "slot_icons":    SLOT_ICONS,
         "slot_colors":   SLOT_COLORS,
         "slot_labels":   SLOT_LABELS,
-        "kcal_categories": KCAL_CATEGORIES,
+        "kcal_categories": CalorieCategory.choices(),
         "all_meal_times":  all_meal_times,
         "meal_cat_map_json":  json.dumps(meal_cat_map, ensure_ascii=False),
         "slot_icons_json":    json.dumps(SLOT_ICONS, ensure_ascii=False),
@@ -843,7 +966,7 @@ def _resolve_ration_proposal(proposal):
     by_id = {p.pk: p for p in Product.objects.filter(pk__in=all_ids)}
 
     kcal_cat = proposal.get("kcal_category")
-    norm = RationNorm.objects.filter(kcal_category=kcal_cat).first()
+    norm = CalorieCategory.norm_for(kcal_cat)
 
     meals = []
     tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
@@ -892,18 +1015,16 @@ def _resolve_ration_proposal(proposal):
 
 
 def _ration_fixed_meal_times(ration):
-    """Фиксированные приёмы пищи рациона — из шаблона калорийности
+    """Фиксированные приёмы пищи рациона — из его калоража
     (fallback: текущие приёмы пищи рациона). Список MealTime в нужном порядке.
-    Структура приёмов пищи задаётся настройками и не меняется Claude."""
+    Структура приёмов пищи задаётся калоражем и не меняется Claude."""
     result, seen = [], set()
-    try:
-        tmpl = RationTemplate.objects.get(kcal_category=ration.kcal_category)
-        for ts in tmpl.slots.select_related("meal_time").order_by("order"):
-            if ts.meal_time_id and ts.meal_time_id not in seen:
-                seen.add(ts.meal_time_id)
-                result.append(ts.meal_time)
-    except RationTemplate.DoesNotExist:
-        pass
+    category = CalorieCategory.norm_for(ration.kcal_category)
+    if category:
+        for meal_time in category.meal_times():
+            if meal_time.pk not in seen:
+                seen.add(meal_time.pk)
+                result.append(meal_time)
     if result:
         return result
     for s in ration.slots.select_related("meal_time").order_by("order", "meal_time__order"):
@@ -936,7 +1057,7 @@ def _claude_generate(request, ration):
         Product.objects.prefetch_related("meal_categories")
         .exclude(pk__in=occupied_ids).order_by("name")
     )
-    norms = RationNorm.objects.filter(kcal_category=ration.kcal_category)
+    norms = CalorieCategory.objects.filter(kcal=ration.kcal_category)
     meal_names = [mt.name for mt in _ration_fixed_meal_times(ration)]
 
     full_wishes = (
@@ -1048,22 +1169,11 @@ def claude_group_list(request):
             "group_cost": round(group_cost, 2),
         })
 
-    tmpl_data = {}
-    for kcal, _ in KCAL_CATEGORIES:
-        try:
-            tmpl = RationTemplate.objects.prefetch_related("slots__meal_time").get(kcal_category=kcal)
-            tmpl_data[kcal] = [
-                {"name": s.meal_time.name, "icon": s.meal_time.icon}
-                for s in tmpl.slots.order_by("order")
-            ]
-        except RationTemplate.DoesNotExist:
-            tmpl_data[kcal] = []
-
     return render(request, "myapp/claude_group_list.html", {
         "groups_data": groups_data,
-        "ration_kcal_choices": KCAL_CATEGORIES,
+        "ration_kcal_choices": CalorieCategory.choices(),
         "slot_icons": SLOT_ICONS,
-        "tmpl_data_json": json.dumps(tmpl_data, ensure_ascii=False),
+        "tmpl_data_json": json.dumps(_calorie_meals_preview(), ensure_ascii=False),
         "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
     })
 
@@ -1169,17 +1279,8 @@ def claude_ration_create(request, group_pk):
                 kcal_category=int(kcal_category),
                 wishes=wishes or None,
             )
-            # Слоты по шаблону приёмов пищи (общий RationTemplate)
-            try:
-                tmpl = RationTemplate.objects.get(kcal_category=int(kcal_category))
-                for i, tslot in enumerate(tmpl.slots.order_by("order")):
-                    ClaudeRationSlot.objects.create(
-                        ration=ration,
-                        meal_time=tslot.meal_time,
-                        order=tslot.order if tslot.order else i,
-                    )
-            except RationTemplate.DoesNotExist:
-                pass
+            # Слоты по приёмам пищи калоража (общий справочник CalorieCategory)
+            _seed_slots_from_calorie_category(ration, int(kcal_category), ClaudeRationSlot)
             return redirect("claude_ration_edit", pk=ration.pk)
     return redirect("claude_rations")
 
@@ -1308,7 +1409,7 @@ def claude_ration_edit(request, pk):
     all_products_json = [_product_picker_dict(p, with_category=True) for p in all_products]
     all_allergens = list(Allergen.objects.order_by("name"))
 
-    norm = RationNorm.objects.filter(kcal_category=ration.kcal_category).first()
+    norm = CalorieCategory.norm_for(ration.kcal_category)
     norm_flags = {}
     if norm:
         def _out(val, lo, hi):
@@ -1341,7 +1442,7 @@ def claude_ration_edit(request, pk):
         "slot_icons": SLOT_ICONS,
         "slot_colors": SLOT_COLORS,
         "slot_labels": SLOT_LABELS,
-        "kcal_categories": KCAL_CATEGORIES,
+        "kcal_categories": CalorieCategory.choices(),
         "all_meal_times": all_meal_times,
         "meal_cat_map_json": json.dumps(meal_cat_map, ensure_ascii=False),
         "slot_icons_json": json.dumps(SLOT_ICONS, ensure_ascii=False),

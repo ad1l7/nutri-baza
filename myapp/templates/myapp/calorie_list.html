@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Калоражи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
+  .logo-text em{color:var(--green);font-style:normal;}
+  .nav-tabs{display:flex;gap:4px;margin-left:12px;flex-shrink:0;}
+  .nav-tab{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;color:var(--muted);border:1.5px solid var(--border);transition:all .18s;white-space:nowrap;}
+  .nav-tab:hover{background:var(--light);color:var(--text-mid);}
+  .nav-tab.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .create-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:7px;transition:background .2s;box-shadow:0 2px 8px rgba(90,170,60,.3);}
+  .create-btn:hover{background:var(--green-mid);}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;display:flex;align-items:center;gap:5px;}
+  .logout-btn:hover{border-color:#d64b2a;color:#d64b2a;background:#fff8f7;}
+
+  .main{max-width:1000px;margin:0 auto;padding:32px 22px;}
+  .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
+  .page-sub{font-size:14px;color:var(--muted);margin-bottom:28px;}
+  .cards{display:flex;flex-direction:column;gap:18px;}
+
+  .cal-card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+  .cal-head{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--green-dark);}
+  .cal-collapse{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .cal-collapse:hover{background:rgba(255,255,255,.28);}
+  .cal-arrow{display:inline-block;transition:transform .25s;}
+  .cal-card.collapsed .cal-arrow{transform:rotate(-90deg);}
+  .cal-card.collapsed .cal-body{display:none;}
+  .cal-icon{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+  .cal-title{font-size:15px;font-weight:800;color:#fff;flex:1;min-width:0;}
+  .cal-kcal{background:rgba(255,255,255,.15);color:#fff;font-size:12px;font-weight:800;padding:4px 11px;border-radius:20px;flex-shrink:0;}
+  .cal-count{background:rgba(255,255,255,.12);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;}
+  .grp-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+  .grp-btn:hover{background:rgba(255,255,255,.3);}
+  .grp-btn.del:hover{background:rgba(214,75,42,.65);}
+
+  .cal-body{padding:16px 18px;}
+  .sec-label{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px;}
+  .norms{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px;}
+  .norm{border:1.5px solid var(--border-soft);border-radius:11px;padding:11px 13px;background:var(--off-white);}
+  .norm-name{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;}
+  .norm-val{font-size:17px;font-weight:800;color:var(--text);}
+  .norm-val span{font-size:12px;font-weight:700;color:var(--green-mid);}
+  .norm-range{font-size:11px;font-weight:600;color:var(--muted);margin-top:3px;}
+
+  .meals{display:flex;flex-wrap:wrap;gap:7px;}
+  .meal-chip{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:20px;border:1.5px solid var(--border);background:var(--light);font-size:12px;font-weight:700;color:var(--text-mid);}
+  .meals-empty{font-size:13px;color:var(--muted);}
+  .usage{margin-top:16px;padding-top:13px;border-top:1.5px solid var(--border-soft);font-size:12px;color:var(--muted);font-weight:600;}
+
+  .empty-state{text-align:center;padding:80px 20px;color:var(--muted);}
+  .empty-state .icon{font-size:52px;margin-bottom:16px;}
+  .empty-state h2{font-size:20px;font-weight:800;color:var(--text);margin-bottom:8px;}
+
+  /* Модалы */
+  .mo{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:200;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
+  .mo.open{display:flex;}
+  .mbox{background:var(--white);border-radius:20px;width:100%;max-width:560px;box-shadow:var(--shadow-md);overflow:hidden;display:flex;flex-direction:column;max-height:88vh;}
+  .mhead{background:var(--green-dark);padding:18px 22px 14px;position:relative;flex-shrink:0;}
+  .mht{font-size:17px;font-weight:800;color:#fff;}
+  .mhs{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;}
+  .mcl{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;}
+  .mbody{padding:20px 22px;overflow-y:auto;}
+  .ff{margin-bottom:14px;}
+  .fl{display:block;font-size:12px;font-weight:700;color:var(--text-mid);margin-bottom:6px;}
+  .fi{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;transition:border .15s;}
+  .fi:focus{border-color:var(--green);}
+  .fsub{width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:12px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:background .2s;}
+  .fsub:hover{background:var(--green-mid);}
+  .fhint{font-size:11px;color:var(--muted);margin-top:5px;font-weight:600;}
+
+  .nutr-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end;margin-bottom:11px;}
+  .nutr-row .fl{margin-bottom:5px;}
+  .sub-head{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:20px 0 11px;padding-top:16px;border-top:1.5px solid var(--border-soft);}
+  .sub-head:first-child{margin-top:0;padding-top:0;border-top:none;}
+
+  .mt-grid{display:flex;flex-wrap:wrap;gap:8px;}
+  .mt-opt{display:flex;align-items:center;gap:7px;padding:9px 14px;border:1.5px solid var(--border);border-radius:11px;background:var(--off-white);cursor:pointer;font-size:13px;font-weight:700;color:var(--text-mid);transition:all .15s;user-select:none;}
+  .mt-opt:hover{border-color:var(--green);background:var(--light);}
+  .mt-opt input{accent-color:var(--green);width:15px;height:15px;cursor:pointer;}
+  .mt-opt.on{border-color:var(--green);background:var(--light);color:var(--green-dark);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="{% url 'product_list' %}" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
+    <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
+    <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
+    <a href="{% url 'calorie_list' %}" class="nav-tab active">⚖️ Калоражи</a>
+  </nav>
+  <div class="topbar-right">
+    <button class="create-btn" onclick="openCreate()">＋ Добавить калораж</button>
+    <form method="post" action="{% url 'logout' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
+    </form>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">Калоражи</div>
+  <div class="page-sub">Категории калорийности для сборки рационов: целевые КБЖУ с погрешностью и набор приёмов пищи. Новый калораж сразу появляется при создании рациона.</div>
+
+  {% if categories_data %}
+  <div class="cards">
+    {% for cd in categories_data %}
+    {% with c=cd.category %}
+    <div class="cal-card" id="cal-{{ c.pk }}">
+      <div class="cal-head">
+        <button class="cal-collapse" onclick="toggleCard({{ c.pk }})" title="Свернуть / развернуть">
+          <span class="cal-arrow">▼</span>
+        </button>
+        <div class="cal-icon">⚖️</div>
+        <div class="cal-title">{{ c.name }}</div>
+        <div class="cal-kcal">⚡ {{ c.kcal }} ккал</div>
+        <div class="cal-count">приёмов пищи: {{ cd.meal_times|length }}</div>
+        <button class="grp-btn" onclick="openEdit({{ c.pk }})" title="Изменить">✏️</button>
+        <form method="post" action="{% url 'calorie_delete' c.pk %}"
+              onsubmit="return confirm('Удалить калораж «{{ c.name|escapejs }}»?{% if cd.usage %}\n\nЕго используют рационов: {{ cd.usage }} — они останутся, но потеряют нормы КБЖУ и приёмы пищи.{% endif %}')"
+              style="display:contents">
+          {% csrf_token %}
+          <button type="submit" class="grp-btn del" title="Удалить калораж">🗑️</button>
+        </form>
+      </div>
+
+      <div class="cal-body">
+        <div class="sec-label">Нормы — цель ± погрешность</div>
+        <div class="norms">
+          <div class="norm">
+            <div class="norm-name">Калорийность</div>
+            <div class="norm-val">{{ c.kcal }} <span>± {{ c.kcal_tolerance }}</span></div>
+            <div class="norm-range">{{ c.kcal_min }}–{{ c.kcal_max }} ккал</div>
+          </div>
+          <div class="norm">
+            <div class="norm-name">Белки</div>
+            <div class="norm-val">{{ c.protein }} <span>± {{ c.protein_tolerance }}</span></div>
+            <div class="norm-range">{{ c.protein_min }}–{{ c.protein_max }} г</div>
+          </div>
+          <div class="norm">
+            <div class="norm-name">Жиры</div>
+            <div class="norm-val">{{ c.fat }} <span>± {{ c.fat_tolerance }}</span></div>
+            <div class="norm-range">{{ c.fat_min }}–{{ c.fat_max }} г</div>
+          </div>
+          <div class="norm">
+            <div class="norm-name">Углеводы</div>
+            <div class="norm-val">{{ c.carbs }} <span>± {{ c.carbs_tolerance }}</span></div>
+            <div class="norm-range">{{ c.carbs_min }}–{{ c.carbs_max }} г</div>
+          </div>
+        </div>
+
+        <div class="sec-label">Приёмы пищи</div>
+        {% if cd.meal_times %}
+        <div class="meals">
+          {% for mt in cd.meal_times %}
+          <div class="meal-chip">{{ mt.icon }} {{ mt.name }}</div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="meals-empty">Приёмы пищи не заданы — рацион создастся без слотов.</div>
+        {% endif %}
+
+        <div class="usage">
+          {% if cd.usage %}Используется в рационах: {{ cd.usage }}{% else %}Пока не используется ни в одном рационе{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">⚖️</div>
+    <h2>Пока нет калоражей</h2>
+    <p>Создайте первый калораж — он появится при сборке рационов.</p>
+    <br>
+    <button class="create-btn" onclick="openCreate()" style="margin:0 auto;">＋ Добавить калораж</button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- МОДАЛ: создать / изменить калораж -->
+<div class="mo" id="cal-modal" onclick="if(event.target===this)closeModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeModal()">✕</button>
+      <div class="mht" id="modal-title">Новый калораж</div>
+      <div class="mhs">Норма считается как цель ± погрешность</div>
+    </div>
+    <form method="post" id="cal-form" action="{% url 'calorie_create' %}">
+      {% csrf_token %}
+      <div class="mbody">
+        <div class="ff">
+          <label class="fl">Название</label>
+          <input class="fi" type="text" name="name" id="f-name" placeholder="1500 ккал">
+          <div class="fhint">Можно оставить пустым — подставится «N ккал».</div>
+        </div>
+
+        <div class="sub-head">Калорийность и БЖУ</div>
+
+        <div class="nutr-row">
+          <div><label class="fl">Калорийность, ккал</label><input class="fi" type="number" min="1" name="kcal" id="f-kcal" required></div>
+          <div><label class="fl">Погрешность, ±ккал</label><input class="fi" type="number" min="0" name="kcal_tolerance" id="f-kcal_tolerance" value="50" required></div>
+        </div>
+        <div class="nutr-row">
+          <div><label class="fl">Белки, г</label><input class="fi" type="number" min="0" name="protein" id="f-protein" value="0" required></div>
+          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="protein_tolerance" id="f-protein_tolerance" value="5" required></div>
+        </div>
+        <div class="nutr-row">
+          <div><label class="fl">Жиры, г</label><input class="fi" type="number" min="0" name="fat" id="f-fat" value="0" required></div>
+          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="fat_tolerance" id="f-fat_tolerance" value="5" required></div>
+        </div>
+        <div class="nutr-row">
+          <div><label class="fl">Углеводы, г</label><input class="fi" type="number" min="0" name="carbs" id="f-carbs" value="0" required></div>
+          <div><label class="fl">Погрешность, ±г</label><input class="fi" type="number" min="0" name="carbs_tolerance" id="f-carbs_tolerance" value="10" required></div>
+        </div>
+
+        <div class="sub-head">Приёмы пищи</div>
+        {% if all_meal_times %}
+        <div class="mt-grid">
+          {% for mt in all_meal_times %}
+          <label class="mt-opt" data-mt="{{ mt.pk }}">
+            <input type="checkbox" name="meal_times" value="{{ mt.pk }}" onchange="this.closest('.mt-opt').classList.toggle('on', this.checked)">
+            {{ mt.icon }} {{ mt.name }}
+          </label>
+          {% endfor %}
+        </div>
+        <div class="fhint">Отмеченные приёмы пищи автоматически создадутся слотами в новом рационе.</div>
+        {% else %}
+        <div class="fhint">Приёмы пищи ещё не заведены — добавьте их в админке (раздел «Приёмы пищи»).</div>
+        {% endif %}
+
+        <br>
+        <button type="submit" class="fsub" id="modal-submit">Создать</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const CATEGORIES = {{ categories_json|safe }};
+const CREATE_URL = "{% url 'calorie_create' %}";
+const NUM_FIELDS = ['kcal','kcal_tolerance','protein','protein_tolerance','fat','fat_tolerance','carbs','carbs_tolerance'];
+const DEFAULTS = {kcal:'', kcal_tolerance:50, protein:0, protein_tolerance:5, fat:0, fat_tolerance:5, carbs:0, carbs_tolerance:10};
+
+function setMealTimes(ids){
+  document.querySelectorAll('.mt-opt').forEach(opt => {
+    const on = ids.includes(parseInt(opt.dataset.mt, 10));
+    opt.querySelector('input').checked = on;
+    opt.classList.toggle('on', on);
+  });
+}
+
+function openCreate(){
+  document.getElementById('modal-title').textContent = 'Новый калораж';
+  document.getElementById('modal-submit').textContent = 'Создать';
+  document.getElementById('cal-form').action = CREATE_URL;
+  document.getElementById('f-name').value = '';
+  NUM_FIELDS.forEach(f => document.getElementById('f-' + f).value = DEFAULTS[f]);
+  setMealTimes([]);
+  document.getElementById('cal-modal').classList.add('open');
+  setTimeout(() => document.getElementById('f-kcal').focus(), 50);
+}
+
+function openEdit(pk){
+  const c = CATEGORIES.find(x => x.id === pk);
+  if(!c) return;
+  document.getElementById('modal-title').textContent = 'Изменить калораж';
+  document.getElementById('modal-submit').textContent = 'Сохранить';
+  document.getElementById('cal-form').action = '/calories/' + pk + '/edit/';
+  document.getElementById('f-name').value = c.name || '';
+  NUM_FIELDS.forEach(f => document.getElementById('f-' + f).value = c[f]);
+  setMealTimes(c.meal_time_ids || []);
+  document.getElementById('cal-modal').classList.add('open');
+}
+
+function closeModal(){ document.getElementById('cal-modal').classList.remove('open'); }
+
+function toggleCard(pk){
+  const card = document.getElementById('cal-' + pk);
+  card.classList.toggle('collapsed');
+  try {
+    const collapsed = JSON.parse(localStorage.getItem('collapsedCalories') || '[]');
+    const idx = collapsed.indexOf(pk);
+    if(card.classList.contains('collapsed')){
+      if(idx === -1) collapsed.push(pk);
+    } else if(idx !== -1){
+      collapsed.splice(idx, 1);
+    }
+    localStorage.setItem('collapsedCalories', JSON.stringify(collapsed));
+  } catch(e){}
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  try {
+    JSON.parse(localStorage.getItem('collapsedCalories') || '[]').forEach(pk => {
+      const card = document.getElementById('cal-' + pk);
+      if(card) card.classList.add('collapsed');
+    });
+  } catch(e){}
+});
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+</script>
+</body>
+</html>

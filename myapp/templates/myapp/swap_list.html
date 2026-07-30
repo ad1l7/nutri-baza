@@ -111,6 +111,7 @@
     <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
     <a href="{% url 'swap_list' %}" class="nav-tab active">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
+    {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
     {% if not is_reader %}<button class="create-btn" onclick="openCreateModal()">＋ Создать подгруппу</button>{% endif %}

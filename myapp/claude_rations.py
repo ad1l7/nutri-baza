@@ -26,7 +26,8 @@ MAX_TOKENS = 64000
 _OUTPUT_SCHEMA = {
     "type": "object",
     "properties": {
-        "kcal_category": {"type": "integer", "enum": [1200, 1500, 1800, 2500]},
+        # enum подставляется в generate_ration из переданных калоражей
+        "kcal_category": {"type": "integer"},
         "meals": {
             "type": "array",
             "items": {
@@ -51,7 +52,7 @@ _SYSTEM = (
     "Ты работаешь только в своей вкладке и не управляешь остальной системой. "
     "Правила:\n"
     "1. Используй ТОЛЬКО блюда из переданного каталога, ссылайся на них по полю id.\n"
-    "2. Собери рацион под одну из категорий калорийности (1200/1500/1800/2500) и старайся "
+    "2. Собери рацион под заданную категорию калорийности и старайся "
     "попасть в нормы КБЖУ для этой категории.\n"
     "3. Не повторяй одно и то же блюдо в рационе.\n"
     "4. Учитывай пожелания пользователя (аллергены, предпочтения, бюджет и т.п.).\n"
@@ -109,11 +110,17 @@ def generate_ration(wishes: str, products, norms, meal_times=None) -> dict:
     catalog = _build_catalog(products)
     norms_data = _build_norms(norms)
 
+    schema = copy.deepcopy(_OUTPUT_SCHEMA)
+
+    # Калорийности берём из переданных калоражей — список задаётся во вкладке
+    # «Калоражи», а не зашит в код.
+    kcal_values = [n["kcal_category"] for n in norms_data if n["kcal_category"]]
+    if kcal_values:
+        schema["properties"]["kcal_category"]["enum"] = kcal_values
+
     # Если приёмы пищи фиксированы — форсируем их названия через enum в схеме
-    schema = _OUTPUT_SCHEMA
     meals_line = "Собери один суточный рацион. Верни строго JSON по заданной схеме."
     if meal_times:
-        schema = copy.deepcopy(_OUTPUT_SCHEMA)
         schema["properties"]["meals"]["items"]["properties"]["meal_name"]["enum"] = list(meal_times)
         meals_line = (
             "ВАЖНО: приёмы пищи ФИКСИРОВАНЫ и менять их нельзя. Разложи блюда РОВНО по "
