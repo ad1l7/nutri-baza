@@ -167,12 +167,14 @@
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
   </nav>
   <div class="topbar-right">
+    {% if not is_reader %}
     <button class="create-btn" onclick="openGroupModal()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
       Новая группа
     </button>
+    {% endif %}
     <form method="post" action="{% url 'logout' %}" style="display:contents">
       {% csrf_token %}
       <button type="submit" class="logout-btn" title="Выйти из системы">
@@ -207,12 +209,12 @@
         </div>
         {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
-        <button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>
+        {% if not is_reader %}<button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>{% endif %}
         <a href="{% url 'claude_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
    title="Просмотр группы" style="text-decoration:none;">👁️</a>
         <a href="{% url 'claude_group_export' g.pk %}" class="grp-export-btn"
    title="Скачать Excel">⬇ Excel</a>
-        <button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>
+        {% if not is_reader %}<button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>{% endif %}
       </div>
 
       <div class="rations-list" data-group-id="{{ g.pk }}">
@@ -220,7 +222,7 @@
         {% with r=ri.ration %}
         <div class="ration-item" id="ri-{{ r.pk }}" data-ration-id="{{ r.pk }}" data-kcal="{{ r.kcal_category }}">
           <div class="ration-row">
-            <span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>
+            {% if not is_reader %}<span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>{% endif %}
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
             {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
@@ -228,10 +230,12 @@
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
             </button>
+            {% if not is_reader %}
             <div class="ration-btns">
               <a href="{% url 'claude_ration_edit' r.pk %}" class="r-btn" title="Редактировать">✏️</a>
               <button class="r-btn del" onclick="confirmDel('ration', {{ r.pk }}, '{{ r.name|escapejs }}')" title="Удалить рацион">🗑️</button>
             </div>
+            {% endif %}
           </div>
 
           <div class="ration-preview">
@@ -266,12 +270,14 @@
         {% endwith %}
         {% endfor %}
 
+        {% if not is_reader %}
         <button class="add-ration-btn" onclick="openRationModal({{ g.pk }})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
           Добавить рацион
         </button>
+        {% endif %}
       </div>
     </div>
     {% endwith %}
@@ -283,12 +289,14 @@
     <div class="icon">📋</div>
     <h2>Групп пока нет</h2>
     <p style="font-size:14px;margin-bottom:24px;">Создайте группу — например «Неделя 1» или «1200 ккал январь»</p>
+    {% if not is_reader %}
     <button class="create-btn" onclick="openGroupModal()" style="margin:0 auto;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
       Создать группу
     </button>
+    {% endif %}
   </div>
   {% endif %}
 </div>

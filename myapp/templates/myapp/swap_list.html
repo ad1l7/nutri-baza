@@ -113,7 +113,7 @@
     <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
   </nav>
   <div class="topbar-right">
-    <button class="create-btn" onclick="openCreateModal()">＋ Создать подгруппу</button>
+    {% if not is_reader %}<button class="create-btn" onclick="openCreateModal()">＋ Создать подгруппу</button>{% endif %}
     <form method="post" action="{% url 'logout' %}" style="display:contents">
       {% csrf_token %}
       <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
@@ -137,12 +137,14 @@
         <div class="group-icon">🔄</div>
         <div class="group-title">{{ g.name }}</div>
         <div class="group-count">{{ gd.count }} позици{{ gd.count|pluralize:"я,и,й" }}</div>
-        <button class="grp-btn" onclick="openEditModal({{ g.pk }}, '{{ g.name|escapejs }}')" title="Переименовать">✏️</button>
+        {% if not is_reader %}<button class="grp-btn" onclick="openEditModal({{ g.pk }}, '{{ g.name|escapejs }}')" title="Переименовать">✏️</button>{% endif %}
         <a href="{% url 'swap_group_export' g.pk %}" class="grp-export-btn" title="Скачать Excel">⬇ Excel</a>
+        {% if not is_reader %}
         <form method="post" action="{% url 'swap_group_delete' g.pk %}" onsubmit="return confirm('Удалить подгруппу «{{ g.name|escapejs }}» со всеми позициями?')" style="display:contents">
           {% csrf_token %}
           <button type="submit" class="grp-btn del" title="Удалить подгруппу">🗑️</button>
         </form>
+        {% endif %}
       </div>
 
       <div class="items-list">
@@ -157,17 +159,19 @@
               Ккал: {{ p.kcal_per_serving|floatformat:0 }} · Б {{ p.protein_per_serving|floatformat:1 }} · Ж {{ p.fat_per_serving|floatformat:1 }} · У {{ p.carbs_per_serving|floatformat:1 }}{% if p.cost %} · <span class="cost">💰 {{ p.cost|floatformat:0 }} ₸</span>{% endif %}
             </div>
           </div>
+          {% if not is_reader %}
           <form method="post" action="{% url 'swap_item_remove' it.item.pk %}" onsubmit="return confirm('Убрать «{{ p.name|escapejs }}» из подгруппы?')" style="display:contents">
             {% csrf_token %}
             <button type="submit" class="si-remove" title="Убрать из подгруппы">✕</button>
           </form>
+          {% endif %}
         </div>
         {% endwith %}
         {% empty %}
         <div class="empty-sub">Пока нет позиций</div>
         {% endfor %}
 
-        <button class="add-item-btn" onclick="openAddItemModal({{ g.pk }}, '{{ g.name|escapejs }}')">＋ Добавить блюдо</button>
+        {% if not is_reader %}<button class="add-item-btn" onclick="openAddItemModal({{ g.pk }}, '{{ g.name|escapejs }}')">＋ Добавить блюдо</button>{% endif %}
       </div>
     </div>
     {% endwith %}
@@ -179,7 +183,7 @@
     <h2>Пока нет подгрупп</h2>
     <p>Создайте первую подгруппу блюд на замену.</p>
     <br>
-    <button class="create-btn" onclick="openCreateModal()" style="margin:0 auto;">＋ Создать подгруппу</button>
+    {% if not is_reader %}<button class="create-btn" onclick="openCreateModal()" style="margin:0 auto;">＋ Создать подгруппу</button>{% endif %}
   </div>
   {% endif %}
 </div>

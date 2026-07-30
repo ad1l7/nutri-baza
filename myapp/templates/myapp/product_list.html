@@ -453,6 +453,7 @@
     </svg>
     Фильтры
   </button>
+  {% if not is_reader %}
   <button type="button" id="iiko-sync-btn" class="iiko-sync-btn" onclick="runIikoSync()">
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <polyline points="23 4 23 10 17 10"/>
@@ -468,6 +469,7 @@
               white-space:nowrap;cursor:default;">
     — / 5
   </div>
+  {% endif %}
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
   <button type="button" class="export-btn" onclick="exportCatalog()" title="Скачать каталог в Excel (с учётом фильтров)">
     ⬇ Excel
@@ -916,6 +918,7 @@ function getCsrfToken() {
     .find(c => c.startsWith('csrftoken='))
     ?.split('=')[1] || '';
 }
+const IS_READER = {{ is_reader|yesno:"true,false" }};
 const PD = {
   {% for p in products %}
   {{ p.pk }}: {
@@ -986,6 +989,9 @@ function showDetail(pk) {
       </div>
       <div class="meta-card">
         <div class="meta-label">Цена продажи с ФЗ</div>
+        ${IS_READER ? `
+        <div class="meta-val cost-val">${v(d.sale) !== '—' ? v(d.sale) + ' ₸' : '—'}</div>
+        ` : `
         <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">
           <input id="sale-input" type="number" min="0" step="1" value="${d.sale || ''}"
                  placeholder="—" onkeydown="if(event.key==='Enter')saveSalePrice(${pk})"
@@ -994,6 +1000,7 @@ function showDetail(pk) {
                   style="border:none;background:var(--green-mid);color:#fff;border-radius:7px;width:30px;height:30px;cursor:pointer;font-size:14px;flex-shrink:0;">💾</button>
         </div>
         <div id="sale-msg" style="font-size:11px;margin-top:4px;min-height:14px;"></div>
+        `}
       </div>
     </div>
 

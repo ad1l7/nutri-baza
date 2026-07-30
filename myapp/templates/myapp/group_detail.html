@@ -204,7 +204,7 @@
     <div class="rb-head">
       <div class="rb-badge">⚡ {{ r.kcal_category }} ккал</div>
       <div class="rb-name">{{ r.name }}</div>
-      <a href="{% url edit_url_name|default:'ration_edit' r.pk %}" class="rb-edit" title="Редактировать">✏️</a>
+      {% if not is_reader %}<a href="{% url edit_url_name|default:'ration_edit' r.pk %}" class="rb-edit" title="Редактировать">✏️</a>{% endif %}
     </div>
 
     <div class="rb-nutr">
