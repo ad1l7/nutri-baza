@@ -14,6 +14,12 @@ urlpatterns = [
     path("calories/<int:pk>/edit/", views.calorie_edit, name="calorie_edit"),
     path("calories/<int:pk>/delete/", views.calorie_delete, name="calorie_delete"),
 
+    # Материалы (упаковка и прочее — уходят в конец заявочного листа)
+    path("materials/", views.material_list, name="material_list"),
+    path("materials/create/", views.material_create, name="material_create"),
+    path("materials/<int:pk>/edit/", views.material_edit, name="material_edit"),
+    path("materials/<int:pk>/delete/", views.material_delete, name="material_delete"),
+
     # Рационы Claude (отдельная система групп/рационов + сборка Claude)
     path("claude/", views.claude_group_list, name="claude_rations"),
     path("claude/order-sheet/", views.claude_order_sheet, name="claude_order_sheet"),

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Материалы</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
+  .logo-text em{color:var(--green);font-style:normal;}
+  .nav-tabs{display:flex;gap:4px;margin-left:12px;flex-shrink:0;}
+  .nav-tab{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;color:var(--muted);border:1.5px solid var(--border);transition:all .18s;white-space:nowrap;}
+  .nav-tab:hover{background:var(--light);color:var(--text-mid);}
+  .nav-tab.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .create-btn{background:var(--green);color:#fff;border:none;border-radius:10px;padding:10px 18px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;box-shadow:0 2px 8px rgba(90,170,60,.3);}
+  .create-btn:hover{background:var(--green-mid);}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;}
+  .logout-btn:hover{border-color:var(--danger);color:var(--danger);background:#fff8f7;}
+
+  .main{max-width:900px;margin:0 auto;padding:32px 22px;}
+  .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
+  .page-sub{font-size:14px;color:var(--muted);margin-bottom:28px;}
+
+  .tbl-wrap{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
+  table{width:100%;border-collapse:collapse;}
+  thead th{background:var(--green-dark);color:#fff;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:12px 16px;text-align:left;}
+  thead th.right{text-align:right;}
+  tbody td{padding:12px 16px;border-top:1.5px solid var(--border-soft);font-size:13.5px;color:var(--text);}
+  tbody tr:hover{background:var(--off-white);}
+  .td-art{font-weight:800;color:var(--text-mid);font-variant-numeric:tabular-nums;width:120px;}
+  .td-art .none{color:var(--muted);font-weight:600;}
+  .td-name{font-weight:600;}
+  .td-unit{width:150px;color:var(--text-mid);font-weight:700;}
+  .td-act{width:90px;text-align:right;white-space:nowrap;}
+  .act-btn{background:transparent;border:1.5px solid var(--border);border-radius:8px;width:30px;height:30px;cursor:pointer;font-size:12px;transition:all .15s;}
+  .act-btn:hover{border-color:var(--green);background:var(--light);}
+  .act-btn.del:hover{border-color:var(--danger);background:rgba(214,75,42,.06);}
+
+  .empty-state{text-align:center;padding:70px 20px;color:var(--muted);}
+  .empty-state .icon{font-size:48px;margin-bottom:14px;}
+  .empty-state h2{font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px;}
+
+  .note{margin-top:16px;font-size:12px;color:var(--muted);line-height:1.5;}
+
+  .mo{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:200;backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:20px;}
+  .mo.open{display:flex;}
+  .mbox{background:var(--white);border-radius:20px;width:100%;max-width:460px;box-shadow:var(--shadow-md);overflow:hidden;}
+  .mhead{background:var(--green-dark);padding:18px 22px 14px;position:relative;}
+  .mht{font-size:17px;font-weight:800;color:#fff;}
+  .mhs{font-size:12px;color:rgba(255,255,255,.6);margin-top:3px;}
+  .mcl{position:absolute;top:14px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:14px;}
+  .mbody{padding:20px 22px;}
+  .ff{margin-bottom:14px;}
+  .fl{display:block;font-size:12px;font-weight:700;color:var(--text-mid);margin-bottom:6px;}
+  .fi{width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:10px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;transition:border .15s;}
+  .fi:focus{border-color:var(--green);}
+  .fhint{font-size:11px;color:var(--muted);margin-top:5px;font-weight:600;}
+  .fsub{width:100%;background:var(--green);color:#fff;border:none;border-radius:10px;padding:13px;font-family:var(--font);font-size:14px;font-weight:800;cursor:pointer;transition:background .2s;}
+  .fsub:hover{background:var(--green-mid);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="{% url 'product_list' %}" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
+    <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
+    <a href="{% url 'material_list' %}" class="nav-tab active">🧰 Материалы</a>
+    {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
+  </nav>
+  <div class="topbar-right">
+    {% if not is_reader %}
+    <button class="create-btn" onclick="openCreate()">＋ Добавить материал</button>
+    {% endif %}
+    <form method="post" action="{% url 'logout' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
+    </form>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">🧰 Материалы</div>
+  <div class="page-sub">Упаковка, вода и прочее, что не является блюдом. Этот список целиком уходит в конец каждого заявочного листа.</div>
+
+  {% if materials %}
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Артикул</th>
+          <th>Наименование</th>
+          <th>Кратность заказа</th>
+          {% if not is_reader %}<th class="right">Действия</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in materials %}
+        <tr>
+          <td class="td-art">{% if m.article %}{{ m.article }}{% else %}<span class="none">—</span>{% endif %}</td>
+          <td class="td-name">{{ m.name }}</td>
+          <td class="td-unit">{{ m.unit }}</td>
+          {% if not is_reader %}
+          <td class="td-act">
+            <button class="act-btn" title="Изменить"
+              onclick="openEdit({{ m.pk }}, '{{ m.article|escapejs }}', '{{ m.name|escapejs }}', '{{ m.unit|escapejs }}')">✏️</button>
+            <form method="post" action="{% url 'material_delete' m.pk %}" style="display:inline"
+                  onsubmit="return confirm('Удалить «{{ m.name|escapejs }}» из материалов?')">
+              {% csrf_token %}
+              <button type="submit" class="act-btn del" title="Удалить">🗑️</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    Порядок строк здесь — тот же, в котором материалы попадут в заявочный лист.
+    Колонки «Цена прод.» и «ИТОГО» у материалов остаются пустыми.
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🧰</div>
+    <h2>Материалов пока нет</h2>
+    <p>Добавьте упаковку и прочие позиции — они будут добавляться в конец каждого заявочного листа.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% if not is_reader %}
+<!-- МОДАЛ: создать / изменить материал -->
+<div class="mo" id="mat-modal" onclick="if(event.target===this)closeModal()">
+  <div class="mbox">
+    <div class="mhead">
+      <button class="mcl" onclick="closeModal()">✕</button>
+      <div class="mht" id="mat-title">Новый материал</div>
+      <div class="mhs">Артикул, наименование и кратность — как в заявочном листе</div>
+    </div>
+    <form method="post" id="mat-form" action="{% url 'material_create' %}">
+      {% csrf_token %}
+      <div class="mbody">
+        <div class="ff">
+          <label class="fl">Артикул</label>
+          <input class="fi" type="text" name="article" id="mat-article" placeholder="27602">
+          <div class="fhint">Можно оставить пустым — как у «Хладогента»</div>
+        </div>
+        <div class="ff">
+          <label class="fl">Наименование</label>
+          <input class="fi" type="text" name="name" id="mat-name" placeholder="У* Термопакет серый 28*28*20" required>
+        </div>
+        <div class="ff">
+          <label class="fl">Кратность заказа</label>
+          <input class="fi" type="text" name="unit" id="mat-unit" placeholder="1 шт" value="1 шт">
+        </div>
+        <button type="submit" class="fsub" id="mat-submit">Добавить материал</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function openCreate() {
+  document.getElementById('mat-title').textContent  = 'Новый материал';
+  document.getElementById('mat-submit').textContent = 'Добавить материал';
+  document.getElementById('mat-form').action = "{% url 'material_create' %}";
+  document.getElementById('mat-article').value = '';
+  document.getElementById('mat-name').value    = '';
+  document.getElementById('mat-unit').value    = '1 шт';
+  document.getElementById('mat-modal').classList.add('open');
+}
+
+function openEdit(pk, article, name, unit) {
+  document.getElementById('mat-title').textContent  = 'Изменить материал';
+  document.getElementById('mat-submit').textContent = 'Сохранить';
+  document.getElementById('mat-form').action = '/materials/' + pk + '/edit/';
+  document.getElementById('mat-article').value = article;
+  document.getElementById('mat-name').value    = name;
+  document.getElementById('mat-unit').value    = unit;
+  document.getElementById('mat-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('mat-modal').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+</script>
+
+</body>
+</html>

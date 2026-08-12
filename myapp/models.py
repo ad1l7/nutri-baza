@@ -123,6 +123,26 @@ class Product(models.Model):
         return pct is not None and pct < self.MARKUP_MIN_PCT
 
 
+# ── Материалы (упаковка и прочее для заявочного листа) ───────────────────────
+
+class Material(models.Model):
+    """Позиция, которая не является блюдом: упаковка, вода, хладагент.
+    В каталоге таких артикулов нет — они ведутся отдельно и попадают
+    в конец каждого заявочного листа."""
+    article = models.CharField(max_length=100, blank=True, default="", verbose_name="Артикул")
+    name    = models.CharField(max_length=300, verbose_name="Наименование")
+    unit    = models.CharField(max_length=50, default="1 шт", verbose_name="Кратность заказа")
+    order   = models.PositiveIntegerField(default=0, verbose_name="Порядок")
+
+    class Meta:
+        verbose_name = "Материал"
+        verbose_name_plural = "Материалы"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
 # ── Лог синхронизаций iiko ────────────────────────────────────────────────────
 
 class IikoSyncLog(models.Model):

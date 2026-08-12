@@ -7,12 +7,20 @@ from .models import (
     IikoCategoryMap,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
+    Material,
 )
 
 
 @admin.register(Allergen)
 class AllergenAdmin(admin.ModelAdmin):
     search_fields = ["name"]
+
+
+@admin.register(Material)
+class MaterialAdmin(admin.ModelAdmin):
+    list_display = ["name", "article", "unit", "order"]
+    list_editable = ["article", "unit", "order"]
+    search_fields = ["name", "article"]
 
 
 @admin.register(MealCategory)

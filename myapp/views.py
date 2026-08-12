@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from .models import (
     Product, Allergen, MealCategory, MealTime,
-    CalorieCategory, CalorieCategoryMeal,
+    CalorieCategory, CalorieCategoryMeal, Material,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, RATION_SLOT_TYPES,
@@ -1330,19 +1330,53 @@ def _export_ration_group_xlsx(group):
     return response
 
 
-# ── Заявочный лист ────────────────────────────────────────────────────────────
+# ── Материалы ─────────────────────────────────────────────────────────────────
 
-# Материалы идут в конце каждого листа неизменным блоком — в каталоге их нет,
-# поэтому список зашит здесь. Взят один в один из ручного заявочного листа.
-ORDER_SHEET_MATERIALS = [
-    ("27602", "У* Термопакет серый 28*28*20",              "1 шт"),
-    ("27605", "У* Термопакет оранжевый 30*30*20",          "1 шт"),
-    ("27603", "У* Термопакет зеленый 28*28*20",            "1 шт"),
-    ("27604", "У* Термопакет красный 30*30*20",            "1 шт"),
-    ("99727", "У* Набор одноразовый (вилка,ложка,салфетка)", "1 шт"),
-    ("31880", "С* Вода Тассай без газа 777 мл",            "1 шт"),
-    ("",      "Хладогент",                                  "1 шт"),
-]
+def material_list(request):
+    """Вкладка «Материалы»: упаковка и прочее, что уходит в конец заявочного листа."""
+    return render(request, "myapp/material_list.html", {
+        "materials": Material.objects.all(),
+    })
+
+
+def _parse_material_form(request):
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return None
+    return {
+        "article": (request.POST.get("article") or "").strip(),
+        "name":    name,
+        "unit":    (request.POST.get("unit") or "").strip() or "1 шт",
+    }
+
+
+def material_create(request):
+    if request.method == "POST":
+        fields = _parse_material_form(request)
+        if fields:
+            Material.objects.create(order=Material.objects.count(), **fields)
+    return redirect("material_list")
+
+
+def material_edit(request, pk):
+    material = get_object_or_404(Material, pk=pk)
+    if request.method == "POST":
+        fields = _parse_material_form(request)
+        if fields:
+            for name, value in fields.items():
+                setattr(material, name, value)
+            material.save()
+    return redirect("material_list")
+
+
+def material_delete(request, pk):
+    material = get_object_or_404(Material, pk=pk)
+    if request.method == "POST":
+        material.delete()
+    return redirect("material_list")
+
+
+# ── Заявочный лист ────────────────────────────────────────────────────────────
 
 # Шапка — первые 9 строк ручного файла, повторены дословно
 ORDER_SHEET_HEADER = [
@@ -1351,11 +1385,13 @@ ORDER_SHEET_HEADER = [
 ORDER_SHEET_TITLE = 'Заявочный лист "Фуд завод"'
 
 
-def _build_order_sheet_xlsx(products):
-    """Заявочный лист: плоский список блюд без подгрупп + блок материалов.
-    Оформление повторяет ручной файл — те же 9 строк шапки, рамки, ширины."""
+def _build_order_sheet_xlsx(products, with_price=False):
+    """Заявочный лист: плоский список блюд, следом — материалы, без заголовков
+    секций. Оформление повторяет ручной файл: те же 9 строк шапки, рамки,
+    ширины. with_price добавляет «Цена прод.» после «Кратность заказа»."""
     import openpyxl
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
     from django.http import HttpResponse
     from urllib.parse import quote
 
@@ -1367,26 +1403,48 @@ def _build_order_sheet_xlsx(products):
     border    = Border(left=thin, right=thin, top=thin, bottom=thin)
     calibri   = Font(name="Calibri", size=12)
     head_font = Font(name="Calibri", size=12, bold=True)
-    sect_font = Font(name="Times New Roman", size=12, bold=True)
     # Цвета с альфой (FF…) — как в исходном файле, иначе openpyxl пишет 00…
     grey_head = PatternFill("solid", fgColor="FFD9D9D9")   # строка «Артикул | Наименование…»
     grey_sep  = PatternFill("solid", fgColor="FFA6A6A6")   # разделитель под ней
-    blue_sect = PatternFill("solid", fgColor="FF8EA9DB")   # заголовок «Материалы»
     center    = Alignment(horizontal="center")
 
+    headers = ["Артикул", "Наименование продукта", "Кратность заказа"]
+    widths  = [19.29, 81.29, 23.57]
+    if with_price:
+        headers.append("Цена прод.")
+        widths.append(15.0)
+    headers.append("ИТОГО")
+    widths.append(17.0)
+    ncols = len(headers)
+    PRICE_COL = 4 if with_price else None
+
     def bordered_row(row, fill=None, font=None):
-        for col in range(1, 5):
+        for col in range(1, ncols + 1):
             c = ws.cell(row=row, column=col)
             c.border = border
             if fill: c.fill = fill
             if font: c.font = font
+
+    def item_row(row, article, name, unit, price=None):
+        ws.cell(row=row, column=1, value=article or "")
+        ws.cell(row=row, column=2, value=name)
+        ws.cell(row=row, column=3, value=unit)
+        if PRICE_COL:
+            ws.cell(row=row, column=PRICE_COL, value=price)
+        bordered_row(row, font=calibri)
+        ws.cell(row=row, column=1).number_format = "@"   # артикул как текст, чтобы не съел нули
+        ws.cell(row=row, column=1).alignment = center
+        ws.cell(row=row, column=3).alignment = center
+        if PRICE_COL:
+            ws.cell(row=row, column=PRICE_COL).alignment = center
+        ws.row_dimensions[row].height = 18
 
     # ── Строки 1–9: шапка ──
     ws.cell(row=1, column=2, value=ORDER_SHEET_TITLE).font = Font(name="Calibri", size=9)
     for i, label in enumerate(ORDER_SHEET_HEADER, start=2):
         ws.cell(row=i, column=1, value=label).font = Font(name="Calibri", size=9)
 
-    for col, title in enumerate(["Артикул", "Наименование продукта", "Кратность заказа", "ИТОГО"], start=1):
+    for col, title in enumerate(headers, start=1):
         c = ws.cell(row=8, column=col, value=title)
         c.font = head_font
         c.fill = grey_head
@@ -1400,38 +1458,22 @@ def _build_order_sheet_xlsx(products):
     ws.row_dimensions[8].height = 18
     ws.row_dimensions[9].height = 18
 
-    # ── Список блюд ──
+    # ── Блюда, следом материалы — одним списком, без заголовков секций ──
     row = 10
     for p in products:
-        ws.cell(row=row, column=1, value=p.article or "")
-        ws.cell(row=row, column=2, value=p.name)
-        ws.cell(row=row, column=3, value=f"1 {p.packing}" if p.packing else "1 порц")
-        bordered_row(row, font=calibri)
-        ws.cell(row=row, column=1).number_format = "@"   # артикул как текст, чтобы не съел нули
-        ws.cell(row=row, column=1).alignment = center
-        ws.cell(row=row, column=3).alignment = center
-        ws.row_dimensions[row].height = 18
+        item_row(
+            row, p.article, p.name,
+            f"1 {p.packing}" if p.packing else "1 порц",
+            float(p.sale_price) if p.sale_price is not None else None,
+        )
         row += 1
 
-    # ── Материалы: всегда в конце, неизменным блоком ──
-    ws.cell(row=row, column=1, value="Материалы")
-    bordered_row(row, fill=blue_sect, font=sect_font)
-    ws.row_dimensions[row].height = 18
-    row += 1
-
-    for article, name, unit in ORDER_SHEET_MATERIALS:
-        ws.cell(row=row, column=1, value=article)
-        ws.cell(row=row, column=2, value=name)
-        ws.cell(row=row, column=3, value=unit)
-        bordered_row(row, font=calibri)
-        ws.cell(row=row, column=1).number_format = "@"
-        ws.cell(row=row, column=1).alignment = center
-        ws.cell(row=row, column=3).alignment = center
-        ws.row_dimensions[row].height = 18
+    for m in Material.objects.all():
+        item_row(row, m.article, m.name, m.unit)
         row += 1
 
-    for letter, width in (("A", 19.29), ("B", 81.29), ("C", 23.57), ("D", 17.0)):
-        ws.column_dimensions[letter].width = width
+    for index, width in enumerate(widths):
+        ws.column_dimensions[get_column_letter(index + 1)].width = width
 
     filename = f"Заявочный лист ПП {timezone.localdate().strftime('%d.%m.%Y')}.xlsx"
     response = HttpResponse(
@@ -1466,7 +1508,7 @@ def claude_order_sheet(request):
         Product.objects.filter(pk__in=product_ids),
         key=lambda p: (p.name or "").strip().lower(),
     )
-    return _build_order_sheet_xlsx(products)
+    return _build_order_sheet_xlsx(products, with_price=bool(request.GET.get("price")))
 
 
 def claude_group_export(request, group_pk):

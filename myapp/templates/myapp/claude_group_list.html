@@ -150,6 +150,10 @@
   .sheet-btn:hover{background:var(--light);border-color:var(--green);}
   .mbox.wide{max-width:620px;}
   .sheet-body{padding:0;display:block;}
+  .sheet-opt{display:flex;align-items:flex-start;gap:10px;padding:13px 22px;border-bottom:1.5px solid var(--border-soft);cursor:pointer;}
+  .sheet-opt:hover{background:var(--off-white);}
+  .sheet-opt-name{display:block;font-size:13px;font-weight:700;color:var(--text);}
+  .sheet-opt-hint{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
   .sheet-toolbar{display:flex;align-items:center;gap:10px;padding:13px 22px;border-bottom:1.5px solid var(--border-soft);background:var(--off-white);}
   .sheet-toolbar .sel-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);}
   .link-btn{background:none;border:none;padding:0;color:var(--green-mid);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;}
@@ -195,6 +199,7 @@
     <a href="/" class="nav-tab">📦 Каталог</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
+    <a href="{% url 'material_list' %}" class="nav-tab">🧰 Материалы</a>
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
@@ -345,6 +350,14 @@
     </div>
     <form method="get" action="{% url 'claude_order_sheet' %}" id="sheet-form">
       <div class="mbody sheet-body">
+
+        <label class="sheet-opt">
+          <input type="checkbox" class="scb" name="price" value="1">
+          <span>
+            <span class="sheet-opt-name">Добавить колонку с ценой</span>
+            <span class="sheet-opt-hint">«Цена прод.» встанет после «Кратность заказа»</span>
+          </span>
+        </label>
 
         <div class="sheet-toolbar">
           <button type="button" class="link-btn" onclick="sheetSelectAll(true)">Выбрать всё</button>
@@ -520,11 +533,10 @@ function sheetToggleGroup(cb) {
   sheetSync();
 }
 
+// Галочку «с ценой» не трогаем — это настройка выгрузки, а не выбор данных
 function sheetSelectAll(on) {
-  document.querySelectorAll('#sheet-form .scb').forEach(cb => {
-    cb.checked = on;
-    cb.indeterminate = false;
-  });
+  document.querySelectorAll('#sheet-form .ration-cb, #sheet-form .swap-cb, #sheet-form .grp-cb')
+    .forEach(cb => { cb.checked = on; cb.indeterminate = false; });
   sheetSync();
 }
 
