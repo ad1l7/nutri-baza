@@ -146,7 +146,7 @@
   .tmpl-slot-pill{display:inline-block;background:var(--white);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--text-mid);margin:2px;}
 
   /* Заявочный лист */
-  .sheet-btn{background:var(--white);color:var(--green-dark);border:1.5px solid var(--green-light);border-radius:10px;padding:9px 15px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;white-space:nowrap;}
+  .sheet-btn{display:inline-flex;align-items:center;background:var(--white);color:var(--green-dark);border:1.5px solid var(--green-light);border-radius:10px;padding:9px 15px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;white-space:nowrap;text-decoration:none;}
   .sheet-btn:hover{background:var(--light);border-color:var(--green);}
   .mbox.wide{max-width:620px;}
   .sheet-body{padding:0;display:block;}
@@ -199,10 +199,12 @@
     <a href="/" class="nav-tab">📦 Каталог</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
-    <a href="{% url 'material_list' %}" class="nav-tab">🧰 Материалы</a>
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
+    <a href="{% url 'material_list' %}" class="sheet-btn" title="Упаковка и прочее — уходит в конец заявочного листа">
+      🧰 Материалы
+    </a>
     <button class="sheet-btn" onclick="openSheetModal()" title="Собрать заявочный лист по выбранным рационам">
       📋 Заявочный лист
     </button>

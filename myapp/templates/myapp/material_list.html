@@ -30,6 +30,8 @@
   .create-btn:hover{background:var(--green-mid);}
   .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;}
   .logout-btn:hover{border-color:var(--danger);color:var(--danger);background:#fff8f7;}
+  .back-btn{display:inline-flex;align-items:center;background:var(--white);color:var(--green-dark);border:1.5px solid var(--green-light);border-radius:10px;padding:9px 15px;font-size:13px;font-weight:700;text-decoration:none;transition:all .18s;white-space:nowrap;}
+  .back-btn:hover{background:var(--light);border-color:var(--green);}
 
   .main{max-width:900px;margin:0 auto;padding:32px 22px;}
   .page-title{font-size:24px;font-weight:800;color:var(--text);margin-bottom:6px;}
@@ -80,11 +82,11 @@
   <nav class="nav-tabs">
     <a href="{% url 'product_list' %}" class="nav-tab">📦 Каталог</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
-    <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
-    <a href="{% url 'material_list' %}" class="nav-tab active">🧰 Материалы</a>
+    <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
+    <a href="{% url 'claude_rations' %}" class="back-btn">← Рационы Claude</a>
     {% if not is_reader %}
     <button class="create-btn" onclick="openCreate()">＋ Добавить материал</button>
     {% endif %}
