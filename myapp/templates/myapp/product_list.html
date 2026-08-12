@@ -516,15 +516,22 @@
       <div class="filter-title">Статус</div>
       <div class="cat-list">
         <label class="cat-item {% if filters.unused %}checked{% endif %}">
-          <input type="checkbox" name="unused" value="1"
+          <input type="checkbox" name="unused" value="1" id="f-unused"
             {% if filters.unused %}checked{% endif %}
-            onchange="toggleCat(this); submitForm()">
+            onchange="toggleUsage(this, 'f-used')">
           <span class="cat-cb"></span>
           <span class="cat-name">Только неиспользуемые</span>
         </label>
+        <label class="cat-item {% if filters.used %}checked{% endif %}">
+          <input type="checkbox" name="used" value="1" id="f-used"
+            {% if filters.used %}checked{% endif %}
+            onchange="toggleUsage(this, 'f-unused')">
+          <span class="cat-cb"></span>
+          <span class="cat-name">Только используемые</span>
+        </label>
       </div>
       <div style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.4;">
-        Блюда, которых нет ни в одном рационе и ни в одной подгруппе на замену
+        Используемое блюдо — стоит в рационе Claude или в подгруппе на замену
       </div>
     </div>
 
@@ -664,8 +671,10 @@
   <main class="main">
 
     {% with f=filters %}
-    {% if f.search or selected_categories or selected_allergens or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing %}
+    {% if f.search or selected_categories or selected_allergens or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing or f.unused or f.used %}
     <div class="chips-row">
+      {% if f.unused %}<div class="chip">🚫 Только неиспользуемые</div>{% endif %}
+      {% if f.used %}<div class="chip">✅ Только используемые</div>{% endif %}
       {% if f.search %}<div class="chip">🔍 «{{ f.search }}»</div>{% endif %}
       {% for key in selected_meal_categories %}<div class="chip">🍽️ {{ slot_labels|get_item:key }}</div>{% endfor %}
       {% if f.packing %}<div class="chip">📦 {{ f.packing }}</div>{% endif %}
@@ -1193,6 +1202,17 @@ function switchTab(tab) {
 })();
 
 function toggleCat(inp) { inp.closest('.cat-item').classList.toggle('checked', inp.checked); }
+
+// «Только неиспользуемые» и «Только используемые» исключают друг друга:
+// включение одного снимает второй.
+function toggleUsage(inp, otherId) {
+  toggleCat(inp);
+  if (inp.checked) {
+    const other = document.getElementById(otherId);
+    if (other && other.checked) { other.checked = false; toggleCat(other); }
+  }
+  submitForm();
+}
 
 function sortBy(field) {
   const f = document.getElementById('filter-form');

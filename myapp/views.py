@@ -46,6 +46,7 @@ def get_filtered_products(request):
     carbs_s_max   = request.GET.get("carbs_s_max", "")
     packing       = request.GET.get("packing", "").strip()
     unused        = request.GET.get("unused", "")
+    used          = request.GET.get("used", "")
     sort_by       = request.GET.get("sort", "name")
     sort_dir      = request.GET.get("dir", "asc")
 
@@ -74,9 +75,15 @@ def get_filtered_products(request):
     if carbs_s_min:    products = products.filter(carbs_per_serving__gte=carbs_s_min)
     if carbs_s_max:    products = products.filter(carbs_per_serving__lte=carbs_s_max)
     if packing:        products = products.filter(packing__icontains=packing)
-    # Только неиспользуемые: нет ни в одном рационе и ни в одной подгруппе на замену
-    if unused:
-        products = products.filter(ration_slots__isnull=True, swap_items__isnull=True)
+    # Использование блюда = стоит в рационе Claude или в подгруппе на замену.
+    # Старые рационы (Ration) не считаем — вкладку убрали, данные заморожены.
+    # Фильтры взаимоисключающие: если каким-то образом пришли оба — не фильтруем.
+    if unused and not used:
+        products = products.filter(claude_ration_slots__isnull=True, swap_items__isnull=True)
+    elif used and not unused:
+        products = products.filter(
+            Q(claude_ration_slots__isnull=False) | Q(swap_items__isnull=False)
+        ).distinct()
 
     sort_map = {
         "name": "name", "article": "article", "net_weight": "net_weight", "cost": "cost",
@@ -99,7 +106,8 @@ def get_filtered_products(request):
         "protein_s_min": protein_s_min, "protein_s_max": protein_s_max,
         "fat_s_min": fat_s_min, "fat_s_max": fat_s_max,
         "carbs_s_min": carbs_s_min, "carbs_s_max": carbs_s_max,
-        "packing": packing, "unused": unused, "sort": sort_by, "dir": sort_dir,
+        "packing": packing, "unused": unused, "used": used,
+        "sort": sort_by, "dir": sort_dir,
     }
     return products, filters, selected_meal_categories, selected_allergens
 
