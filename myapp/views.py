@@ -7,7 +7,6 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from .models import (
     Product, Allergen, MealCategory, MealTime,
-    RationGroup, Ration, RationSlot,
     CalorieCategory, CalorieCategoryMeal,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
@@ -377,10 +376,7 @@ def calorie_list(request):
     # Сколько рационов уже используют калораж — показываем при удалении
     usage = {}
     for c in categories:
-        usage[c.pk] = (
-            Ration.objects.filter(kcal_category=c.kcal).count()
-            + ClaudeRation.objects.filter(kcal_category=c.kcal).count()
-        )
+        usage[c.pk] = ClaudeRation.objects.filter(kcal_category=c.kcal).count()
 
     categories_data = [
         {"category": c, "meal_times": c.meal_times(), "usage": usage[c.pk]}
@@ -440,7 +436,6 @@ def calorie_edit(request, pk):
                 # Рационы ссылаются на калораж числом ккал — переносим их следом,
                 # иначе они остались бы без нормы КБЖУ.
                 if old_kcal != category.kcal:
-                    Ration.objects.filter(kcal_category=old_kcal).update(kcal_category=category.kcal)
                     ClaudeRation.objects.filter(kcal_category=old_kcal).update(kcal_category=category.kcal)
     return redirect("calorie_list")
 
@@ -451,340 +446,6 @@ def calorie_delete(request, pk):
     if request.method == "POST":
         category.delete()
     return redirect("calorie_list")
-
-
-# ── Группы рационов ───────────────────────────────────────────────────────────
-
-def ration_group_list(request):
-    groups = RationGroup.objects.prefetch_related("rations__slots__product").all()
-    groups_data = []
-    for g in groups:
-        rations = list(g.rations.all())
-        rations_info = []
-        group_cost = 0
-        for r in rations:
-            slots = list(r.slots.select_related("product", "meal_time").order_by("order", "meal_time__order"))
-# Только слоты с продуктом
-            filled_slots = [s for s in slots if s.product_id]
-            total_kcal = sum(float(s.product.kcal_per_serving or 0) for s in filled_slots)
-            total_cost = sum(float(s.product.cost or 0) for s in filled_slots)
-            group_cost += total_cost
-            rations_info.append({
-                "ration": r,
-                "slots": filled_slots,  # ← передаём только заполненные
-                "total_kcal": round(total_kcal, 1),
-                "total_cost": round(total_cost, 2),
-                "filled_count": len(filled_slots),
-            })
-        groups_data.append({
-            "group": g,
-            "rations_info": rations_info,
-            "count": len(rations),
-            "group_cost": round(group_cost, 2),
-        })
-
-    return render(request, "myapp/ration_group_list.html", {
-        "groups_data": groups_data,
-        "ration_kcal_choices": CalorieCategory.choices(),
-        "slot_icons": SLOT_ICONS,
-        "tmpl_data_json": json.dumps(_calorie_meals_preview(), ensure_ascii=False),
-        "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
-    })
-
-
-def ration_group_create(request):
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        description = request.POST.get("description", "").strip()
-        if name:
-            RationGroup.objects.create(name=name, description=description or None)
-    return redirect("ration_group_list")
-
-
-def ration_group_edit(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        description = request.POST.get("description", "").strip()
-        if name:
-            group.name = name
-            group.description = description or None
-            group.save()
-    return redirect("ration_group_list")
-
-
-def ration_group_delete(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    if request.method == "POST":
-        group.delete()
-    return redirect("ration_group_list")
-
-
-@require_POST
-def ration_reorder(request):
-    """Сохраняет новый порядок рационов и (опц.) перемещение в другую группу.
-    Тело JSON: {ration_id, target_group_id, ordered_ids: [...]}.
-    При перемещении в другую группу проверяет дубли блюд одной калорийности."""
-    try:
-        data = json.loads(request.body or "{}")
-    except (ValueError, TypeError):
-        return JsonResponse({"ok": False, "message": "Некорректные данные"}, status=400)
-
-    ration_id       = data.get("ration_id")
-    target_group_id = data.get("target_group_id")
-    ordered_ids     = data.get("ordered_ids") or []
-
-    ration = get_object_or_404(Ration, pk=ration_id)
-    target_group = get_object_or_404(RationGroup, pk=target_group_id)
-
-    # Перемещение в ДРУГУЮ группу — проверяем конфликт по блюдам той же калорийности
-    if ration.group_id != target_group.pk:
-        moved_product_ids = set(
-            RationSlot.objects.filter(ration=ration, product__isnull=False)
-            .values_list("product_id", flat=True)
-        )
-        if moved_product_ids:
-            conflicts = (
-                RationSlot.objects.filter(
-                    ration__group_id=target_group.pk,
-                    ration__kcal_category=ration.kcal_category,
-                    product_id__in=moved_product_ids,
-                )
-                .exclude(ration=ration)
-                .select_related("product", "ration")
-            )
-            conflict_names = sorted({
-                f"{c.product.name} (в «{c.ration.name}»)"
-                for c in conflicts if c.product_id
-            })
-            if conflict_names:
-                return JsonResponse({
-                    "ok": False,
-                    "conflict": True,
-                    "message": (
-                        f"Нельзя переместить: в группе «{target_group.name}» "
-                        f"уже есть рацион {ration.kcal_category} ккал с теми же блюдами:\n"
-                        + "\n".join("• " + n for n in conflict_names)
-                    ),
-                }, status=409)
-
-        ration.group = target_group
-        ration.save(update_fields=["group"])
-
-    # Обновляем порядок всех рационов целевой группы
-    for index, rid in enumerate(ordered_ids):
-        Ration.objects.filter(pk=rid, group_id=target_group.pk).update(order=index)
-
-    return JsonResponse({"ok": True})
-
-
-# ── Рационы ───────────────────────────────────────────────────────────────────
-
-def ration_list(request, group_pk):
-    return redirect("ration_group_list")
-
-
-def ration_create(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        kcal_category = request.POST.get("kcal_category", "")
-        notes = request.POST.get("notes", "").strip()
-        if name and kcal_category:
-            ration = Ration.objects.create(
-                group=group, name=name,
-                kcal_category=int(kcal_category),
-                notes=notes or None,
-            )
-            # Автоматически создаём слоты по приёмам пищи калоража
-            _seed_slots_from_calorie_category(ration, int(kcal_category), RationSlot)
-            return redirect("ration_edit", pk=ration.pk)
-    return redirect("ration_group_list")
-
-
-def ration_edit(request, pk):
-    ration = get_object_or_404(Ration, pk=pk)
-
-    if request.method == "POST":
-        action = request.POST.get("action", "")
-
-        if action == "update_meta":
-            ration.name = request.POST.get("name", ration.name).strip()
-            ration.kcal_category = int(request.POST.get("kcal_category", ration.kcal_category))
-            ration.notes = request.POST.get("notes", "").strip() or None
-            ration.save()
-
-        elif action == "add_slot":
-            meal_time_id = request.POST.get("meal_time_id")
-            if meal_time_id:
-                last_order = ration.slots.count()
-                RationSlot.objects.create(
-                    ration=ration,
-                    meal_time_id=meal_time_id,
-                    order=last_order,
-                )
-
-        elif action == "add_slot_with_category":
-            meal_time_id = request.POST.get("meal_time_id")
-            slot_type    = request.POST.get("slot_type") or None
-            if meal_time_id:
-                last_order = ration.slots.count()
-                RationSlot.objects.create(
-                    ration=ration,
-                    meal_time_id=meal_time_id,
-                    slot_type=slot_type,
-                    order=last_order,
-                )
-
-        elif action == "update_slot_category":
-            # Установить категорию блюда для слота
-            slot_id = request.POST.get("slot_id")
-            slot_type = request.POST.get("slot_type") or None
-            try:
-                slot = RationSlot.objects.get(pk=slot_id, ration=ration)
-                slot.slot_type = slot_type
-                slot.product = None  # сбрасываем блюдо при смене категории
-                slot.save()
-            except RationSlot.DoesNotExist:
-                pass
-
-        elif action == "update_slot":
-            # Установить блюдо для слота
-            slot_id = request.POST.get("slot_id")
-            product_id = request.POST.get("product_id") or None
-            try:
-                slot = RationSlot.objects.get(pk=slot_id, ration=ration)
-                slot.product_id = product_id
-                slot.save()
-            except RationSlot.DoesNotExist:
-                pass
-
-        elif action == "delete_slot":
-            slot_id = request.POST.get("slot_id")
-            RationSlot.objects.filter(pk=slot_id, ration=ration).delete()
-
-        return redirect("ration_edit", pk=pk)
-
-    # GET
-    slots = list(
-        ration.slots
-        .select_related("product", "meal_time")
-        .order_by("order", "meal_time__order")
-    )
-
-    # Группируем слоты по приёму пищи
-    meal_time_groups = {}  # {meal_time_id: {meal_time, slots: []}}
-    total_kcal = total_protein = total_fat = total_carbs = total_cost = 0
-
-    for slot in slots:
-        mt_id = slot.meal_time_id
-        if mt_id not in meal_time_groups:
-            meal_time_groups[mt_id] = {
-                "meal_time": slot.meal_time,
-                "slots": [],
-            }
-        p = slot.product
-        kcal    = float(p.kcal_per_serving or 0) if p else 0
-        protein = float(p.protein_per_serving or 0) if p else 0
-        fat     = float(p.fat_per_serving or 0) if p else 0
-        carbs   = float(p.carbs_per_serving or 0) if p else 0
-        cost    = float(p.cost or 0) if p else 0
-        total_kcal    += kcal
-        total_protein += protein
-        total_fat     += fat
-        total_carbs   += carbs
-        total_cost    += cost
-
-        meal_time_groups[mt_id]["slots"].append({
-            "slot": slot,
-            "label": SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else None,
-            "icon":  SLOT_ICONS.get(slot.slot_type, "🍴") if slot.slot_type else "❓",
-            "color": SLOT_COLORS.get(slot.slot_type, "green") if slot.slot_type else "green",
-            "kcal":    round(kcal, 1),
-            "protein": round(protein, 1),
-            "fat":     round(fat, 1),
-            "carbs":   round(carbs, 1),
-        })
-
-    # Занятые продукты в других рационах группы той же калорийности:
-    # блюдо может повторяться в 1200 и 1500, но не в двух рационах по 1200
-    occupied_ids = set()
-    if ration.group_id:
-        occupied_ids = set(
-            RationSlot.objects.filter(
-                ration__group_id=ration.group_id,
-                ration__kcal_category=ration.kcal_category,
-                product__isnull=False,
-            ).exclude(ration=ration)
-            .values_list("product_id", flat=True)
-        )
-
-    # Блюда по категориям для пикера (каталог-онли категории тут не нужны)
-    meal_cat_map = {}
-    for key, _ in RATION_SLOT_TYPES:
-        prods = list(
-            Product.objects
-            .filter(meal_categories__key=key)
-            .exclude(pk__in=occupied_ids)
-            .prefetch_related("allergens")
-            .order_by("name")
-        )
-        meal_cat_map[key] = [_product_picker_dict(p) for p in prods]
-
-    # Все приёмы пищи для модала добавления слота
-    all_meal_times = list(MealTime.objects.order_by("order", "name"))
-    all_products = list(
-        Product.objects
-        .prefetch_related("meal_categories", "allergens")
-        .exclude(pk__in=occupied_ids)
-        .order_by("name")
-    )
-    all_products_json = [_product_picker_dict(p, with_category=True) for p in all_products]
-    all_allergens = list(Allergen.objects.order_by("name"))
-
-    # Нормы КБЖУ для категории + флаги выхода за диапазон
-    norm = CalorieCategory.norm_for(ration.kcal_category)
-    norm_flags = {}
-    if norm:
-        def _out(val, lo, hi):
-            return val < lo or val > hi
-        norm_flags = {
-            "kcal":    _out(total_kcal,    norm.kcal_min,    norm.kcal_max),
-            "protein": _out(total_protein, norm.protein_min, norm.protein_max),
-            "fat":     _out(total_fat,     norm.fat_min,     norm.fat_max),
-            "carbs":   _out(total_carbs,   norm.carbs_min,   norm.carbs_max),
-        }
-
-    return render(request, "myapp/ration_edit.html", {
-        "ration": ration,
-        "meal_time_groups": list(meal_time_groups.values()),
-        "total_kcal":    round(total_kcal, 1),
-        "total_protein": round(total_protein, 1),
-        "total_fat":     round(total_fat, 1),
-        "total_carbs":   round(total_carbs, 1),
-        "total_cost":    round(total_cost, 2),
-        "norm":          norm,
-        "norm_flags":    norm_flags,
-        "slot_types":    RATION_SLOT_TYPES,
-        "slot_icons":    SLOT_ICONS,
-        "slot_colors":   SLOT_COLORS,
-        "slot_labels":   SLOT_LABELS,
-        "kcal_categories": CalorieCategory.choices(),
-        "all_meal_times":  all_meal_times,
-        "meal_cat_map_json":  json.dumps(meal_cat_map, ensure_ascii=False),
-        "slot_icons_json":    json.dumps(SLOT_ICONS, ensure_ascii=False),
-        "slot_labels_json":   json.dumps(SLOT_LABELS, ensure_ascii=False),
-        "occupied_count": len(occupied_ids),
-        "all_products_json":  json.dumps(all_products_json, ensure_ascii=False),
-        "all_allergens": all_allergens,
-    })
-
-
-def ration_delete(request, pk):
-    ration = get_object_or_404(Ration, pk=pk)
-    if request.method == "POST":
-        ration.delete()
-    return redirect("ration_group_list")
 
 
 # ── Блюда на замену ───────────────────────────────────────────────────────────
@@ -1679,11 +1340,6 @@ def _export_ration_group_xlsx(group):
     return response
 
 
-def ration_group_export(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    return _export_ration_group_xlsx(group)
-
-
 def claude_group_export(request, group_pk):
     group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
     return _export_ration_group_xlsx(group)
@@ -1768,16 +1424,14 @@ def iiko_sync_status(request):
         "last_sync": last_sync.strftime("%d.%m.%Y %H:%M") if last_sync else None,
         "can_sync":  IikoSyncLog.can_sync(),
     })
-# ── 1. Добавь в views.py ──────────────────────────────────────────────────────
 
-# Замени функцию ration_group_detail в views.py на эту версию
 
-# Замени ration_group_detail в views.py на эту версию
+# ── Просмотр группы ───────────────────────────────────────────────────────────
 
 def _render_group_detail(request, group, back_url_name, back_label, edit_url_name):
-    """Общая страница просмотра группы рационов (обычной и Claude).
+    """Страница просмотра группы рационов.
     back_url_name / back_label / edit_url_name задают ссылки под конкретную
-    вкладку, чтобы шаблон group_detail.html не дублировать."""
+    вкладку."""
     rations = list(
         group.rations
         .prefetch_related(
@@ -1851,15 +1505,6 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
     })
 
 
-def ration_group_detail(request, group_pk):
-    group = get_object_or_404(RationGroup, pk=group_pk)
-    return _render_group_detail(
-        request, group,
-        back_url_name="ration_group_list", back_label="Рационы",
-        edit_url_name="ration_edit",
-    )
-
-
 def claude_group_detail(request, group_pk):
     group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
     return _render_group_detail(
@@ -1867,16 +1512,3 @@ def claude_group_detail(request, group_pk):
         back_url_name="claude_rations", back_label="Рационы Claude",
         edit_url_name="claude_ration_edit",
     )
-
-
-# ── 3. В ration_group_list.html найди шапку группы и добавь кнопку 👁️ ────────
-# Найди строку с .grp-del-btn и ПЕРЕД ней добавь:
-#
-#   <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn" title="Просмотр группы"
-#      style="text-decoration:none;">👁️</a>
-#
-# Итого шапка будет выглядеть так:
-#
-#   <div class="group-count">{{ gd.count }} рацион...</div>
-#   <a href="{% url 'ration_group_detail' g.pk %}" class="grp-del-btn" title="Просмотр" style="text-decoration:none;">👁️</a>
-#   <button class="grp-del-btn" onclick="confirmDel('group', ...)" title="Удалить">🗑️</button>

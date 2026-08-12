@@ -166,7 +166,7 @@
 <body>
 
 <div class="topbar">
-  <a href="{% url back_url_name|default:'ration_group_list' %}" class="back-btn">← {{ back_label|default:'Рационы' }}</a>
+  <a href="{% url back_url_name|default:'claude_rations' %}" class="back-btn">← {{ back_label|default:'Рационы Claude' }}</a>
   <span class="topbar-title">{{ group.name }}</span>
   <span class="topbar-meta">{{ rations_data|length }} рацион{{ rations_data|length|pluralize:",,ов" }}</span>
   <form method="post" action="{% url 'logout' %}" style="display:contents">
@@ -204,7 +204,7 @@
     <div class="rb-head">
       <div class="rb-badge">⚡ {{ r.kcal_category }} ккал</div>
       <div class="rb-name">{{ r.name }}</div>
-      {% if not is_reader %}<a href="{% url edit_url_name|default:'ration_edit' r.pk %}" class="rb-edit" title="Редактировать">✏️</a>{% endif %}
+      {% if not is_reader %}<a href="{% url edit_url_name|default:'claude_ration_edit' r.pk %}" class="rb-edit" title="Редактировать">✏️</a>{% endif %}
     </div>
 
     <div class="rb-nutr">

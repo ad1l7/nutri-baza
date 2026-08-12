@@ -163,7 +163,6 @@
   <span class="logo-text">O-<em>Live</em></span>
   <nav class="nav-tabs">
     <a href="/" class="nav-tab">📦 Каталог</a>
-    <a href="{% url 'ration_group_list' %}" class="nav-tab">🥗 Рационы</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}

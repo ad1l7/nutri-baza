@@ -14,21 +14,6 @@ urlpatterns = [
     path("calories/<int:pk>/edit/", views.calorie_edit, name="calorie_edit"),
     path("calories/<int:pk>/delete/", views.calorie_delete, name="calorie_delete"),
 
-    # Группы рационов
-    path("rations/", views.ration_group_list, name="ration_group_list"),
-    path("rations/group/create/", views.ration_group_create, name="ration_group_create"),
-    path("rations/reorder/", views.ration_reorder, name="ration_reorder"),
-    path("rations/group/<int:group_pk>/edit/", views.ration_group_edit, name="ration_group_edit"),
-    path("rations/group/<int:group_pk>/delete/", views.ration_group_delete, name="ration_group_delete"),
-    path("rations/group/<int:group_pk>/", views.ration_list, name="ration_list"),
-    path("rations/group/<int:group_pk>/create/", views.ration_create, name="ration_create"),
-    path("rations/group/<int:group_pk>/detail/", views.ration_group_detail, name="ration_group_detail"),
-    path("rations/group/<int:group_pk>/export/", views.ration_group_export, name="ration_group_export"),
-
-    # Рационы
-    path("rations/<int:pk>/edit/", views.ration_edit, name="ration_edit"),
-    path("rations/<int:pk>/delete/", views.ration_delete, name="ration_delete"),
-
     # Рационы Claude (отдельная система групп/рационов + сборка Claude)
     path("claude/", views.claude_group_list, name="claude_rations"),
     path("claude/rations/reorder/", views.claude_ration_reorder, name="claude_ration_reorder"),
