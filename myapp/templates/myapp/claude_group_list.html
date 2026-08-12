@@ -145,6 +145,36 @@
   .tmpl-preview-title{font-size:10px;font-weight:700;color:var(--green-mid);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;}
   .tmpl-slot-pill{display:inline-block;background:var(--white);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;color:var(--text-mid);margin:2px;}
 
+  /* Заявочный лист */
+  .sheet-btn{background:var(--white);color:var(--green-dark);border:1.5px solid var(--green-light);border-radius:10px;padding:9px 15px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;transition:all .18s;white-space:nowrap;}
+  .sheet-btn:hover{background:var(--light);border-color:var(--green);}
+  .mbox.wide{max-width:620px;}
+  .sheet-body{padding:0;display:block;}
+  .sheet-toolbar{display:flex;align-items:center;gap:10px;padding:13px 22px;border-bottom:1.5px solid var(--border-soft);background:var(--off-white);}
+  .sheet-toolbar .sel-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);}
+  .link-btn{background:none;border:none;padding:0;color:var(--green-mid);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;}
+  .link-btn:hover{color:var(--green-dark);}
+  .sheet-scroll{max-height:min(58vh,460px);overflow-y:auto;padding:8px 22px 14px;}
+  .sheet-sect{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;margin:14px 0 6px;}
+  .sheet-grp{border:1.5px solid var(--border);border-radius:11px;margin-bottom:7px;overflow:hidden;}
+  .sheet-grp-head{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--off-white);cursor:pointer;}
+  .sheet-grp-head:hover{background:var(--light);}
+  .sheet-grp-name{font-size:13px;font-weight:700;color:var(--text);flex:1;}
+  .sheet-grp-meta{font-size:11px;font-weight:600;color:var(--muted);}
+  .sheet-arrow{font-size:9px;color:var(--muted);transition:transform .18s;}
+  .sheet-grp.closed .sheet-arrow{transform:rotate(-90deg);}
+  .sheet-grp.closed .sheet-items{display:none;}
+  .sheet-items{padding:3px 11px 7px 34px;display:flex;flex-direction:column;}
+  .sheet-item{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:7px;cursor:pointer;}
+  .sheet-item:hover{background:var(--off-white);}
+  .sheet-item-kcal{font-size:10px;font-weight:800;color:var(--green-mid);background:var(--light);border-radius:20px;padding:2px 7px;flex-shrink:0;}
+  .sheet-item-name{font-size:12.5px;color:var(--text-mid);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sheet-item-cnt{margin-left:auto;font-size:11px;color:var(--muted);flex-shrink:0;}
+  .sheet-foot{padding:14px 22px 18px;border-top:1.5px solid var(--border-soft);}
+  .sheet-hint{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.45;}
+  .fsub:disabled{background:var(--border);cursor:not-allowed;}
+  input[type=checkbox].scb{width:16px;height:16px;accent-color:var(--green-mid);cursor:pointer;flex-shrink:0;margin:0;}
+
   .del-modal{display:none;position:fixed;inset:0;background:rgba(30,77,20,.35);z-index:300;backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px;}
   .del-modal.open{display:flex;}
   .del-box{background:var(--white);border-radius:16px;padding:26px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow-md);}
@@ -168,6 +198,9 @@
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
+    <button class="sheet-btn" onclick="openSheetModal()" title="Собрать заявочный лист по выбранным рационам">
+      📋 Заявочный лист
+    </button>
     {% if not is_reader %}
     <button class="create-btn" onclick="openGroupModal()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -302,6 +335,78 @@
   {% endif %}
 </div>
 
+<!-- МОДАЛ: заявочный лист -->
+<div class="mo" id="sheet-modal" onclick="if(event.target===this)closeSheetModal()">
+  <div class="mbox wide">
+    <div class="mhead">
+      <button class="mcl" onclick="closeSheetModal()">✕</button>
+      <div class="mht">📋 Заявочный лист</div>
+      <div class="mhs">Отметьте рационы и группы замен — блюда соберутся в один список</div>
+    </div>
+    <form method="get" action="{% url 'claude_order_sheet' %}" id="sheet-form">
+      <div class="mbody sheet-body">
+
+        <div class="sheet-toolbar">
+          <button type="button" class="link-btn" onclick="sheetSelectAll(true)">Выбрать всё</button>
+          <button type="button" class="link-btn" onclick="sheetSelectAll(false)">Снять всё</button>
+          <span class="sel-count" id="sheet-count">ничего не выбрано</span>
+        </div>
+
+        <div class="sheet-scroll">
+          <div class="sheet-sect">Рационы Claude</div>
+          {% for gd in groups_data %}
+          {% with g=gd.group %}
+          <div class="sheet-grp closed" id="sg-{{ g.pk }}">
+            <label class="sheet-grp-head">
+              <input type="checkbox" class="scb grp-cb" data-group="{{ g.pk }}" onchange="sheetToggleGroup(this)">
+              <span class="sheet-grp-name">{{ g.name }}</span>
+              <span class="sheet-grp-meta">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</span>
+              <span class="sheet-arrow" onclick="event.preventDefault();sheetToggleOpen({{ g.pk }})">▼</span>
+            </label>
+            <div class="sheet-items">
+              {% for ri in gd.rations_info %}
+              <label class="sheet-item">
+                <input type="checkbox" class="scb ration-cb" name="ration" value="{{ ri.ration.pk }}"
+                       data-group="{{ g.pk }}" onchange="sheetSync()">
+                <span class="sheet-item-kcal">{{ ri.ration.kcal_category }}</span>
+                <span class="sheet-item-name">{{ ri.ration.name }}</span>
+                <span class="sheet-item-cnt">{{ ri.filled_count }} блюд</span>
+              </label>
+              {% empty %}
+              <div class="sheet-item-name" style="padding:5px 4px;">В группе пока нет рационов</div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endwith %}
+          {% endfor %}
+
+          <div class="sheet-sect">Блюда на замену</div>
+          {% for sg in swap_groups %}
+          <div class="sheet-grp">
+            <label class="sheet-grp-head">
+              <input type="checkbox" class="scb swap-cb" name="swap_group" value="{{ sg.pk }}" onchange="sheetSync()">
+              <span class="sheet-grp-name">{{ sg.name }}</span>
+              <span class="sheet-grp-meta">{{ sg.items.count }} блюд</span>
+            </label>
+          </div>
+          {% empty %}
+          <div class="sheet-hint">Групп замен пока нет</div>
+          {% endfor %}
+        </div>
+
+        <div class="sheet-foot">
+          <div class="sheet-hint">
+            Блюдо попадёт в лист один раз, даже если стоит в нескольких рационах и в заменах.
+            Подгруппы не выводятся — сплошной список по алфавиту. Материалы добавляются в конец сами.
+          </div>
+          <button type="submit" class="fsub" id="sheet-submit" style="width:100%" disabled>Сформировать лист</button>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- МОДАЛ: создать группу (без даты) -->
 <div class="mo" id="group-modal" onclick="if(event.target===this)closeGroupModal()">
   <div class="mbox">
@@ -400,6 +505,53 @@ const SLOT_LABELS = {{ slot_labels_json|safe }};
 
 function toggleAccordion(pk) {
   document.getElementById('ri-' + pk).classList.toggle('open');
+}
+
+// ── Заявочный лист ────────────────────────────────────────────────────────
+function openSheetModal()  { document.getElementById('sheet-modal').classList.add('open'); sheetSync(); }
+function closeSheetModal() { document.getElementById('sheet-modal').classList.remove('open'); }
+
+function sheetToggleOpen(pk) { document.getElementById('sg-' + pk).classList.toggle('closed'); }
+
+// Галочка на группе — ставит/снимает все её рационы
+function sheetToggleGroup(cb) {
+  document.querySelectorAll(`.ration-cb[data-group="${cb.dataset.group}"]`)
+    .forEach(r => { r.checked = cb.checked; });
+  sheetSync();
+}
+
+function sheetSelectAll(on) {
+  document.querySelectorAll('#sheet-form .scb').forEach(cb => {
+    cb.checked = on;
+    cb.indeterminate = false;
+  });
+  sheetSync();
+}
+
+// Пересчитывает состояние групповых галочек и счётчик выбранного
+function sheetSync() {
+  document.querySelectorAll('#sheet-form .grp-cb').forEach(gcb => {
+    const kids = [...document.querySelectorAll(`.ration-cb[data-group="${gcb.dataset.group}"]`)];
+    const on = kids.filter(k => k.checked).length;
+    gcb.checked = kids.length > 0 && on === kids.length;
+    gcb.indeterminate = on > 0 && on < kids.length;
+  });
+
+  const rations = document.querySelectorAll('#sheet-form .ration-cb:checked').length;
+  const swaps   = document.querySelectorAll('#sheet-form .swap-cb:checked').length;
+  const label   = document.getElementById('sheet-count');
+  const parts   = [];
+  if (rations) parts.push(rations + ' рацион' + plural(rations, '', 'а', 'ов'));
+  if (swaps)   parts.push(swaps + ' групп' + plural(swaps, 'а', 'ы', ''));
+  label.textContent = parts.length ? 'выбрано: ' + parts.join(' + ') : 'ничего не выбрано';
+  document.getElementById('sheet-submit').disabled = !(rations || swaps);
+}
+
+function plural(n, one, few, many) {
+  const n10 = n % 10, n100 = n % 100;
+  if (n10 === 1 && n100 !== 11) return one;
+  if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return few;
+  return many;
 }
 
 function toggleGroup(pk) {

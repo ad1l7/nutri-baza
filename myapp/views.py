@@ -4,6 +4,7 @@ import json
 import logging
 from django.conf import settings
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from .models import (
     Product, Allergen, MealCategory, MealTime,
@@ -859,6 +860,8 @@ def claude_group_list(request):
 
     return render(request, "myapp/claude_group_list.html", {
         "groups_data": groups_data,
+        # для модалки заявочного листа: группы замен выбираются наравне с рационами
+        "swap_groups": SwapGroup.objects.prefetch_related("items").all(),
         "ration_kcal_choices": CalorieCategory.choices(),
         "slot_icons": SLOT_ICONS,
         "tmpl_data_json": json.dumps(_calorie_meals_preview(), ensure_ascii=False),
@@ -1325,6 +1328,145 @@ def _export_ration_group_xlsx(group):
     response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
     return response
+
+
+# ── Заявочный лист ────────────────────────────────────────────────────────────
+
+# Материалы идут в конце каждого листа неизменным блоком — в каталоге их нет,
+# поэтому список зашит здесь. Взят один в один из ручного заявочного листа.
+ORDER_SHEET_MATERIALS = [
+    ("27602", "У* Термопакет серый 28*28*20",              "1 шт"),
+    ("27605", "У* Термопакет оранжевый 30*30*20",          "1 шт"),
+    ("27603", "У* Термопакет зеленый 28*28*20",            "1 шт"),
+    ("27604", "У* Термопакет красный 30*30*20",            "1 шт"),
+    ("99727", "У* Набор одноразовый (вилка,ложка,салфетка)", "1 шт"),
+    ("31880", "С* Вода Тассай без газа 777 мл",            "1 шт"),
+    ("",      "Хладогент",                                  "1 шт"),
+]
+
+# Шапка — первые 9 строк ручного файла, повторены дословно
+ORDER_SHEET_HEADER = [
+    "Информация заказчика", "Дата", "Компания", "Эл.почта", "Конт.тел", "Заполнил (И.Ф.)",
+]
+ORDER_SHEET_TITLE = 'Заявочный лист "Фуд завод"'
+
+
+def _build_order_sheet_xlsx(products):
+    """Заявочный лист: плоский список блюд без подгрупп + блок материалов.
+    Оформление повторяет ручной файл — те же 9 строк шапки, рамки, ширины."""
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Лист1"
+
+    thin      = Side(style="thin", color="000000")
+    border    = Border(left=thin, right=thin, top=thin, bottom=thin)
+    calibri   = Font(name="Calibri", size=12)
+    head_font = Font(name="Calibri", size=12, bold=True)
+    sect_font = Font(name="Times New Roman", size=12, bold=True)
+    # Цвета с альфой (FF…) — как в исходном файле, иначе openpyxl пишет 00…
+    grey_head = PatternFill("solid", fgColor="FFD9D9D9")   # строка «Артикул | Наименование…»
+    grey_sep  = PatternFill("solid", fgColor="FFA6A6A6")   # разделитель под ней
+    blue_sect = PatternFill("solid", fgColor="FF8EA9DB")   # заголовок «Материалы»
+    center    = Alignment(horizontal="center")
+
+    def bordered_row(row, fill=None, font=None):
+        for col in range(1, 5):
+            c = ws.cell(row=row, column=col)
+            c.border = border
+            if fill: c.fill = fill
+            if font: c.font = font
+
+    # ── Строки 1–9: шапка ──
+    ws.cell(row=1, column=2, value=ORDER_SHEET_TITLE).font = Font(name="Calibri", size=9)
+    for i, label in enumerate(ORDER_SHEET_HEADER, start=2):
+        ws.cell(row=i, column=1, value=label).font = Font(name="Calibri", size=9)
+
+    for col, title in enumerate(["Артикул", "Наименование продукта", "Кратность заказа", "ИТОГО"], start=1):
+        c = ws.cell(row=8, column=col, value=title)
+        c.font = head_font
+        c.fill = grey_head
+        c.border = border
+        if col != 2:
+            c.alignment = center
+    bordered_row(9, fill=grey_sep)
+
+    for r in range(1, 8):
+        ws.row_dimensions[r].height = 16.5
+    ws.row_dimensions[8].height = 18
+    ws.row_dimensions[9].height = 18
+
+    # ── Список блюд ──
+    row = 10
+    for p in products:
+        ws.cell(row=row, column=1, value=p.article or "")
+        ws.cell(row=row, column=2, value=p.name)
+        ws.cell(row=row, column=3, value=f"1 {p.packing}" if p.packing else "1 порц")
+        bordered_row(row, font=calibri)
+        ws.cell(row=row, column=1).number_format = "@"   # артикул как текст, чтобы не съел нули
+        ws.cell(row=row, column=1).alignment = center
+        ws.cell(row=row, column=3).alignment = center
+        ws.row_dimensions[row].height = 18
+        row += 1
+
+    # ── Материалы: всегда в конце, неизменным блоком ──
+    ws.cell(row=row, column=1, value="Материалы")
+    bordered_row(row, fill=blue_sect, font=sect_font)
+    ws.row_dimensions[row].height = 18
+    row += 1
+
+    for article, name, unit in ORDER_SHEET_MATERIALS:
+        ws.cell(row=row, column=1, value=article)
+        ws.cell(row=row, column=2, value=name)
+        ws.cell(row=row, column=3, value=unit)
+        bordered_row(row, font=calibri)
+        ws.cell(row=row, column=1).number_format = "@"
+        ws.cell(row=row, column=1).alignment = center
+        ws.cell(row=row, column=3).alignment = center
+        ws.row_dimensions[row].height = 18
+        row += 1
+
+    for letter, width in (("A", 19.29), ("B", 81.29), ("C", 23.57), ("D", 17.0)):
+        ws.column_dimensions[letter].width = width
+
+    filename = f"Заявочный лист ПП {timezone.localdate().strftime('%d.%m.%Y')}.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    wb.save(response)
+    return response
+
+
+def claude_order_sheet(request):
+    """Собирает заявочный лист по отмеченным рационам Claude и группам замен.
+
+    Блюдо попадает в лист один раз, даже если стоит в нескольких рационах и
+    ещё и в заменах. Порядок — по алфавиту, подгруппы не выводятся."""
+    ration_ids = request.GET.getlist("ration")
+    swap_ids   = request.GET.getlist("swap_group")
+    if not ration_ids and not swap_ids:
+        return redirect("claude_rations")
+
+    product_ids = set(
+        ClaudeRationSlot.objects
+        .filter(ration_id__in=ration_ids, product__isnull=False)
+        .values_list("product_id", flat=True)
+    ) | set(
+        SwapItem.objects
+        .filter(swap_group_id__in=swap_ids)
+        .values_list("product_id", flat=True)
+    )
+
+    products = sorted(
+        Product.objects.filter(pk__in=product_ids),
+        key=lambda p: (p.name or "").strip().lower(),
+    )
+    return _build_order_sheet_xlsx(products)
 
 
 def claude_group_export(request, group_pk):

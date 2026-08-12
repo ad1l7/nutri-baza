@@ -16,6 +16,7 @@ urlpatterns = [
 
     # Рационы Claude (отдельная система групп/рационов + сборка Claude)
     path("claude/", views.claude_group_list, name="claude_rations"),
+    path("claude/order-sheet/", views.claude_order_sheet, name="claude_order_sheet"),
     path("claude/rations/reorder/", views.claude_ration_reorder, name="claude_ration_reorder"),
     path("claude/group/create/", views.claude_group_create, name="claude_group_create"),
     path("claude/group/<int:group_pk>/edit/", views.claude_group_edit, name="claude_group_edit"),
