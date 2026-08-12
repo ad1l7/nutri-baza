@@ -276,6 +276,27 @@
   .td-cost   { width: 85px; white-space: nowrap; font-weight: 700; color: var(--text); font-size: 13px; text-align: right; }
   .td-cost-unit { color: var(--muted); font-weight: 400; font-size: 11px; }
 
+  /* Наценка ниже нормы — себестоимость краснеет */
+  .td-cost.cost-low { color: var(--danger); background: rgba(214,75,42,.08); }
+  .td-cost.cost-low .td-cost-unit { color: var(--danger); opacity: .7; }
+  .td-markup.mk-low { color: var(--danger); font-weight: 700; }
+
+  /* Цена продажи — редактируется прямо в таблице */
+  .td-sale { width: 110px; text-align: right; white-space: nowrap; }
+  .sale-inp {
+    width: 100%; max-width: 92px; padding: 4px 6px; border: 1px solid var(--border);
+    border-radius: 6px; font-family: var(--font); font-size: 12.5px; font-weight: 700;
+    color: var(--text); text-align: right; background: #fff; transition: border-color .15s;
+  }
+  .sale-inp:hover  { border-color: var(--green-mid); }
+  .sale-inp:focus  { outline: none; border-color: var(--green-dark); box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
+  .sale-inp.saving { border-color: var(--green-mid); background: #f6fbf2; }
+  .sale-inp.saved  { border-color: var(--green-mid); background: #eaf6e2; }
+  .sale-inp.err    { border-color: var(--danger); background: rgba(214,75,42,.06); }
+  /* Стрелки number-инпута только мешают в узкой ячейке */
+  .sale-inp::-webkit-outer-spin-button, .sale-inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .sale-inp { -moz-appearance: textfield; }
+
   .td-num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-mid); font-weight: 500; }
   .td-num.strong { color: var(--text); font-weight: 600; }
 
@@ -667,8 +688,9 @@
       <table>
         <thead>
           <tr class="thead-groups">
-            <!-- 6 колонок основного: Категория, Наименование, Артикул, Кратность, Масса, Себестоимость -->
-            <th colspan="6" class="g-base">Основная информация</th>
+            <!-- 9 колонок основного: Категория, Наименование, Артикул, Кратность,
+                 Масса, Себестоимость, Цена продажи, Наценка ₸, Наценка % -->
+            <th colspan="9" class="g-base">Основная информация</th>
             <th colspan="5" class="g-100 grp-border">На 100 г</th>
             <th colspan="5" class="g-serv grp-border">На 1 порцию</th>
           </tr>
@@ -692,6 +714,10 @@
             <th class="col-right sortable {% if s == 'cost' %}sort-active{% endif %}" onclick="sortBy('cost')" style="width:85px">
               Себест. <span class="sort-arr">{% if s == 'cost' %}{% if d == 'asc' %}↑{% else %}↓{% endif %}{% else %}↕{% endif %}</span>
             </th>
+            <!-- Цена продажи с ФЗ — вносится прямо в таблице; наценка считается автоматом -->
+            <th class="col-right" style="width:110px">Цена прод.</th>
+            <th class="col-right" style="width:90px">Наценка, ₸</th>
+            <th class="col-right" style="width:85px">Наценка, %</th>
 
             <!-- На 100г -->
             <th class="col-right col-border sortable {% if s == 'protein' %}sort-active{% endif %}" onclick="sortBy('protein')">
@@ -747,9 +773,29 @@
             <td class="td-pack">{{ p.packing|default:"—" }}</td>
             <!-- Масса — без smart_num, чтобы сохранить нули (напр. 500.000) -->
             <td class="td-weight">{% if p.net_weight %}{{ p.net_weight }}{% else %}—{% endif %}</td>
-            <!-- Себестоимость -->
-            <td class="td-cost">
+            <!-- Себестоимость: краснеет, если наценка ниже нормы -->
+            <td class="td-cost {% if p.markup_is_low %}cost-low{% endif %}" id="cost-{{ p.pk }}">
               {% if p.cost %}{{ p.cost|smart_num }} <span class="td-cost-unit">₸</span>{% else %}—{% endif %}
+            </td>
+            <!-- Цена продажи с ФЗ — единственное, что вносится руками -->
+            <td class="td-sale" onclick="event.stopPropagation()">
+              {% if is_reader %}
+                {% if p.sale_price %}{{ p.sale_price|smart_num }} <span class="td-cost-unit">₸</span>{% else %}—{% endif %}
+              {% else %}
+                <input type="number" min="0" step="1" class="sale-inp" id="sale-{{ p.pk }}"
+                       value="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
+                       data-saved="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
+                       placeholder="—"
+                       onchange="saveSaleCell({{ p.pk }})"
+                       onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">
+              {% endif %}
+            </td>
+            <!-- Наценка ₸ и % — считаются автоматически -->
+            <td class="td-num td-markup" id="mk-{{ p.pk }}">
+              {% if p.markup is not None %}{{ p.markup|smart_num }}{% else %}—{% endif %}
+            </td>
+            <td class="td-num td-markup {% if p.markup_is_low %}mk-low{% endif %}" id="mkp-{{ p.pk }}">
+              {% if p.markup_pct is not None %}{{ p.markup_pct|floatformat:'-1' }}%{% else %}—{% endif %}
             </td>
             <!-- На 100г -->
             <td class="td-num strong col-border">{{ p.protein|smart_num }}</td>
@@ -1040,6 +1086,57 @@ function showDetail(pk) {
   document.getElementById('modal').classList.add('open');
 }
 
+// ── Цена продажи прямо в таблице ──────────────────────────────────────────
+// Сохраняем на change/blur, наценку ₸ и % пересчитывает сервер и присылает
+// в ответе — чтобы округление в таблице совпадало с отрисованным при загрузке.
+function saveSaleCell(pk) {
+  const input = document.getElementById('sale-' + pk);
+  if (!input) return;
+  const val = input.value.trim();
+  if (val === input.dataset.saved) return;   // ничего не поменялось
+
+  input.className = 'sale-inp saving';
+  fetch(`/product/${pk}/sale-price/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': getCsrfToken(),
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'sale_price=' + encodeURIComponent(val),
+  })
+    .then(r => r.json().then(d => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok || !d.ok) {
+        input.className = 'sale-inp err';
+        input.title = d.message || 'Не удалось сохранить';
+        return;
+      }
+      input.dataset.saved = val;
+      input.title = '';
+      input.className = 'sale-inp saved';
+      setTimeout(() => { input.className = 'sale-inp'; }, 900);
+      applyMarkup(pk, d);
+      if (PD[pk]) PD[pk].sale = d.sale_price !== null ? String(d.sale_price) : '';
+    })
+    .catch(() => {
+      input.className = 'sale-inp err';
+      input.title = 'Сеть недоступна';
+    });
+}
+
+// Обновляет ячейки «Наценка ₸ / %» и подсветку себестоимости в строке
+function applyMarkup(pk, d) {
+  const mk   = document.getElementById('mk-'   + pk);
+  const mkp  = document.getElementById('mkp-'  + pk);
+  const cost = document.getElementById('cost-' + pk);
+  if (mk)  mk.textContent  = d.markup     !== null ? String(d.markup) : '—';
+  if (mkp) {
+    mkp.textContent = d.markup_pct !== null ? d.markup_pct + '%' : '—';
+    mkp.classList.toggle('mk-low', !!d.markup_low);
+  }
+  if (cost) cost.classList.toggle('cost-low', !!d.markup_low);
+}
+
 function saveSalePrice(pk) {
   const input = document.getElementById('sale-input');
   const msg   = document.getElementById('sale-msg');
@@ -1064,6 +1161,10 @@ function saveSalePrice(pk) {
       }
       // Обновляем кэш, чтобы при повторном открытии показалось новое значение
       PD[pk].sale = (d.sale_price !== null && d.sale_price !== undefined) ? String(d.sale_price) : '';
+      // …и строку в таблице под модалкой — цену, наценку, подсветку себестоимости
+      const cell = document.getElementById('sale-' + pk);
+      if (cell) { cell.value = PD[pk].sale; cell.dataset.saved = PD[pk].sale; }
+      applyMarkup(pk, d);
       msg.textContent = 'Сохранено ✓';
       msg.style.color = 'var(--green-mid)';
     })

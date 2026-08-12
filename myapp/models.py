@@ -87,6 +87,9 @@ class Product(models.Model):
     iiko_category = models.CharField(max_length=300, null=True, blank=True, verbose_name="Категория iiko")
     iiko_synced_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя синхронизация")
 
+    # Ниже этой наценки себестоимость подсвечивается красным в каталоге
+    MARKUP_MIN_PCT = 40
+
     class Meta:
         verbose_name = "Продукт"
         verbose_name_plural = "Продукты"
@@ -94,6 +97,30 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    # ── Наценка фудзавода (считается из cost и sale_price, в БД не хранится) ──
+
+    @property
+    def markup(self):
+        """Наценка в тенге: цена продажи − себестоимость.
+        Считаем в Decimal — на float вылезает мусор вида 349.99999999999994."""
+        if self.sale_price is None or self.cost is None:
+            return None
+        return self.sale_price - self.cost
+
+    @property
+    def markup_pct(self):
+        """Наценка в процентах от себестоимости."""
+        m = self.markup
+        if m is None or not self.cost:
+            return None
+        return float(m) / float(self.cost) * 100
+
+    @property
+    def markup_is_low(self):
+        """Наценка меньше нормы — повод подсветить себестоимость."""
+        pct = self.markup_pct
+        return pct is not None and pct < self.MARKUP_MIN_PCT
 
 
 # ── Лог синхронизаций iiko ────────────────────────────────────────────────────
