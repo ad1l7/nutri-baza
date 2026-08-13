@@ -290,6 +290,9 @@
   }
   .sale-inp:hover  { border-color: var(--green-mid); }
   .sale-inp:focus  { outline: none; border-color: var(--green-dark); box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
+  /* Ручная цена — жирнее и с янтарной рамкой, чтобы отличать от автоматической 67% */
+  .sale-inp.manual { border-color: #e0b93a; background: #fffcf0; }
+  .sale-inp.manual:hover { border-color: #c9a52c; }
   .sale-inp.saving { border-color: var(--green-mid); background: #f6fbf2; }
   .sale-inp.saved  { border-color: var(--green-mid); background: #eaf6e2; }
   .sale-inp.err    { border-color: var(--danger); background: rgba(214,75,42,.06); }
@@ -791,7 +794,9 @@
               {% if is_reader %}
                 {% if p.sale_price %}{{ p.sale_price|smart_num }} <span class="td-cost-unit">₸</span>{% else %}—{% endif %}
               {% else %}
-                <input type="number" min="0" step="1" class="sale-inp" id="sale-{{ p.pk }}"
+                <input type="number" min="0" step="0.01" id="sale-{{ p.pk }}"
+                       class="sale-inp{% if p.sale_price_manual %} manual{% endif %}"
+                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку 67%{% else %}Наценка 67% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
                        value="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        data-saved="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        placeholder="—"
@@ -1120,12 +1125,18 @@ function saveSaleCell(pk) {
         input.title = d.message || 'Не удалось сохранить';
         return;
       }
-      input.dataset.saved = val;
-      input.title = '';
-      input.className = 'sale-inp saved';
-      setTimeout(() => { input.className = 'sale-inp'; }, 900);
+      // Очистили поле — сервер вернул автоцену (67%), показываем её сразу
+      const shown = d.sale_price !== null ? String(d.sale_price) : '';
+      input.value = shown;
+      input.dataset.saved = shown;
+      input.title = d.manual
+        ? 'Цена задана вручную. Очистите поле, чтобы вернуть наценку 67%'
+        : 'Наценка 67% — считается сама. Впишите своё значение, чтобы зафиксировать цену';
+      const mark = d.manual ? ' manual' : '';
+      input.className = 'sale-inp saved' + mark;
+      setTimeout(() => { input.className = 'sale-inp' + mark; }, 900);
       applyMarkup(pk, d);
-      if (PD[pk]) PD[pk].sale = d.sale_price !== null ? String(d.sale_price) : '';
+      if (PD[pk]) PD[pk].sale = shown;
     })
     .catch(() => {
       input.className = 'sale-inp err';
@@ -1172,7 +1183,11 @@ function saveSalePrice(pk) {
       PD[pk].sale = (d.sale_price !== null && d.sale_price !== undefined) ? String(d.sale_price) : '';
       // …и строку в таблице под модалкой — цену, наценку, подсветку себестоимости
       const cell = document.getElementById('sale-' + pk);
-      if (cell) { cell.value = PD[pk].sale; cell.dataset.saved = PD[pk].sale; }
+      if (cell) {
+        cell.value = PD[pk].sale;
+        cell.dataset.saved = PD[pk].sale;
+        cell.className = 'sale-inp' + (d.manual ? ' manual' : '');
+      }
       applyMarkup(pk, d);
       msg.textContent = 'Сохранено ✓';
       msg.style.color = 'var(--green-mid)';

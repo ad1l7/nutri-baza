@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.db import models
 from django.utils import timezone
 
@@ -56,8 +58,10 @@ class Product(models.Model):
     name = models.CharField(max_length=300, verbose_name="Наименование")
     photo = models.ImageField(upload_to="products/", null=True, blank=True, verbose_name="Фото")
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Себестоимость ФЗ")
-    # Вносится вручную в каталоге; синхронизация с iiko это поле не трогает.
+    # По умолчанию считается автоматически (наценка MARKUP_TARGET_PCT), но
+    # введённая руками цена фиксируется флагом ниже и больше не пересчитывается.
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Цена продажи с ФЗ")
+    sale_price_manual = models.BooleanField(default=False, verbose_name="Цена задана вручную")
     net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
     packing = models.CharField(max_length=100, null=True, blank=True, verbose_name="Кратность / Фасовка")
     composition = models.TextField(null=True, blank=True, verbose_name="Состав")
@@ -89,6 +93,8 @@ class Product(models.Model):
 
     # Ниже этой наценки себестоимость подсвечивается красным в каталоге
     MARKUP_MIN_PCT = 40
+    # Целевая наценка: на неё считается цена продажи, пока её не задали руками
+    MARKUP_TARGET_PCT = 67
 
     class Meta:
         verbose_name = "Продукт"
@@ -98,7 +104,30 @@ class Product(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        """Цена продажи всегда держит наценку MARKUP_TARGET_PCT — кроме блюд,
+        где её задали вручную, и блюд без себестоимости (там ставить не из чего).
+        Пересчёт живёт здесь, чтобы срабатывать и на синхронизации с iiko, и в
+        админке — везде, где меняется себестоимость."""
+        if not self.sale_price_manual:
+            auto = self.auto_sale_price
+            if auto is not None and auto != self.sale_price:
+                self.sale_price = auto
+                update_fields = kwargs.get("update_fields")
+                if update_fields is not None:
+                    kwargs["update_fields"] = set(update_fields) | {"sale_price"}
+        super().save(*args, **kwargs)
+
     # ── Наценка фудзавода (считается из cost и sale_price, в БД не хранится) ──
+
+    @property
+    def auto_sale_price(self):
+        """Цена продажи с целевой наценкой. None, если себестоимости нет:
+        нулевой себес — это тоже «нет данных», из него цену не считаем."""
+        if not self.cost:
+            return None
+        factor = Decimal(1) + Decimal(self.MARKUP_TARGET_PCT) / Decimal(100)
+        return (self.cost * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @property
     def markup(self):

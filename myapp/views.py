@@ -235,14 +235,17 @@ def product_detail(request, pk):
 @require_POST
 def product_set_sale_price(request, pk):
     """Сохраняет «Цену продажи с ФЗ» блюда из каталога (колонка в таблице
-    или модалка). Пустое значение очищает поле. Наценка не хранится —
-    считается из cost и sale_price и возвращается, чтобы обновить строку.
-    iiko-синхронизация это поле не трогает."""
+    или модалка). Введённая цена фиксируется как ручная и больше не
+    пересчитывается автоматически; пустое поле снимает ручной режим и
+    возвращает цену с целевой наценкой. Наценка в БД не хранится — считается
+    и возвращается в ответе, чтобы обновить строку без перезагрузки."""
     from decimal import Decimal, InvalidOperation
     product = get_object_or_404(Product, pk=pk)
     raw = (request.POST.get("sale_price") or "").strip().replace(",", ".").replace(" ", "")
     if raw == "":
+        # Возврат к автоцене: save() подставит её сам, если есть себестоимость
         product.sale_price = None
+        product.sale_price_manual = False
     else:
         try:
             val = Decimal(raw)
@@ -251,13 +254,15 @@ def product_set_sale_price(request, pk):
         if val < 0:
             return JsonResponse({"ok": False, "message": "Цена не может быть отрицательной"}, status=400)
         product.sale_price = val
-    product.save(update_fields=["sale_price"])
+        product.sale_price_manual = True
+    product.save(update_fields=["sale_price", "sale_price_manual"])
     return JsonResponse({
         "ok": True,
         "sale_price": float(product.sale_price) if product.sale_price is not None else None,
         "markup":      float(product.markup) if product.markup is not None else None,
         "markup_pct":  round(product.markup_pct, 1) if product.markup_pct is not None else None,
         "markup_low":  product.markup_is_low,
+        "manual":      product.sale_price_manual,
     })
 
 
