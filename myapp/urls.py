@@ -14,6 +14,11 @@ urlpatterns = [
     path("calories/<int:pk>/edit/", views.calorie_edit, name="calorie_edit"),
     path("calories/<int:pk>/delete/", views.calorie_delete, name="calorie_delete"),
 
+    # Этикетки для ZT411
+    path("labels/", views.label_list, name="label_list"),
+    path("labels/<int:pk>/preview.png", views.label_preview, name="label_preview"),
+    path("labels/zpl/", views.label_zpl, name="label_zpl"),
+
     # Материалы (упаковка и прочее — уходят в конец заявочного листа)
     path("materials/", views.material_list, name="material_list"),
     path("materials/create/", views.material_create, name="material_create"),

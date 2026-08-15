@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>O-Live — Этикетки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --white:#fff; --off-white:#f7f9f5; --light:#eef4ea;
+    --green-light:#c8e6b0; --green:#5aaa3c; --green-mid:#3d8a26;
+    --green-dark:#1e4d14; --text:#1a2e12; --text-mid:#3d5c30;
+    --muted:#7a9668; --border:#d6e8cc; --border-soft:#e8f2e0;
+    --danger:#d64b2a; --amber:#8a6200; --radius:14px; --font:'Manrope',sans-serif;
+    --shadow:0 2px 16px rgba(30,77,20,.07); --shadow-md:0 4px 32px rgba(30,77,20,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--off-white);color:var(--text);font-family:var(--font);font-size:14px;}
+
+  .topbar{background:var(--white);border-bottom:1.5px solid var(--border);padding:0 28px;height:64px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
+  .logo-text{font-size:18px;font-weight:800;color:var(--green-dark);letter-spacing:-.5px;flex-shrink:0;}
+  .logo-text em{color:var(--green);font-style:normal;}
+  .nav-tabs{display:flex;gap:4px;margin-left:12px;flex-shrink:0;}
+  .nav-tab{padding:7px 15px;border-radius:9px;font-size:13px;font-weight:700;text-decoration:none;color:var(--muted);border:1.5px solid var(--border);transition:all .18s;white-space:nowrap;}
+  .nav-tab:hover{background:var(--light);color:var(--text-mid);}
+  .nav-tab.active{background:var(--green-dark);color:#fff;border-color:var(--green-dark);}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .logout-btn{background:none;border:1.5px solid var(--border);border-radius:9px;padding:7px 13px;font-family:var(--font);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:all .18s;}
+  .logout-btn:hover{border-color:var(--danger);color:var(--danger);background:#fff8f7;}
+
+  .main{max-width:1360px;margin:0 auto;padding:24px 22px;}
+  .page-title{font-size:24px;font-weight:800;margin-bottom:6px;}
+  .page-sub{font-size:14px;color:var(--muted);margin-bottom:22px;}
+
+  .cols{display:grid;grid-template-columns:300px minmax(320px,1fr) 430px;gap:18px;align-items:start;}
+  @media(max-width:1180px){.cols{grid-template-columns:1fr;}}
+  .card{background:var(--white);border:1.5px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+
+  label.fl{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:14px 0 6px;}
+  label.fl:first-child{margin-top:0;}
+  .fi{width:100%;padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-family:var(--font);font-size:14px;color:var(--text);outline:none;}
+  .fi:focus{border-color:var(--green);}
+  .row{display:flex;gap:9px;}.row>div{flex:1;}
+
+  .btn{width:100%;border:none;border-radius:10px;padding:11px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;transition:all .18s;}
+  .btn-ghost{background:var(--light);color:var(--green-dark);border:1.5px solid var(--border);}
+  .btn-ghost:hover{border-color:var(--green);}
+  .btn-main{background:var(--green);color:#fff;margin-top:12px;box-shadow:0 2px 10px rgba(90,170,60,.3);}
+  .btn-main:hover{background:var(--green-mid);}
+  .btn-main:disabled{background:var(--border);box-shadow:none;cursor:not-allowed;}
+
+  .status{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-mid);margin-top:9px;}
+  .led{width:10px;height:10px;border-radius:50%;background:#bbb;flex-shrink:0;}
+  .led.ok{background:var(--green);}.led.err{background:var(--danger);}.led.busy{background:#e0a800;}
+  #log{margin-top:10px;font-size:11.5px;color:var(--muted);max-height:120px;overflow:auto;white-space:pre-wrap;line-height:1.5;}
+  #log .er{color:var(--danger);} #log .okk{color:var(--green-mid);}
+
+  .search-row{display:flex;gap:8px;margin-bottom:12px;}
+  .list-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .list-head .cnt{margin-left:auto;font-size:12px;font-weight:700;color:var(--muted);}
+  .plist{max-height:62vh;overflow-y:auto;border:1.5px solid var(--border);border-radius:11px;}
+  .pitem{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border-soft);cursor:pointer;}
+  .pitem:last-child{border-bottom:none;}
+  .pitem:hover{background:var(--off-white);}
+  .pitem.active{background:var(--light);}
+  .pitem input[type=checkbox]{width:16px;height:16px;accent-color:var(--green-mid);cursor:pointer;flex-shrink:0;}
+  .pname{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .part{font-size:11px;color:var(--muted);font-weight:600;flex-shrink:0;}
+  .copies{width:62px;padding:5px 7px;border:1.5px solid var(--border);border-radius:7px;font-family:var(--font);font-size:12.5px;font-weight:700;text-align:center;color:var(--text);}
+  .copies:focus{outline:none;border-color:var(--green);}
+
+  .preview{text-align:center;}
+  .preview img{width:100%;max-width:390px;border:1.5px solid var(--border);border-radius:6px;background:#fff;}
+  .hint{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:10px;text-align:left;}
+  .empty{padding:40px 16px;text-align:center;color:var(--muted);font-size:13px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo-text">O-<em>Live</em></span>
+  <nav class="nav-tabs">
+    <a href="{% url 'product_list' %}" class="nav-tab">📦 Каталог</a>
+    <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
+    <a href="{% url 'claude_rations' %}" class="nav-tab">🤖 Рационы Claude</a>
+    <a href="{% url 'label_list' %}" class="nav-tab active">🏷 Этикетки</a>
+    {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
+  </nav>
+  <div class="topbar-right">
+    <form method="post" action="{% url 'logout' %}" style="display:contents">
+      {% csrf_token %}
+      <button type="submit" class="logout-btn" title="Выйти">⎋ Выйти</button>
+    </form>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">🏷 Этикетки</div>
+  <div class="page-sub">
+    {{ label_mm }} мм · 203 dpi · Zebra ZT411. Состав, БЖУ и масса берутся из каталога.
+    Печатается ровно то, что видно в превью.
+  </div>
+
+  <div class="cols">
+
+    <!-- ЛЕВО: параметры и печать -->
+    <div class="card">
+      <label class="fl">Дата и время изготовления</label>
+      <div class="row">
+        <div><input class="fi" type="date" id="made_date" value="{{ today }}"></div>
+        <div><input class="fi" type="time" id="made_time" value="17:00"></div>
+      </div>
+
+      <label class="fl">Срок хранения, часов</label>
+      <input class="fi" type="number" id="shelf" value="{{ shelf_hours }}" min="1" max="8760">
+
+      <div class="row">
+        <div>
+          <label class="fl">Скорость, ips</label>
+          <select class="fi" id="speed">
+            <option>2</option><option>3</option><option selected>4</option>
+            <option>5</option><option>6</option><option>8</option>
+          </select>
+        </div>
+        <div>
+          <label class="fl">Плотность</label>
+          <input class="fi" type="number" id="darkness" value="15" min="0" max="30">
+        </div>
+      </div>
+
+      <label class="fl">Принтер</label>
+      <button class="btn btn-ghost" id="find">Найти принтер</button>
+      <div class="status"><span class="led" id="led"></span><span id="stat">Принтер не найден</span></div>
+
+      <button class="btn btn-main" id="print" disabled>ПЕЧАТЬ (0)</button>
+      <div id="log"></div>
+    </div>
+
+    <!-- ЦЕНТР: блюда -->
+    <div class="card">
+      <form class="search-row" method="get">
+        <input class="fi" type="text" name="search" value="{{ search }}" placeholder="Поиск блюда или артикула…">
+        <button class="btn btn-ghost" style="width:auto;padding:9px 16px" type="submit">Найти</button>
+      </form>
+
+      <div class="list-head">
+        <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--green-mid);cursor:pointer">
+          <input type="checkbox" id="selall" style="width:16px;height:16px;accent-color:var(--green-mid)"> Выбрать все
+        </label>
+        <span class="cnt" id="cnt">выбрано: 0</span>
+      </div>
+
+      <div class="plist">
+        {% for p in products %}
+        <div class="pitem" data-id="{{ p.pk }}" onclick="pick({{ p.pk }})">
+          <input type="checkbox" class="pcb" value="{{ p.pk }}" onclick="event.stopPropagation();sync()">
+          <span class="pname" title="{{ p.name }}">{{ p.name }}</span>
+          <span class="part">{{ p.article|default:"—" }}</span>
+          <input class="copies" type="number" min="1" max="500" value="1"
+                 onclick="event.stopPropagation()" oninput="sync()">
+        </div>
+        {% empty %}
+        <div class="empty">Блюда не найдены</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ПРАВО: превью -->
+    <div class="card preview">
+      <label class="fl" style="text-align:left">Превью — реальный размер печати</label>
+      <img id="prev" alt="Выберите блюдо">
+      <p class="hint">
+        Чёрное — то, что напечатается. Картинка целиком рисуется на сервере и уходит
+        на принтер командой <b>^GFA</b>. Верхний блок пока продублирован по-русски —
+        там будет казахский текст, видно, сколько места он займёт.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let active = null, device = null;
+
+function log(msg, cls){ const d=document.createElement('div'); if(cls)d.className=cls; d.textContent=msg; $('log').prepend(d); }
+function params(){
+  return 'made_date='+encodeURIComponent($('made_date').value)
+       + '&made_time='+encodeURIComponent($('made_time').value)
+       + '&shelf='+encodeURIComponent($('shelf').value);
+}
+
+// Превью строит сервер — той же функцией, что готовит ZPL
+function pick(id){
+  active = id;
+  document.querySelectorAll('.pitem').forEach(el => el.classList.toggle('active', +el.dataset.id === id));
+  $('prev').src = '/labels/' + id + '/preview.png?' + params() + '&_=' + Date.now();
+}
+function refreshPreview(){ if(active) pick(active); }
+
+function checked(){ return [...document.querySelectorAll('.pcb:checked')]; }
+function sync(){
+  const n = checked().length;
+  $('cnt').textContent = 'выбрано: ' + n;
+  $('print').textContent = 'ПЕЧАТЬ (' + n + ')';
+  $('print').disabled = !(device && n);
+  const all = document.querySelectorAll('.pcb').length;
+  $('selall').checked = n > 0 && n === all;
+  $('selall').indeterminate = n > 0 && n < all;
+}
+$('selall').onchange = e => {
+  document.querySelectorAll('.pcb').forEach(cb => cb.checked = e.target.checked);
+  sync();
+};
+['made_date','made_time','shelf'].forEach(id => $(id).addEventListener('input', refreshPreview));
+
+// ── Zebra Browser Print ──
+const BP = 'https://localhost:9101';
+$('find').onclick = async () => {
+  $('led').className = 'led busy'; $('stat').textContent = 'Поиск…';
+  try{
+    const r = await fetch(BP + '/available');
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const list = await r.json();
+    const printers = list.printer || [];
+    if(!printers.length) throw new Error('список принтеров пуст');
+    device = printers.find(p => p.connection === 'usb') || printers[0];
+    $('led').className = 'led ok';
+    $('stat').textContent = 'Принтер: ' + (device.name || device.uid);
+    log('Принтер найден', 'okk');
+  }catch(e){
+    device = null; $('led').className = 'led err';
+    $('stat').textContent = 'Не найден: ' + e.message;
+    log('Browser Print недоступен: ' + e.message, 'er');
+  }
+  sync();
+};
+
+$('print').onclick = async () => {
+  const items = checked().map(cb => {
+    const row = cb.closest('.pitem');
+    return cb.value + ':' + (row.querySelector('.copies').value || 1);
+  }).join(',');
+  const total = checked().reduce((s, cb) =>
+    s + (+cb.closest('.pitem').querySelector('.copies').value || 1), 0);
+
+  $('print').disabled = true;
+  log('Готовлю ' + total + ' этикеток…');
+  try{
+    const url = '/labels/zpl/?items=' + encodeURIComponent(items) + '&' + params()
+              + '&speed=' + $('speed').value + '&darkness=' + $('darkness').value;
+    const zpl = await (await fetch(url)).text();
+    const r = await fetch(BP + '/write', {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain;charset=UTF-8'},
+      body: JSON.stringify({device: device, data: zpl}),
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    log('Отправлено на принтер: ' + total + ' шт.', 'okk');
+  }catch(e){
+    log('Ошибка печати: ' + e.message, 'er');
+  }
+  $('print').disabled = false;
+};
+
+const first = document.querySelector('.pitem');
+if(first) pick(+first.dataset.id);
+sync();
+</script>
+
+</body>
+</html>

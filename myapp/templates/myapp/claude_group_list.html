@@ -199,6 +199,7 @@
     <a href="/" class="nav-tab">📦 Каталог</a>
     <a href="{% url 'swap_list' %}" class="nav-tab">🔄 Блюда на замену</a>
     <a href="{% url 'claude_rations' %}" class="nav-tab active">🤖 Рационы Claude</a>
+    <a href="{% url 'label_list' %}" class="nav-tab">🏷 Этикетки</a>
     {% if not is_reader %}<a href="{% url 'calorie_list' %}" class="nav-tab">⚖️ Калоражи</a>{% endif %}
   </nav>
   <div class="topbar-right">
