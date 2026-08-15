@@ -990,7 +990,7 @@ const PD = {
     cost:   "{{ p.cost|smart_num }}",
     sale:   "{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}",
     photo:  "{% if p.photo %}{{ p.photo.url }}{% endif %}",
-    comp:   `{{ p.composition|default:''|escapejs }}`,
+    comp:   `{{ p.composition_clean|default:''|escapejs }}`,
     allergens: [{% for a in p.allergens.all %}"{{ a.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
     p:    "{{ p.protein|smart_num }}",
     f:    "{{ p.fat|smart_num }}",

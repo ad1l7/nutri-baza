@@ -52,7 +52,11 @@ def get_filtered_products(request):
     sort_dir      = request.GET.get("dir", "asc")
 
     if search:
-        products = products.filter(Q(name__icontains=search) | Q(composition__icontains=search))
+        products = products.filter(
+            Q(name__icontains=search)
+            | Q(composition__icontains=search)
+            | Q(composition_clean__icontains=search)
+        )
     if selected_meal_categories:
         products = products.filter(meal_categories__key__in=selected_meal_categories).distinct()
     if selected_allergens:
@@ -202,7 +206,7 @@ def product_export(request):
             num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100), num(p.kj_per_100),
             num(p.protein_per_serving), num(p.fat_per_serving), num(p.carbs_per_serving),
             num(p.kcal_per_serving), num(p.kj_per_serving),
-            p.composition or "",
+            p.composition_clean or "",
         ]
         for col, val in enumerate(values, start=1):
             c = ws.cell(row=row, column=col, value=val)
@@ -1278,7 +1282,7 @@ def _export_ration_group_xlsx(group):
                     num(p.protein_per_serving), num(p.fat_per_serving),
                     num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
                     num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
-                    p.composition or "",
+                    p.composition_clean or "",
                 ]
                 tot_kcal += float(p.kcal_per_serving or 0)
                 tot_p    += float(p.protein_per_serving or 0)

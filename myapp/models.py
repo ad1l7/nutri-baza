@@ -3,6 +3,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
 from django.utils import timezone
 
+from .ingredient_aliases import clean_composition
+
 
 class Allergen(models.Model):
     name = models.CharField(max_length=200, verbose_name="Аллерген")
@@ -64,7 +66,11 @@ class Product(models.Model):
     sale_price_manual = models.BooleanField(default=False, verbose_name="Цена задана вручную")
     net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
     packing = models.CharField(max_length=100, null=True, blank=True, verbose_name="Кратность / Фасовка")
-    composition = models.TextField(null=True, blank=True, verbose_name="Состав")
+    # composition — как пришло из техкарты iiko, храним нетронутым для сверки.
+    # composition_clean — то же самое через справочник ингредиентов: без
+    # артикульных хвостов и дублей. Показывается везде, пересчитывается сам.
+    composition = models.TextField(null=True, blank=True, verbose_name="Состав (из iiko)")
+    composition_clean = models.TextField(blank=True, default="", verbose_name="Состав")
     allergens = models.ManyToManyField(Allergen, blank=True, verbose_name="Аллергены")
     meal_categories = models.ManyToManyField(MealCategory, blank=True, verbose_name="Категории блюда")
 
@@ -116,6 +122,15 @@ class Product(models.Model):
                 update_fields = kwargs.get("update_fields")
                 if update_fields is not None:
                     kwargs["update_fields"] = set(update_fields) | {"sale_price"}
+
+        # Чистый состав пересчитывается из сырого — в том числе на синхронизации
+        clean = clean_composition(self.composition)
+        if clean != self.composition_clean:
+            self.composition_clean = clean
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {"composition_clean"}
+
         super().save(*args, **kwargs)
 
     # ── Наценка фудзавода (считается из cost и sale_price, в БД не хранится) ──

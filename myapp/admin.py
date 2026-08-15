@@ -39,12 +39,15 @@ class MealTimeAdmin(admin.ModelAdmin):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ["name", "article", "get_categories", "cost", "kcal_per_100", "protein", "fat", "carbs", "packing"]
     list_filter = ["meal_categories", "packing", "allergens"]
-    search_fields = ["name", "article", "composition"]
+    search_fields = ["name", "article", "composition", "composition_clean"]
     ordering = ["name"]
     filter_horizontal = ["allergens", "meal_categories"]
+    # Чистый состав считается из сырого по справочнику — править руками нечего
+    readonly_fields = ["composition_clean"]
     fieldsets = [
         ("Основное", {
-            "fields": ["name", "article", "photo", "cost", "packing", "net_weight", "composition", "allergens", "meal_categories"]
+            "fields": ["name", "article", "photo", "cost", "packing", "net_weight",
+                       "composition", "composition_clean", "allergens", "meal_categories"]
         }),
         ("На 100 г", {
             "fields": ["protein", "fat", "carbs", "kcal_per_100", "kj_per_100"]
