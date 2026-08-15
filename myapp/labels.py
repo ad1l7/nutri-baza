@@ -4,17 +4,30 @@
 на вкладке, и в ZPL-команду ^GFA на принтер. Поэтому «что вижу, то и печатаю»
 выполняется буквально, а раскладка живёт в одном месте.
 
-Размер — 100×130 мм при 203 dpi = 799×1039 точек (как в шаблоне Zebra Designer).
+Размер по умолчанию — 100×130 мм при 203 dpi. Ширину, высоту и поля можно
+менять на вкладке: у наклеек бывает разная реальная печатная область, и если
+текст уползает за край — уменьшают ширину, не трогая код.
+
+Середина этикетки остаётся пустой: там на самой наклейке уже напечатаны
+рисунок и QR-код.
 """
 import os
 from datetime import timedelta
 
 from PIL import Image, ImageDraw, ImageFont
 
-DPMM = 203 / 25.4
-WIDTH, HEIGHT = 799, 1039        # 100 × 130 мм при 203 dpi
-PAD = int(4 * DPMM)              # поля 4 мм
+DPI = 203
+DPMM = DPI / 25.4
+# Печатная ширина с запасом: на 100 мм крайние миллиметры уходили за край
+# наклейки. Поднимается на вкладке, если на конкретных наклейках влезает больше.
+DEFAULT_WIDTH_MM = 96
+DEFAULT_HEIGHT_MM = 130
+DEFAULT_MARGIN_MM = 6
 DEFAULT_SHELF_HOURS = 72
+
+# Свободная середина под рисунок и QR — доли от высоты этикетки
+ART_TOP = 0.40
+ART_BOTTOM = 0.63
 
 # Шрифты: на сервере — DejaVu (есть кириллица и казахские буквы), локально — Arial
 _FONT_DIRS = ["/usr/share/fonts/truetype/dejavu", r"C:\Windows\Fonts"]
@@ -51,7 +64,7 @@ FIXED = {
 }
 
 
-# ── помощники отрисовки ──────────────────────────────────────────────────────
+# ── текст ────────────────────────────────────────────────────────────────────
 
 def _wrap(draw, text, font, max_width):
     lines, current = [], ""
@@ -68,12 +81,29 @@ def _wrap(draw, text, font, max_width):
     return lines
 
 
-def _para(draw, text, x, y, max_width, size, bold=False, line_height=1.28):
-    font = _font(size, bold)
-    for line in _wrap(draw, text, font, max_width):
-        draw.text((x, y), line, font=font, fill=0)
-        y += int(size * line_height)
-    return y
+class Block:
+    """Накопитель строк: сначала считаем, сколько места займёт текст при данном
+    размере шрифта, и только потом рисуем. Так подбирается кегль под зону."""
+
+    def __init__(self, draw, x, width):
+        self.draw, self.x, self.width = draw, x, width
+        self.items = []
+        self.height = 0
+
+    def text(self, value, size, bold=False, width=None, gap=0, line_height=1.30):
+        font = _font(size, bold)
+        for line in _wrap(self.draw, value, font, width or self.width):
+            self.items.append((line, font, self.height))
+            self.height += int(size * line_height)
+        self.height += gap
+
+    def space(self, pixels):
+        self.height += pixels
+
+    def draw_at(self, y):
+        for line, font, offset in self.items:
+            self.draw.text((self.x, y + offset), line, font=font, fill=0)
+        return y + self.height
 
 
 def _num(value, digits=1):
@@ -82,26 +112,27 @@ def _num(value, digits=1):
     return ("%.*f" % (digits, float(value))).replace(".", ",")
 
 
+# ── значки ───────────────────────────────────────────────────────────────────
+
 def _triangle(draw, x, y, size, digit, caption):
-    """Треугольник переработки с цифрой и подписью."""
     points = [(x + size / 2, y), (x + size, y + size * .86), (x, y + size * .86)]
-    draw.line(points + [points[0]], fill=0, width=max(2, int(size * .05)))
+    draw.line(points + [points[0]], fill=0, width=max(2, int(size * .06)))
     draw.text((x + size / 2, y + size * .34), digit,
-              font=_font(int(size * .38), True), fill=0, anchor="mm")
-    draw.text((x + size / 2, y + size * .99), caption,
-              font=_font(int(size * .21)), fill=0, anchor="mm")
+              font=_font(int(size * .40), True), fill=0, anchor="mm")
+    draw.text((x + size / 2, y + size * 1.02), caption,
+              font=_font(int(size * .24), True), fill=0, anchor="mm")
 
 
 def _eac(draw, x, y, size):
     draw.rectangle([x, y, x + size * 1.3, y + size * .8], outline=0,
-                   width=max(2, int(size * .06)))
+                   width=max(2, int(size * .07)))
     draw.text((x + size * .65, y + size * .4), "EAC",
-              font=_font(int(size * .42), True), fill=0, anchor="mm")
+              font=_font(int(size * .44), True), fill=0, anchor="mm")
 
 
 def _fork_glass(draw, x, y, size):
     """Знак «пригодно для контакта с пищей» — вилка и бокал."""
-    w = max(2, int(size * .05))
+    w = max(2, int(size * .06))
     draw.rectangle([x, y, x + size * .82, y + size * .82], outline=0, width=w)
     draw.line([(x + size * .22, y + size * .18), (x + size * .22, y + size * .64)], fill=0, width=w)
     draw.line([(x + size * .13, y + size * .18), (x + size * .13, y + size * .36)], fill=0, width=w)
@@ -115,95 +146,114 @@ def _fork_glass(draw, x, y, size):
 
 
 def _date_box(draw, x, y, width, height, text):
-    """Рамка с датой — как в образце, с «иконкой» слева внутри."""
     draw.rectangle([x, y, x + width, y + height], outline=0, width=2)
     draw.rectangle([x + 5, y + 5, x + height - 5, y + height - 5], outline=0, width=2)
-    draw.text((x + height + 6, y + height / 2), text,
-              font=_font(int(height * .55), True), fill=0, anchor="lm")
+    draw.text((x + height + 8, y + height / 2), text,
+              font=_font(int(height * .58), True), fill=0, anchor="lm")
 
 
 # ── этикетка ─────────────────────────────────────────────────────────────────
 
-def render_label(product, made_at, shelf_hours=DEFAULT_SHELF_HOURS):
-    """Возвращает монохромное изображение этикетки для блюда."""
-    image = Image.new("1", (WIDTH, HEIGHT), 1)
+def label_size(width_mm=DEFAULT_WIDTH_MM, height_mm=DEFAULT_HEIGHT_MM):
+    return int(round(width_mm * DPMM)), int(round(height_mm * DPMM))
+
+
+def render_label(product, made_at, shelf_hours=DEFAULT_SHELF_HOURS,
+                 width_mm=DEFAULT_WIDTH_MM, height_mm=DEFAULT_HEIGHT_MM,
+                 margin_mm=DEFAULT_MARGIN_MM):
+    """Монохромная картинка этикетки.
+
+    Рисуем в градациях серого (шрифты сглаживаются), а в конце переводим в 1 бит.
+    Прямой рендер в монохром даёт рваные буквы — на 203 dpi это заметно."""
+    width, height = label_size(width_mm, height_mm)
+    margin = int(round(margin_mm * DPMM))
+
+    image = Image.new("L", (width, height), 255)
     draw = ImageDraw.Draw(image)
 
     best_before = made_at + timedelta(hours=shelf_hours)
     fmt = lambda moment: moment.strftime("%d.%m.%Y  %H:%M")
-
     composition = product.composition_clean or product.composition or ""
     weight_g = float(product.net_weight * 1000) if product.net_weight else None
-
-    right_column = 165                      # место под значки справа
-    width_text = WIDTH - 2 * PAD - right_column
-    width_full = WIDTH - 2 * PAD
-    y = PAD + 8
-
-    # ── Верхний блок. Место казахского текста: пока тот же текст по-русски,
-    #    чтобы было видно, сколько площади он займёт после перевода. ──
-    if composition:
-        y = _para(draw, "Құрамы / Состав: " + composition + ". " + FIXED["allergens"],
-                  PAD, y, width_text, 15)
-    y = _para(draw, FIXED["storage"].format(hours=shelf_hours), PAD, y, width_text, 15)
-    y = _para(draw, FIXED["gas"], PAD, y, width_text, 15)
-    y = _para(draw, FIXED["producer"], PAD, y, width_text, 15)
-    y = _para(draw, FIXED["address"], PAD, y, width_text, 15)
-    y = _para(draw, FIXED["phone"], PAD, y, width_text, 15)
-    y += 12
-
-    # ── Значки справа ──
-    marks_x = WIDTH - PAD - right_column + 12
-    _triangle(draw, marks_x, PAD + 4, 64, "7", "OTHER")
-    _triangle(draw, marks_x + 90, PAD + 4, 64, "5", "PP")
-    _fork_glass(draw, marks_x, PAD + 104, 62)
-    _eac(draw, marks_x + 88, PAD + 112, 54)
-
-    # ── Даты: подпись слева, рамка справа ──
-    _para(draw, "Дайындалған күні мен уақыты / Дата и время изготовления:", PAD, y, 340, 15)
-    _date_box(draw, PAD + 355, y - 4, 215, 30, fmt(made_at))
-    y += 40
-    _para(draw, "Жарамдылық мерзімі / Годен до:", PAD, y, 230, 15)
-    _date_box(draw, PAD + 245, y - 4, 215, 30, fmt(best_before))
-    y += 52
-
-    # ── Название (верхнее — место казахского) ──
     name = _clean_name(product.name)
-    for line in _wrap(draw, name, _font(40, True), width_full):
-        draw.text((PAD, y), line, font=_font(40, True), fill=0)
-        y += 48
 
-    # ── Вертикальная строка СТ ТОО у правого края ──
+    marks_w = int(round(21 * DPMM))          # колонка значков справа
+    text_w = width - 2 * margin - marks_w
+    full_w = width - 2 * margin
+    art_top = int(height * ART_TOP)
+    art_bottom = int(height * ART_BOTTOM)
+
+    # ── Верхняя зона: реквизиты, даты, название. Кегль подбираем так,
+    #    чтобы всё легло выше свободной середины. ──
+    date_h = int(round(4.4 * DPMM))
+    for size in range(18, 11, -1):
+        top = Block(draw, margin, text_w)
+        if composition:
+            top.text("Құрамы / Состав: " + composition + ". " + FIXED["allergens"], size)
+        top.text(FIXED["storage"].format(hours=shelf_hours), size)
+        top.text(FIXED["gas"], size)
+        top.text(FIXED["producer"], size)
+        top.text(FIXED["address"], size)
+        top.text(FIXED["phone"], size, gap=int(size * .7))
+        dates_at = top.height
+        top.space(2 * (date_h + 8))
+        name_at = top.height
+        top.text(name, size + 16, bold=True, width=full_w, line_height=1.20)
+        if margin + top.height <= art_top - 6:
+            break
+
+    y = top.draw_at(margin)
+    # Даты — подпись слева, рамка справа, поверх зарезервированного места
+    dy = margin + dates_at
+    box_w = int(round(27 * DPMM))
+    draw.text((margin, dy + date_h * .28), "Дата и время изготовления:",
+              font=_font(size, False), fill=0)
+    _date_box(draw, width - margin - box_w, dy, box_w, date_h, fmt(made_at))
+    dy += date_h + 8
+    draw.text((margin, dy + date_h * .28), "Годен до:", font=_font(size, False), fill=0)
+    _date_box(draw, width - margin - box_w, dy, box_w, date_h, fmt(best_before))
+
+    # ── Значки справа сверху ──
+    marks_x = width - margin - marks_w
+    mark = int(round(8 * DPMM))
+    _triangle(draw, marks_x, margin, mark, "7", "OTHER")
+    _triangle(draw, marks_x + mark + 12, margin, mark, "5", "PP")
+    _fork_glass(draw, marks_x, margin + mark + 26, mark)
+    _eac(draw, marks_x + mark + 12, margin + mark + 30, int(mark * .85))
+
+    # ── Вертикальная строка СТ ТОО у правого края, вдоль свободной середины ──
     st_font = _font(15)
-    strip = Image.new("1", (int(draw.textlength(FIXED["st"], font=st_font)) + 6, 22), 1)
+    strip = Image.new("L", (int(draw.textlength(FIXED["st"], font=st_font)) + 6, 22), 255)
     ImageDraw.Draw(strip).text((0, 0), FIXED["st"], font=st_font, fill=0)
-    image.paste(strip.rotate(90, expand=True), (WIDTH - PAD - 20, int(HEIGHT * .34)))
+    image.paste(strip.rotate(90, expand=True), (width - margin - 22, art_top + 10))
 
-    # ── Нижняя половина: центр этикетки намеренно пустой ──
-    y = int(HEIGHT * .58)
-    for line in _wrap(draw, name, _font(40, True), width_full):
-        draw.text((PAD, y), line, font=_font(40, True), fill=0)
-        y += 48
-    y += 12
+    # ── Нижняя зона: название, состав, БЖУ, масса ──
+    weight_h = int(round(11 * DPMM))          # место под массу нетто справа внизу
+    for size in range(18, 11, -1):
+        bottom = Block(draw, margin, full_w)
+        bottom.text(name, size + 16, bold=True, line_height=1.20, gap=int(size * .5))
+        if composition:
+            bottom.text("Состав: " + composition + ". " + FIXED["allergens"], size,
+                        gap=int(size * .4))
+        bottom.text(FIXED["iso"], size - 1)
+        bottom.text("Пищевая ценность продукта:", size - 1)
+        bottom.text("Белки — %sг; Жиры — %sг; Углеводы — %sг"
+                    % (_num(product.protein_per_serving), _num(product.fat_per_serving),
+                       _num(product.carbs_per_serving)), size - 1)
+        bottom.text("Энергетическая ценность %s Ккал / %s КДж"
+                    % (_num(product.kcal_per_serving, 0), _num(product.kj_per_serving, 0)),
+                    size - 1)
+        if art_bottom + bottom.height <= height - margin - weight_h:
+            break
+    bottom.draw_at(art_bottom)
 
-    if composition:
-        y = _para(draw, "Состав: " + composition + ". " + FIXED["allergens"],
-                  PAD, y, width_full, 15)
-    y += 8
-    y = _para(draw, FIXED["iso"], PAD, y, width_full, 14)
-    y = _para(draw, "Пищевая ценность продукта:", PAD, y, width_full - 190, 14)
-    y = _para(draw, "Белки — %sг; Жиры — %sг; Углеводы — %sг"
-              % (_num(product.protein_per_serving), _num(product.fat_per_serving),
-                 _num(product.carbs_per_serving)),
-              PAD, y, width_full - 190, 14)
-    y = _para(draw, "Энергетическая ценность %s Ккал / %s КДж"
-              % (_num(product.kcal_per_serving, 0), _num(product.kj_per_serving, 0)),
-              PAD, y, width_full, 14)
+    draw.text((width - margin, height - margin - 42), "Таза салмағы/",
+              font=_font(16), fill=0, anchor="ra")
+    draw.text((width - margin, height - margin - 20), "Масса нетто: %s г" % _num(weight_g, 0),
+              font=_font(19, True), fill=0, anchor="ra")
 
-    draw.text((WIDTH - PAD - 175, HEIGHT - 96), "Таза салмағы/", font=_font(15), fill=0)
-    draw.text((WIDTH - PAD - 175, HEIGHT - 76), "Масса нетто: %s г" % _num(weight_g, 0),
-              font=_font(17, True), fill=0)
-    return image
+    # Сглаженный серый → чистый чёрно-белый растр для термопечати
+    return image.point(lambda v: 0 if v < 150 else 255).convert("1")
 
 
 def _clean_name(name):
@@ -216,19 +266,20 @@ def _clean_name(name):
 
 # ── ZPL ──────────────────────────────────────────────────────────────────────
 
-def image_to_zpl(image, copies=1, speed=4, darkness=15):
+def image_to_zpl(image, copies=1, speed=4, darkness=20):
     """Картинка → ZPL-команда ^GFA (тот же способ, что и в старом файле печати)."""
-    bytes_per_row = (WIDTH + 7) // 8
-    total = bytes_per_row * HEIGHT
+    width, height = image.size
+    bytes_per_row = (width + 7) // 8
+    total = bytes_per_row * height
     pixels = image.load()
 
     chunks = []
-    for y in range(HEIGHT):
+    for y in range(height):
         for block in range(bytes_per_row):
             byte = 0
             for bit in range(8):
                 x = block * 8 + bit
-                if x < WIDTH and pixels[x, y] == 0:   # 0 = чёрное
+                if x < width and pixels[x, y] == 0:   # 0 = чёрное
                     byte |= 0x80 >> bit
             chunks.append("%02X" % byte)
 
@@ -236,8 +287,8 @@ def image_to_zpl(image, copies=1, speed=4, darkness=15):
         "~SD%d" % max(0, min(30, darkness)),
         "^XA",
         "^PR%d" % speed,
-        "^PW%d" % WIDTH,
-        "^LL%d" % HEIGHT,
+        "^PW%d" % width,
+        "^LL%d" % height,
         "^PQ%d" % max(1, copies),
         "^FO0,0",
         "^GFA,%d,%d,%d,%s" % (total, total, bytes_per_row, "".join(chunks)),

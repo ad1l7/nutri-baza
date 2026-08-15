@@ -1352,11 +1352,19 @@ def _label_params(request):
         made_at = datetime.strptime(f"{raw_date} {raw_time}", "%Y-%m-%d %H:%M")
     except ValueError:
         made_at = datetime.combine(timezone.localdate(), datetime.min.time().replace(hour=17))
-    try:
-        shelf = int(request.GET.get("shelf") or labels.DEFAULT_SHELF_HOURS)
-    except (TypeError, ValueError):
-        shelf = labels.DEFAULT_SHELF_HOURS
-    return made_at, max(1, min(shelf, 8760))
+    def number(key, default, low, high):
+        try:
+            return max(low, min(int(float(request.GET.get(key) or default)), high))
+        except (TypeError, ValueError):
+            return default
+
+    return {
+        "made_at": made_at,
+        "shelf_hours": number("shelf", labels.DEFAULT_SHELF_HOURS, 1, 8760),
+        "width_mm": number("width", labels.DEFAULT_WIDTH_MM, 40, 120),
+        "height_mm": number("height", labels.DEFAULT_HEIGHT_MM, 40, 200),
+        "margin_mm": number("margin", labels.DEFAULT_MARGIN_MM, 0, 20),
+    }
 
 
 def label_list(request):
@@ -1376,7 +1384,9 @@ def label_list(request):
         "search": search,
         "today": timezone.localdate().isoformat(),
         "shelf_hours": labels.DEFAULT_SHELF_HOURS,
-        "label_mm": "100 × 130",
+        "width_mm": labels.DEFAULT_WIDTH_MM,
+        "height_mm": labels.DEFAULT_HEIGHT_MM,
+        "margin_mm": labels.DEFAULT_MARGIN_MM,
     })
 
 
@@ -1384,8 +1394,7 @@ def label_preview(request, pk):
     """PNG этикетки — то же изображение, что уйдёт на принтер."""
     from django.http import HttpResponse
     product = get_object_or_404(Product, pk=pk)
-    made_at, shelf = _label_params(request)
-    image = labels.render_label(product, made_at, shelf)
+    image = labels.render_label(product, **_label_params(request))
 
     buffer = io.BytesIO()
     image.convert("L").save(buffer, format="PNG")
@@ -1398,12 +1407,12 @@ def label_zpl(request):
     """ZPL для выбранных блюд. items=«id:копий,id:копий».
     Браузер забирает текст и передаёт его в Zebra Browser Print."""
     from django.http import HttpResponse
-    made_at, shelf = _label_params(request)
+    params = _label_params(request)
     try:
         speed = int(request.GET.get("speed") or 4)
-        darkness = int(request.GET.get("darkness") or 15)
+        darkness = int(request.GET.get("darkness") or 20)
     except (TypeError, ValueError):
-        speed, darkness = 4, 15
+        speed, darkness = 4, 20
 
     jobs = []
     for chunk in (request.GET.get("items") or "").split(","):
@@ -1424,7 +1433,7 @@ def label_zpl(request):
         product = by_id.get(product_id)
         if not product:
             continue
-        image = labels.render_label(product, made_at, shelf)
+        image = labels.render_label(product, **params)
         parts.append(labels.image_to_zpl(image, copies=copies, speed=speed, darkness=darkness))
 
     return HttpResponse("\n".join(parts), content_type="text/plain; charset=utf-8")

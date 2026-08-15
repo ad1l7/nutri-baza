@@ -98,7 +98,7 @@
 <div class="main">
   <div class="page-title">🏷 Этикетки</div>
   <div class="page-sub">
-    {{ label_mm }} мм · 203 dpi · Zebra ZT411. Состав, БЖУ и масса берутся из каталога.
+    100 × 130 мм · 203 dpi · Zebra ZT411. Состав, БЖУ и масса берутся из каталога.
     Печатается ровно то, что видно в превью.
   </div>
 
@@ -115,6 +115,17 @@
       <label class="fl">Срок хранения, часов</label>
       <input class="fi" type="number" id="shelf" value="{{ shelf_hours }}" min="1" max="8760">
 
+      <label class="fl">Размер этикетки, мм</label>
+      <div class="row">
+        <div><input class="fi" type="number" id="width" value="{{ width_mm }}" min="40" max="120" title="Ширина"></div>
+        <div><input class="fi" type="number" id="height" value="{{ height_mm }}" min="40" max="200" title="Высота"></div>
+        <div><input class="fi" type="number" id="margin" value="{{ margin_mm }}" min="0" max="20" title="Поля"></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.45">
+        ширина · высота · поля. Если текст уходит за край наклейки — уменьшайте
+        ширину на 2–3 мм, пока не сядет ровно.
+      </div>
+
       <div class="row">
         <div>
           <label class="fl">Скорость, ips</label>
@@ -125,7 +136,7 @@
         </div>
         <div>
           <label class="fl">Плотность</label>
-          <input class="fi" type="number" id="darkness" value="15" min="0" max="30">
+          <input class="fi" type="number" id="darkness" value="20" min="0" max="30">
         </div>
       </div>
 
@@ -171,9 +182,9 @@
       <label class="fl" style="text-align:left">Превью — реальный размер печати</label>
       <img id="prev" alt="Выберите блюдо">
       <p class="hint">
-        Чёрное — то, что напечатается. Картинка целиком рисуется на сервере и уходит
-        на принтер командой <b>^GFA</b>. Верхний блок пока продублирован по-русски —
-        там будет казахский текст, видно, сколько места он займёт.
+        Чёрное — то, что напечатается. Середина оставлена пустой — там на наклейке
+        уже есть рисунок и QR-код. Текст сам уменьшается, если состав длинный,
+        чтобы не залезть на свободную середину.
       </p>
     </div>
 
@@ -188,7 +199,10 @@ function log(msg, cls){ const d=document.createElement('div'); if(cls)d.classNam
 function params(){
   return 'made_date='+encodeURIComponent($('made_date').value)
        + '&made_time='+encodeURIComponent($('made_time').value)
-       + '&shelf='+encodeURIComponent($('shelf').value);
+       + '&shelf='+encodeURIComponent($('shelf').value)
+       + '&width='+encodeURIComponent($('width').value)
+       + '&height='+encodeURIComponent($('height').value)
+       + '&margin='+encodeURIComponent($('margin').value);
 }
 
 // Превью строит сервер — той же функцией, что готовит ZPL
@@ -213,7 +227,7 @@ $('selall').onchange = e => {
   document.querySelectorAll('.pcb').forEach(cb => cb.checked = e.target.checked);
   sync();
 };
-['made_date','made_time','shelf'].forEach(id => $(id).addEventListener('input', refreshPreview));
+['made_date','made_time','shelf','width','height','margin'].forEach(id => $(id).addEventListener('input', refreshPreview));
 
 // ── Zebra Browser Print ──
 const BP = 'https://localhost:9101';
