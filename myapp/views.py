@@ -1392,6 +1392,8 @@ ORDER_SHEET_HEADER = [
     "Информация заказчика", "Дата", "Компания", "Эл.почта", "Конт.тел", "Заполнил (И.Ф.)",
 ]
 ORDER_SHEET_TITLE = 'Заявочный лист "Фуд завод"'
+# Заголовок над списком блюд — на объединённых колонках «Артикул + Наименование»
+ORDER_SHEET_SECTION = "Здоровое Питание"
 
 
 def _build_order_sheet_xlsx(products, with_price=False):
@@ -1415,6 +1417,8 @@ def _build_order_sheet_xlsx(products, with_price=False):
     # Цвета с альфой (FF…) — как в исходном файле, иначе openpyxl пишет 00…
     grey_head = PatternFill("solid", fgColor="FFD9D9D9")   # строка «Артикул | Наименование…»
     grey_sep  = PatternFill("solid", fgColor="FFA6A6A6")   # разделитель под ней
+    yellow_sect = PatternFill("solid", fgColor="FFFFFF00")  # заголовок раздела
+    sect_font = Font(name="Times New Roman", size=12, bold=True)
     center    = Alignment(horizontal="center")
 
     headers = ["Артикул", "Наименование продукта", "Кратность заказа"]
@@ -1467,8 +1471,14 @@ def _build_order_sheet_xlsx(products, with_price=False):
     ws.row_dimensions[8].height = 18
     ws.row_dimensions[9].height = 18
 
+    # ── Строка 10: заголовок раздела на объединённых «Артикул + Наименование» ──
+    ws.merge_cells(start_row=10, start_column=1, end_row=10, end_column=2)
+    ws.cell(row=10, column=1, value=ORDER_SHEET_SECTION)
+    bordered_row(10, fill=yellow_sect, font=sect_font)
+    ws.row_dimensions[10].height = 18
+
     # ── Блюда, следом материалы — одним списком, без заголовков секций ──
-    row = 10
+    row = 11
     for p in products:
         item_row(
             row, p.article, p.name,
