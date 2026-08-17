@@ -21,6 +21,19 @@ def is_reader(user) -> bool:
     )
 
 
+def can_edit_prices(user) -> bool:
+    """Кто может вносить «Цену прод.» в каталоге.
+
+    Все, кроме читателей, — как и раньше. Читателю право открывается
+    галочкой «Может менять цены продажи» в его карточке в админке."""
+    if not (user and user.is_authenticated):
+        return False
+    if not is_reader(user):
+        return True
+    rights = getattr(user, "rights", None)
+    return bool(rights and rights.can_edit_prices)
+
+
 def editor_required(view):
     """Страница целиком недоступна читателю — даже на просмотр.
 

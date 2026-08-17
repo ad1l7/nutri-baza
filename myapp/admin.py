@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.models import User
+
 from .models import (
     IikoSyncLog,
     Product, Allergen, MealCategory, MealTime,
@@ -7,8 +10,32 @@ from .models import (
     IikoCategoryMap,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
-    Material,
+    Material, UserRights,
 )
+
+
+# ── Права пользователя: галочка прямо в его карточке ─────────────────────────
+
+class UserRightsInline(admin.StackedInline):
+    model = UserRights
+    can_delete = False
+    verbose_name_plural = "Дополнительные права"
+    extra = 0
+
+
+class UserAdmin(DjangoUserAdmin):
+    """Стандартная карточка пользователя плюс блок с точечными правами."""
+    inlines = [UserRightsInline]
+    list_display = DjangoUserAdmin.list_display + ("prices_allowed",)
+
+    @admin.display(description="Правит цены", boolean=True)
+    def prices_allowed(self, user):
+        rights = getattr(user, "rights", None)
+        return bool(rights and rights.can_edit_prices)
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
 
 
 @admin.register(Allergen)

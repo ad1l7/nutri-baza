@@ -792,7 +792,7 @@
             </td>
             <!-- Цена продажи с ФЗ — единственное, что вносится руками -->
             <td class="td-sale" onclick="event.stopPropagation()">
-              {% if is_reader %}
+              {% if not can_edit_prices %}
                 {% if p.sale_price %}{{ p.sale_price|smart_num }} <span class="td-cost-unit">₸</span>{% else %}—{% endif %}
               {% else %}
                 <input type="number" min="0" step="0.01" id="sale-{{ p.pk }}"
@@ -979,7 +979,7 @@ function getCsrfToken() {
     .find(c => c.startsWith('csrftoken='))
     ?.split('=')[1] || '';
 }
-const IS_READER = {{ is_reader|yesno:"true,false" }};
+const CAN_EDIT_PRICES = {{ can_edit_prices|yesno:"true,false" }};
 const PD = {
   {% for p in products %}
   {{ p.pk }}: {
@@ -1050,7 +1050,7 @@ function showDetail(pk) {
       </div>
       <div class="meta-card">
         <div class="meta-label">Цена продажи с ФЗ</div>
-        ${IS_READER ? `
+        ${!CAN_EDIT_PRICES ? `
         <div class="meta-val cost-val">${v(d.sale) !== '—' ? v(d.sale) + ' ₸' : '—'}</div>
         ` : `
         <div style="display:flex;gap:6px;align-items:center;margin-top:2px;">

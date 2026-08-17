@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -165,6 +166,32 @@ class Product(models.Model):
         """Наценка меньше нормы — повод подсветить себестоимость."""
         pct = self.markup_pct
         return pct is not None and pct < self.MARKUP_MIN_PCT
+
+
+# ── Точечные права пользователя ──────────────────────────────────────────────
+
+class UserRights(models.Model):
+    """Отдельные разрешения поверх роли «читатель».
+
+    Читатель по умолчанию не может ничего менять. Галочки здесь открывают ему
+    конкретные действия — не превращая его в полноценного редактора.
+    Правятся в карточке пользователя в админке."""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name="rights", verbose_name="Пользователь",
+    )
+    can_edit_prices = models.BooleanField(
+        default=False, verbose_name="Может менять цены продажи",
+        help_text="Читатель сможет вносить «Цену прод.» в каталоге. Остальное "
+                  "останется только для чтения.",
+    )
+
+    class Meta:
+        verbose_name = "Права пользователя"
+        verbose_name_plural = "Права пользователей"
+
+    def __str__(self):
+        return f"Права: {self.user}"
 
 
 # ── Материалы (упаковка и прочее для заявочного листа) ───────────────────────
