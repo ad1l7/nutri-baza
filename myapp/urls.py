@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import api, views
 
 urlpatterns = [
     # Каталог
@@ -50,4 +50,9 @@ urlpatterns = [
     # iiko
     path("iiko/sync/", views.iiko_sync_view, name="iiko_sync"),
     path("iiko/status/", views.iiko_sync_status, name="iiko_sync_status"),
+
+    # API для внешних систем: ERP забирает каталог и печатает этикетки у себя.
+    # Только чтение, доступ по токену (см. LoginRequiredMiddleware).
+    path("api/v1/labels/products/", api.label_products, name="api_label_products"),
+    path("api/v1/labels/products/<int:pk>/", api.label_product, name="api_label_product"),
 ]
