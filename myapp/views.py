@@ -1,6 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
-import io
 import json
 import logging
 from django.conf import settings
@@ -14,7 +13,6 @@ from .models import (
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, RATION_SLOT_TYPES,
 )
-from . import labels
 from .roles import editor_required
 
 logger = logging.getLogger(__name__)
@@ -1339,104 +1337,6 @@ def _export_ration_group_xlsx(group):
     response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
     wb.save(response)
     return response
-
-
-# ── Этикетки ──────────────────────────────────────────────────────────────────
-
-def _label_params(request):
-    """Разбирает общие параметры печати: дата/время изготовления и срок."""
-    from datetime import datetime
-    raw_date = request.GET.get("made_date") or timezone.localdate().isoformat()
-    raw_time = request.GET.get("made_time") or "17:00"
-    try:
-        made_at = datetime.strptime(f"{raw_date} {raw_time}", "%Y-%m-%d %H:%M")
-    except ValueError:
-        made_at = datetime.combine(timezone.localdate(), datetime.min.time().replace(hour=17))
-    def number(key, default, low, high):
-        try:
-            return max(low, min(int(float(request.GET.get(key) or default)), high))
-        except (TypeError, ValueError):
-            return default
-
-    return {
-        "made_at": made_at,
-        "shelf_hours": number("shelf", labels.DEFAULT_SHELF_HOURS, 1, 8760),
-        "width_mm": number("width", labels.DEFAULT_WIDTH_MM, 40, 120),
-        "height_mm": number("height", labels.DEFAULT_HEIGHT_MM, 40, 200),
-        "margin_mm": number("margin", labels.DEFAULT_MARGIN_MM, 0, 20),
-    }
-
-
-def label_list(request):
-    """Вкладка «Этикетки»: выбор блюд, количество копий, превью и печать."""
-    products = (
-        Product.objects
-        .exclude(composition_clean="")
-        .order_by("name")
-    )
-    search = request.GET.get("search", "").strip()
-    if search:
-        products = products.filter(
-            Q(name__icontains=search) | Q(article__icontains=search)
-        )
-    return render(request, "myapp/label_list.html", {
-        "products": products,
-        "search": search,
-        "today": timezone.localdate().isoformat(),
-        "shelf_hours": labels.DEFAULT_SHELF_HOURS,
-        "width_mm": labels.DEFAULT_WIDTH_MM,
-        "height_mm": labels.DEFAULT_HEIGHT_MM,
-        "margin_mm": labels.DEFAULT_MARGIN_MM,
-    })
-
-
-def label_preview(request, pk):
-    """PNG этикетки — то же изображение, что уйдёт на принтер."""
-    from django.http import HttpResponse
-    product = get_object_or_404(Product, pk=pk)
-    image = labels.render_label(product, **_label_params(request))
-
-    buffer = io.BytesIO()
-    image.convert("L").save(buffer, format="PNG")
-    response = HttpResponse(buffer.getvalue(), content_type="image/png")
-    response["Cache-Control"] = "no-store"
-    return response
-
-
-def label_zpl(request):
-    """ZPL для выбранных блюд. items=«id:копий,id:копий».
-    Браузер забирает текст и передаёт его в Zebra Browser Print."""
-    from django.http import HttpResponse
-    params = _label_params(request)
-    try:
-        speed = int(request.GET.get("speed") or 4)
-        darkness = int(request.GET.get("darkness") or 20)
-    except (TypeError, ValueError):
-        speed, darkness = 4, 20
-
-    jobs = []
-    for chunk in (request.GET.get("items") or "").split(","):
-        if not chunk.strip():
-            continue
-        product_id, _, copies = chunk.partition(":")
-        try:
-            jobs.append((int(product_id), max(1, min(int(copies or 1), 500))))
-        except ValueError:
-            continue
-
-    if not jobs:
-        return HttpResponse("нечего печатать", status=400, content_type="text/plain; charset=utf-8")
-
-    parts = []
-    by_id = Product.objects.in_bulk([pid for pid, _ in jobs])
-    for product_id, copies in jobs:
-        product = by_id.get(product_id)
-        if not product:
-            continue
-        image = labels.render_label(product, **params)
-        parts.append(labels.image_to_zpl(image, copies=copies, speed=speed, darkness=darkness))
-
-    return HttpResponse("\n".join(parts), content_type="text/plain; charset=utf-8")
 
 
 # ── Материалы ─────────────────────────────────────────────────────────────────

@@ -17,8 +17,17 @@ LoginRequiredMiddleware для всего /api/ целиком, а не деко
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
-from .labels import _clean_name
 from .models import Product
+
+
+def _clean_name(name):
+    """Убирает служебные части названия из iiko: «ПП* Упак», «(1порц)».
+    На этикетку идёт очищенное имя, поэтому чистим здесь, а не в ERP:
+    это особенность выгрузки iiko, и знать про неё должна наша сторона."""
+    result = (name or "").replace("ПП* Упак ", "").replace("ПП*Упак ", "")
+    for tail in (" (1порц)", " (1шт)", "(1порц)", "(1шт)"):
+        result = result.replace(tail, "")
+    return result.strip()
 
 
 def _num(value, digits=2):
@@ -59,8 +68,7 @@ def _product_json(product):
 
 
 def _queryset():
-    """Блюда, пригодные для печати: без состава этикетку не сделать.
-    Тот же отбор, что на вкладке «Этикетки»."""
+    """Блюда, пригодные для печати: без состава этикетку не сделать."""
     return (
         Product.objects
         .exclude(composition_clean="")
