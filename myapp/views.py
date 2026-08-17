@@ -1394,6 +1394,7 @@ ORDER_SHEET_HEADER = [
 ORDER_SHEET_TITLE = 'Заявочный лист "Фуд завод"'
 # Заголовок над списком блюд — на объединённых колонках «Артикул + Наименование»
 ORDER_SHEET_SECTION = "Здоровое Питание"
+ORDER_SHEET_COMPANY = "O-Live"
 
 
 def _build_order_sheet_xlsx(products, with_price=False):
@@ -1453,9 +1454,13 @@ def _build_order_sheet_xlsx(products, with_price=False):
         ws.row_dimensions[row].height = 18
 
     # ── Строки 1–9: шапка ──
-    ws.cell(row=1, column=2, value=ORDER_SHEET_TITLE).font = Font(name="Calibri", size=9)
+    small = Font(name="Calibri", size=9)
+    ws.cell(row=1, column=1, value=1).font = small
+    ws.cell(row=1, column=2, value=ORDER_SHEET_TITLE).font = small
     for i, label in enumerate(ORDER_SHEET_HEADER, start=2):
-        ws.cell(row=i, column=1, value=label).font = Font(name="Calibri", size=9)
+        ws.cell(row=i, column=1, value=label).font = small
+    # Строка 4 — «Компания», заполняем сразу
+    ws.cell(row=4, column=2, value=ORDER_SHEET_COMPANY).font = small
 
     for col, title in enumerate(headers, start=1):
         c = ws.cell(row=8, column=col, value=title)
