@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, ROUND_CEILING
 
 from django.conf import settings
 from django.db import models
@@ -138,12 +138,13 @@ class Product(models.Model):
 
     @property
     def auto_sale_price(self):
-        """Цена продажи с целевой наценкой. None, если себестоимости нет:
-        нулевой себес — это тоже «нет данных», из него цену не считаем."""
+        """Цена продажи с целевой наценкой, округлённая вверх до целых тенге.
+        Округляем именно вверх — наценка не должна оказаться ниже целевой.
+        None, если себестоимости нет: нулевой себес — это тоже «нет данных»."""
         if not self.cost:
             return None
         factor = Decimal(1) + Decimal(self.MARKUP_TARGET_PCT) / Decimal(100)
-        return (self.cost * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return (self.cost * factor).quantize(Decimal("1"), rounding=ROUND_CEILING)
 
     @property
     def markup(self):
