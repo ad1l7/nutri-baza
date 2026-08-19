@@ -474,7 +474,9 @@ class IikoServerClient:
 
         body = {
             "reportType": "TRANSACTIONS",
-            "groupByRowFields": ["Product.Name"],
+            # GUID и артикул — надёжные ключи. Названия в складской номенклатуре
+            # и в меню доставки расходятся, по ним часть позиций не находилась.
+            "groupByRowFields": ["Product.Id", "Product.Num", "Product.Name"],
             "groupByColFields": [],
             # Amount.Out — количество в строке накладной; цена за единицу
             # считается как Sum.Incoming / Amount.Out (см. _parse_cost_report)
@@ -642,57 +644,63 @@ def _norm_name_nosuffix(s) -> str:
 
 
 def _parse_cost_report(report_data: dict) -> dict:
-    """Возвращает {product_name: себестоимость за единицу} из OLAP-отчёта.
+    """Разбирает OLAP-отчёт себестоимости в три индекса: по GUID, по артикулу
+    и по названию — {'by_id': {...}, 'by_num': {...}, 'by_name': {...}}.
 
-    В отчёте Sum.Incoming — сумма по строке накладной, Amount.Out — количество
-    в ней. Себестоимость единицы = сумма / количество: без деления позиция,
-    ушедшая не по одной штуке, получала кратно завышенную цену.
-    Строки с нулевым количеством пропускаем — цену из них не вывести.
+    Sum.Incoming — сумма по строке расходной накладной, Amount.Out — количество
+    в ней; себестоимость единицы = сумма / количество. Строки с нулевым
+    количеством пропускаем — цену из них не вывести.
     """
-    costs = {}
-    columns = report_data.get("columnNames") or report_data.get("columns") or []
+    index = {"by_id": {}, "by_num": {}, "by_name": {}}
     rows = report_data.get("data") or []
+    if not rows or not isinstance(rows[0], dict):
+        return index
 
-    if not rows:
-        return costs
-
-    def put(name, total, amount):
-        name = str(name or "").strip()
-        if not name:
-            return
+    for row in rows:
         try:
-            total = float(total)
-            amount = float(amount if amount is not None else 0)
+            total = float(row.get("Sum.Incoming") or 0)
+            amount = float(row.get("Amount.Out") or 0)
         except (TypeError, ValueError):
-            return
+            continue
         if amount <= 0:
-            return
-        costs[name] = total / amount
+            continue
+        unit = total / amount
 
-    # Формат 1: список имён колонок + список строк-списков
-    if columns:
-        def index_of(key):
-            return next((i for i, c in enumerate(columns) if key in str(c)), None)
+        product_id = str(row.get("Product.Id") or "").strip()
+        num = str(row.get("Product.Num") or "").strip()
+        name = str(row.get("Product.Name") or "").strip()
+        if product_id:
+            index["by_id"].setdefault(product_id, unit)
+        if num:
+            index["by_num"].setdefault(num, unit)
+        if name:
+            index["by_name"].setdefault(_norm_name(name), unit)
+            index["by_name"].setdefault(_norm_name_nosuffix(name), unit)
+    return index
 
-        name_idx = index_of("Product.Name")
-        cost_idx = index_of("Sum.Incoming")
-        amount_idx = index_of("Amount.Out")
-        if name_idx is not None and cost_idx is not None:
-            needed = max(i for i in (name_idx, cost_idx, amount_idx) if i is not None)
-            for row in rows:
-                if not isinstance(row, list) or len(row) <= needed:
-                    continue
-                amount = row[amount_idx] if amount_idx is not None else 1
-                put(row[name_idx], row[cost_idx], amount)
-        return costs
 
-    # Формат 2: строки-словари
-    if isinstance(rows[0], dict):
-        for row in rows:
-            put(row.get("Product.Name"), row.get("Sum.Incoming") or 0,
-                row.get("Amount.Out", 1))
+def _lookup_cost(index: dict, iiko_id: str, article: str, name: str):
+    """Ищет себестоимость по самому надёжному ключу: сначала GUID, затем
+    артикул и только потом название. Названия в складской номенклатуре и в
+    меню доставки совпадают не всегда — по ним часть позиций терялась."""
+    if not index:
+        return None
+    if iiko_id:
+        hit = index["by_id"].get(str(iiko_id).strip())
+        if hit is not None:
+            return hit
+    if article:
+        hit = index["by_num"].get(str(article).strip())
+        if hit is not None:
+            return hit
+    if name:
+        hit = index["by_name"].get(_norm_name(name))
+        if hit is None:
+            hit = index["by_name"].get(_norm_name_nosuffix(name))
+        return hit
+    return None
 
-    return costs
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Главная функция синхронизации
 # ──────────────────────────────────────────────────────────────────────────────
@@ -776,7 +784,7 @@ def sync_products_from_iiko(
 
     # ── Шаг 3: iiko Server — состав + себестоимость ──────────────────────────
     server_composition = {}
-    cost_by_name = {}
+    cost_index = {}
     if server_url and server_login:
         server = None
         try:
@@ -817,10 +825,12 @@ def sync_products_from_iiko(
             # Себестоимость из OLAP-отчёта
             try:
                 raw_report = server.get_cost_report()
-                cost_by_name = _parse_cost_report(raw_report)
-                logger.info(f"OLAP себестоимость: {len(cost_by_name)} блюд")
-                sample_keys = list(cost_by_name.keys())[:8]
-                logger.info(f"OLAP примеры названий: {sample_keys}")
+                cost_index = _parse_cost_report(raw_report)
+                logger.info(
+                    "OLAP себестоимость: %d позиций (по GUID %d, по артикулу %d)"
+                    % (len(cost_index["by_id"]), len(cost_index["by_id"]),
+                       len(cost_index["by_num"]))
+                )
             except Exception as e:
                 logger.warning(f"OLAP отчёт себестоимости: {e}")
                 result["errors"].append(f"OLAP себестоимость: {e}")
@@ -913,12 +923,6 @@ def sync_products_from_iiko(
 
     now = dj_timezone.now()
 
-    # Нормализованные словари себестоимости для устойчивого сопоставления
-    cost_norm = {}
-    cost_norm_nosuffix = {}
-    for k, v in cost_by_name.items():
-        cost_norm.setdefault(_norm_name(k), v)
-        cost_norm_nosuffix.setdefault(_norm_name_nosuffix(k), v)
     cost_matched = 0
     cost_unmatched = []
 
@@ -977,14 +981,10 @@ def sync_products_from_iiko(
             if uuid in server_composition:
                 new_fields["composition"] = server_composition[uuid]
 
-            # Себестоимость: точное → по нормализованному имени → без суффикса "(1порц)"
-            if cost_by_name:
+            # Себестоимость: GUID → артикул → название
+            if cost_index:
                 product_name = menu_info["name"]
-                cost_val = cost_by_name.get(product_name)
-                if cost_val is None:
-                    cost_val = cost_norm.get(_norm_name(product_name))
-                if cost_val is None:
-                    cost_val = cost_norm_nosuffix.get(_norm_name_nosuffix(product_name))
+                cost_val = _lookup_cost(cost_index, uuid, article, product_name)
                 if cost_val is not None:
                     # Decimal, а не float: поле DecimalField, и цена продажи
                     # считается в Decimal — смешение типов ломает сохранение
@@ -1053,7 +1053,7 @@ def sync_products_from_iiko(
 
     _last_sync_time = time.time()
 
-    if cost_by_name:
+    if cost_index:
         logger.info(
             f"Себестоимость: сопоставлено {cost_matched}, "
             f"не найдено {len(cost_unmatched)}. "
