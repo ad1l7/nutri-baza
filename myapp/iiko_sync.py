@@ -17,6 +17,7 @@ iiko_sync.py — умная синхронизация продуктов из i
 """
 
 import re
+from decimal import Decimal
 import time
 import hashlib
 import requests
@@ -985,7 +986,9 @@ def sync_products_from_iiko(
                 if cost_val is None:
                     cost_val = cost_norm_nosuffix.get(_norm_name_nosuffix(product_name))
                 if cost_val is not None:
-                    new_fields["cost"] = round(cost_val, 2)
+                    # Decimal, а не float: поле DecimalField, и цена продажи
+                    # считается в Decimal — смешение типов ломает сохранение
+                    new_fields["cost"] = Decimal(str(round(cost_val, 2)))
                     cost_matched += 1
                 else:
                     cost_unmatched.append(product_name)

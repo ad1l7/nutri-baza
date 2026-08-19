@@ -136,6 +136,14 @@ class Product(models.Model):
 
     # ── Наценка фудзавода (считается из cost и sale_price, в БД не хранится) ──
 
+    @staticmethod
+    def _decimal(value):
+        """Приводит к Decimal. Из БД поля приходят Decimal, но синхронизация с
+        iiko присваивает их как float — смешивать типы в арифметике нельзя."""
+        if value is None or isinstance(value, Decimal):
+            return value
+        return Decimal(str(value))
+
     @property
     def auto_sale_price(self):
         """Цена продажи с целевой наценкой, округлённая вверх до целых тенге.
@@ -144,7 +152,8 @@ class Product(models.Model):
         if not self.cost:
             return None
         factor = Decimal(1) + Decimal(self.MARKUP_TARGET_PCT) / Decimal(100)
-        return (self.cost * factor).quantize(Decimal("1"), rounding=ROUND_CEILING)
+        return (self._decimal(self.cost) * factor).quantize(
+            Decimal("1"), rounding=ROUND_CEILING)
 
     @property
     def markup(self):
@@ -152,7 +161,7 @@ class Product(models.Model):
         Считаем в Decimal — на float вылезает мусор вида 349.99999999999994."""
         if self.sale_price is None or self.cost is None:
             return None
-        return self.sale_price - self.cost
+        return self._decimal(self.sale_price) - self._decimal(self.cost)
 
     @property
     def markup_pct(self):
