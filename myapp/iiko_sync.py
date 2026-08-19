@@ -475,7 +475,9 @@ class IikoServerClient:
             "reportType": "TRANSACTIONS",
             "groupByRowFields": ["Product.Name"],
             "groupByColFields": [],
-            "aggregateFields": ["Sum.Incoming"],
+            # Amount.Out — количество в строке накладной; цена за единицу
+            # считается как Sum.Incoming / Amount.Out (см. _parse_cost_report)
+            "aggregateFields": ["Sum.Incoming", "Amount.Out"],
             "filters": {
                 "DateTime.OperDayFilter": {
                     "filterType": "DateRange",
@@ -639,7 +641,13 @@ def _norm_name_nosuffix(s) -> str:
 
 
 def _parse_cost_report(report_data: dict) -> dict:
-    """Возвращает {product_name: cost} из ответа OLAP-отчёта iiko Server."""
+    """Возвращает {product_name: себестоимость за единицу} из OLAP-отчёта.
+
+    В отчёте Sum.Incoming — сумма по строке накладной, Amount.Out — количество
+    в ней. Себестоимость единицы = сумма / количество: без деления позиция,
+    ушедшая не по одной штуке, получала кратно завышенную цену.
+    Строки с нулевым количеством пропускаем — цену из них не вывести.
+    """
     costs = {}
     columns = report_data.get("columnNames") or report_data.get("columns") or []
     rows = report_data.get("data") or []
@@ -647,36 +655,43 @@ def _parse_cost_report(report_data: dict) -> dict:
     if not rows:
         return costs
 
+    def put(name, total, amount):
+        name = str(name or "").strip()
+        if not name:
+            return
+        try:
+            total = float(total)
+            amount = float(amount if amount is not None else 0)
+        except (TypeError, ValueError):
+            return
+        if amount <= 0:
+            return
+        costs[name] = total / amount
+
     # Формат 1: список имён колонок + список строк-списков
     if columns:
-        name_idx = next((i for i, c in enumerate(columns) if "Product.Name" in str(c)), None)
-        cost_idx = next((i for i, c in enumerate(columns) if "Sum.Incoming" in str(c)), None)
+        def index_of(key):
+            return next((i for i, c in enumerate(columns) if key in str(c)), None)
+
+        name_idx = index_of("Product.Name")
+        cost_idx = index_of("Sum.Incoming")
+        amount_idx = index_of("Amount.Out")
         if name_idx is not None and cost_idx is not None:
+            needed = max(i for i in (name_idx, cost_idx, amount_idx) if i is not None)
             for row in rows:
-                if isinstance(row, list) and len(row) > max(name_idx, cost_idx):
-                    try:
-                        name = str(row[name_idx]).strip()
-                        cost = float(row[cost_idx])
-                        if name:
-                            costs[name] = cost
-                    except (TypeError, ValueError):
-                        pass
+                if not isinstance(row, list) or len(row) <= needed:
+                    continue
+                amount = row[amount_idx] if amount_idx is not None else 1
+                put(row[name_idx], row[cost_idx], amount)
         return costs
 
     # Формат 2: строки-словари
-    if rows and isinstance(rows[0], dict):
+    if isinstance(rows[0], dict):
         for row in rows:
-            name = str(row.get("Product.Name") or "").strip()
-            try:
-                cost = float(row.get("Sum.Incoming") or 0)
-                if name:
-                    costs[name] = cost
-            except (TypeError, ValueError):
-                pass
+            put(row.get("Product.Name"), row.get("Sum.Incoming") or 0,
+                row.get("Amount.Out", 1))
 
     return costs
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Главная функция синхронизации
 # ──────────────────────────────────────────────────────────────────────────────
