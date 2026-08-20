@@ -16,10 +16,6 @@ CSRF_TRUSTED_ORIGINS = [
     'https://www.olive-nutri-baza.kz',
 ]
 
-# Токен для /api/ — по нему ERP забирает каталог блюд, чтобы печатать этикетки
-# у себя. Значение в .env; пустое = API закрыт полностью.
-LABEL_API_TOKEN = config('LABEL_API_TOKEN', default='')
-
 # ── База данных ───────────────────────────────────────────────────────────────
 # Если USE_SQLITE=True в .env — локальная разработка на SQLite
 # Если USE_SQLITE не задан — PostgreSQL (продакшн)
