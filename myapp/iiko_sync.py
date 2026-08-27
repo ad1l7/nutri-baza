@@ -811,17 +811,53 @@ def sync_products_from_iiko(
             products_by_id = {sp.get("id"): sp for sp in server_products if sp.get("id")}
             dish_ids = [pid for pid in menu_map if pid in products_by_id]
 
-            # «Название в системе» из карточки продукта. Имя во внешнем
-            # меню редактируется отдельно и часто скопировано с соседней позиции
-            # (например, все поке значатся как «с лососем»), поэтому системное имя
-            # приоритетнее.
-            for pid in dish_ids:
-                sp = products_by_id[pid]
+            # «Название в системе» из карточки продукта. Имя во внешнем меню
+            # редактируется отдельно и часто скопировано с соседней позиции
+            # (например, все поке значатся как «с лососем»), поэтому системное
+            # имя приоритетнее.
+            #
+            # Основная связка — id: внешнее меню ссылается на карточку именно по
+            # нему, обе стороны читаются из iiko в один момент. Запасная — по
+            # артикулу: если карточку блюда пересоздали, в номенклатуре будет уже
+            # новый id, а меню какое-то время отдаёт старый itemId (тот же случай,
+            # который чинил f3a7c68 для сопоставления с нашей базой). Артикул
+            # берём только уникальный с обеих сторон: задвоенный (в Server такие
+            # есть) подставил бы имя чужого блюда.
+            from collections import Counter as _C
+            _srv_num_counts = _C(
+                str(sp.get("num") or "").strip()
+                for sp in server_products
+                if str(sp.get("num") or "").strip()
+            )
+            _menu_art_counts_srv = _C(
+                (info.get("article") or "").strip()
+                for info in menu_map.values()
+                if (info.get("article") or "").strip()
+            )
+            srv_by_num = {
+                str(sp.get("num") or "").strip(): sp
+                for sp in server_products
+                if str(sp.get("num") or "").strip()
+                and _srv_num_counts[str(sp.get("num") or "").strip()] == 1
+            }
+
+            name_by_article = 0
+            for pid, info in menu_map.items():
+                sp = products_by_id.get(pid)
+                if sp is None:
+                    art = (info.get("article") or "").strip()
+                    if art and _menu_art_counts_srv[art] == 1:
+                        sp = srv_by_num.get(art)
+                        if sp is not None:
+                            name_by_article += 1
+                if sp is None:
+                    continue
                 nm = (sp.get("name") or "").strip()
                 if nm:
                     uuid_to_name[pid] = nm
             logger.info(
-                f"iiko Server: названия для {len(dish_ids)} блюд из {len(menu_map)} в меню"
+                f"iiko Server: названия для {len(uuid_to_name)} блюд из "
+                f"{len(menu_map)} в меню (по артикулу: {name_by_article})"
             )
 
             def _fetch_composition(pid):
