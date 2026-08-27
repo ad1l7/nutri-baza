@@ -771,9 +771,10 @@ def sync_products_from_iiko(
     logger.info(f"iiko артикулы из меню: {with_article}/{len(menu_map)} блюд. Примеры: {sample}")
 
     # ── Шаг 2: Номенклатура — артикулы и названия ────────────────────────────
-    # Имя из номенклатуры — это «Название в системе» в iiko. Оно точнее, чем
-    # «Название для внеш. меню»: у блюда во внешнем меню имя часто скопировано
-    # с соседней позиции (все поке значатся как «с лососем»).
+    # Cloud-номенклатура покрывает только меню доставки (~85 позиций против 289
+    # во внешнем меню) и по uuid с ним практически не пересекается, так что это
+    # лишь слабый фолбэк. Основной источник и артикулов, и «Названия в системе» —
+    # iiko Server на шаге 3.
     uuid_to_sku = {}
     uuid_to_name = {}
     try:
@@ -809,6 +810,19 @@ def sync_products_from_iiko(
             server_products = server.get_products()
             products_by_id = {sp.get("id"): sp for sp in server_products if sp.get("id")}
             dish_ids = [pid for pid in menu_map if pid in products_by_id]
+
+            # «Название в системе» из карточки продукта. Имя во внешнем
+            # меню редактируется отдельно и часто скопировано с соседней позиции
+            # (например, все поке значатся как «с лососем»), поэтому системное имя
+            # приоритетнее.
+            for pid in dish_ids:
+                sp = products_by_id[pid]
+                nm = (sp.get("name") or "").strip()
+                if nm:
+                    uuid_to_name[pid] = nm
+            logger.info(
+                f"iiko Server: названия для {len(dish_ids)} блюд из {len(menu_map)} в меню"
+            )
 
             def _fetch_composition(pid):
                 try:
@@ -965,7 +979,7 @@ def sync_products_from_iiko(
                 if nom_num and nom_num != uuid:
                     article = nom_num
 
-            # Название в системе (номенклатура) → фолбэк на имя из внеш. меню
+            # «Название в системе» (iiko Server) → фолбэк на имя из внеш. меню
             product_name = uuid_to_name.get(uuid) or menu_info["name"]
 
             new_fields = {
