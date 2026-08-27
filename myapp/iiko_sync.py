@@ -770,16 +770,26 @@ def sync_products_from_iiko(
     sample = [(i.get("article"), i.get("name")) for i in menu_map.values() if i.get("article")][:5]
     logger.info(f"iiko артикулы из меню: {with_article}/{len(menu_map)} блюд. Примеры: {sample}")
 
-    # ── Шаг 2: Номенклатура — артикулы ───────────────────────────────────────
+    # ── Шаг 2: Номенклатура — артикулы и названия ────────────────────────────
+    # Имя из номенклатуры — это «Название в системе» в iiko. Оно точнее, чем
+    # «Название для внеш. меню»: у блюда во внешнем меню имя часто скопировано
+    # с соседней позиции (все поке значатся как «с лососем»).
     uuid_to_sku = {}
+    uuid_to_name = {}
     try:
         nom = cloud.get_nomenclature(org_id)
         for prod in nom.get("products") or []:
             pid = prod.get("id") or ""
             num = prod.get("num") or prod.get("code") or ""
+            nm = (prod.get("name") or "").strip()
             if pid and num:
                 uuid_to_sku[pid] = str(num).strip()
-        logger.info(f"Nomenclature: {len(uuid_to_sku)} артикулов")
+            if pid and nm:
+                uuid_to_name[pid] = nm
+        logger.info(
+            f"Nomenclature: {len(uuid_to_sku)} артикулов, "
+            f"{len(uuid_to_name)} названий"
+        )
     except Exception as e:
         logger.warning(f"Номенклатура: {e}")
         result["errors"].append(f"Nomenclature: {e}")
@@ -955,8 +965,11 @@ def sync_products_from_iiko(
                 if nom_num and nom_num != uuid:
                     article = nom_num
 
+            # Название в системе (номенклатура) → фолбэк на имя из внеш. меню
+            product_name = uuid_to_name.get(uuid) or menu_info["name"]
+
             new_fields = {
-                "name":           menu_info["name"],
+                "name":           product_name,
                 "article":        article,
                 "iiko_category":  cat_display,
                 "iiko_sku":       sku,
@@ -985,7 +998,6 @@ def sync_products_from_iiko(
 
             # Себестоимость: GUID → артикул → название
             if cost_index:
-                product_name = menu_info["name"]
                 cost_val = _lookup_cost(cost_index, uuid, article, product_name)
                 if cost_val is not None:
                     # Decimal, а не float: поле DecimalField, и цена продажи
@@ -1007,7 +1019,7 @@ def sync_products_from_iiko(
                     product.iiko_synced_at = now
                     product.save()
                     result["updated"] += 1
-                    logger.debug(f"Обновлён '{menu_info['name']}': {changed_fields}")
+                    logger.debug(f"Обновлён '{product_name}': {changed_fields}")
                 else:
                     result["unchanged"] += 1
 
