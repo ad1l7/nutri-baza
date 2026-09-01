@@ -853,6 +853,7 @@ def sync_products_from_iiko(
             }
 
             name_by_article = 0
+            name_from_server = 0
             for pid, info in menu_map.items():
                 sp = products_by_id.get(pid)
                 if sp is None:
@@ -866,8 +867,11 @@ def sync_products_from_iiko(
                 nm = (sp.get("name") or "").strip()
                 if nm:
                     uuid_to_name[pid] = nm
+                    name_from_server += 1
+            # считаем именно блюда меню: в uuid_to_name лежат ещё имена из
+            # Cloud-номенклатуры с шага 2, и их подмешивание давало 374 из 289
             logger.info(
-                f"iiko Server: названия для {len(uuid_to_name)} блюд из "
+                f"iiko Server: названия для {name_from_server} блюд из "
                 f"{len(menu_map)} в меню (по артикулу: {name_by_article})"
             )
 
