@@ -38,6 +38,7 @@ MAX_RETRIES       = 3
 RETRY_DELAY       = 5
 MIN_SYNC_INTERVAL = 5  # временно уменьшено для тестирования категорий
 COMPOSITION_WORKERS = 8  # параллельных запросов техкарт к iiko Server
+COST_HISTORY_DAYS = 60   # окно OLAP-отчёта себестоимости
 
 _last_sync_time = 0
 
@@ -462,23 +463,33 @@ class IikoServerClient:
         return resp.json().get("assemblyCharts") or []
 
     def get_cost_report(self) -> dict:
-        """OLAP-отчёт себестоимости за текущий месяц.
-        Контрагент: 0Частное лицо Покупатель, тип транзакции: OUTGOING_INVOICE.
+        """OLAP-отчёт себестоимости за последние COST_HISTORY_DAYS дней.
+        Тип транзакции: OUTGOING_INVOICE, все контрагенты.
         Возвращает сырой JSON ответа iiko Server.
+
+        Окно намеренно шире месяца: за текущий месяц (особенно 1–2 числа) по
+        доброй трети блюд в накладных стоит нулевая себестоимость — они списаны
+        с нулевого остатка, производство ещё не проведено. Разбивка по учётному
+        дню нужна, чтобы взять последнюю НЕнулевую цену, а не среднее за период.
+
+        Фильтр по контрагенту «0Частное лицо Покупатель» убран: за последние два
+        месяца отгрузок этому контрагенту почти нет (основные — «98-O-live: Склад
+        O-live» и «85-ДФЗ»), а себестоимость списания от контрагента не зависит.
         """
-        from datetime import date
+        from datetime import date, timedelta
         today = date.today()
-        first_day = today.replace(day=1)
-        if today.month == 12:
-            next_first = today.replace(year=today.year + 1, month=1, day=1)
-        else:
-            next_first = today.replace(month=today.month + 1, day=1)
+        date_from = today - timedelta(days=COST_HISTORY_DAYS)
+        # +2 дня: накладные выписывают на завтрашний учётный день, а includeHigh
+        # у фильтра выключен — с +1 «завтра» в отчёт не попадало
+        date_to = today + timedelta(days=2)
 
         body = {
             "reportType": "TRANSACTIONS",
             # GUID и артикул — надёжные ключи. Названия в складской номенклатуре
             # и в меню доставки расходятся, по ним часть позиций не находилась.
-            "groupByRowFields": ["Product.Id", "Product.Num", "Product.Name"],
+            "groupByRowFields": [
+                "DateTime.DateTyped", "Product.Id", "Product.Num", "Product.Name",
+            ],
             "groupByColFields": [],
             # Amount.Out — количество в строке накладной; цена за единицу
             # считается как Sum.Incoming / Amount.Out (см. _parse_cost_report)
@@ -486,11 +497,11 @@ class IikoServerClient:
             "filters": {
                 "DateTime.OperDayFilter": {
                     "filterType": "DateRange",
-                    "from": first_day.strftime("%Y-%m-%dT00:00:00"),
-                    "to": next_first.strftime("%Y-%m-%dT00:00:00"),
+                    "from": date_from.strftime("%Y-%m-%dT00:00:00"),
+                    "to": date_to.strftime("%Y-%m-%dT00:00:00"),
                     "includeLow": True,
                     "includeHigh": False,
-                    "periodType": "CURRENT_MONTH",
+                    "periodType": "CUSTOM",
                 },
                 "Product.ThirdParent": {
                     "filterType": "IncludeValues",
@@ -499,10 +510,6 @@ class IikoServerClient:
                 "TransactionType": {
                     "filterType": "IncludeValues",
                     "values": ["OUTGOING_INVOICE"],
-                },
-                "Counteragent.Name": {
-                    "filterType": "IncludeValues",
-                    "values": ["0Частное лицо Покупатель"],
                 },
             },
         }
@@ -634,29 +641,38 @@ def _extract_menu_items(menu_data: dict) -> dict:
 # Парсер OLAP-отчёта себестоимости
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _norm_name(s) -> str:
-    """Нормализует название блюда: схлопывает пробелы, нижний регистр."""
-    return re.sub(r'\s+', ' ', str(s or '')).strip().lower()
-
-
-def _norm_name_nosuffix(s) -> str:
-    """То же + убирает хвостовой суффикс в скобках, напр. '(1порц)', '(3шт)'."""
-    s = _norm_name(s)
-    return re.sub(r'\s*\([^)]*\)\s*$', '', s).strip()
-
-
 def _parse_cost_report(report_data: dict) -> dict:
-    """Разбирает OLAP-отчёт себестоимости в три индекса: по GUID, по артикулу
-    и по названию — {'by_id': {...}, 'by_num': {...}, 'by_name': {...}}.
+    """Разбирает OLAP-отчёт себестоимости в два индекса: по GUID и по артикулу —
+    {'by_id': {...}, 'by_num': {...}}.
+
+    Индекса по названию больше нет: он отбрасывал хвост «(1порц)» и склеивал
+    разные блюда — «Поке с лососем» отдавал свою цену «Поке боул с уткой»,
+    потому что во внешнем меню у них было одно и то же имя. На реальных данных
+    он не давал ни одного попадания сверх GUID и артикула.
 
     Sum.Incoming — сумма по строке расходной накладной, Amount.Out — количество
-    в ней; себестоимость единицы = сумма / количество. Строки с нулевым
-    количеством пропускаем — цену из них не вывести.
+    в ней; себестоимость единицы = сумма / количество.
+
+    Пропускаем строки не только с нулевым количеством, но и с НУЛЕВОЙ суммой:
+    так iiko помечает списание с нулевого остатка (производство ещё не
+    проведено). Раньше такая строка давала цену 0 и затирала в каталоге
+    нормальную себестоимость — 101 блюдо из 289 стояло с нулём.
+
+    Отчёт разбит по учётному дню, поэтому из нескольких строк по одному блюду
+    берём самую свежую: цены меняются, и последняя накладная актуальнее.
     """
-    index = {"by_id": {}, "by_num": {}, "by_name": {}}
+    index = {"by_id": {}, "by_num": {}}
     rows = report_data.get("data") or []
     if not rows or not isinstance(rows[0], dict):
         return index
+
+    # ключ → (учётный день, цена за единицу); день пустой, если отчёт без разбивки
+    best = {"by_id": {}, "by_num": {}}
+
+    def _keep(bucket, key, day, unit):
+        prev = best[bucket].get(key)
+        if prev is None or day >= prev[0]:
+            best[bucket][key] = (day, unit)
 
     for row in rows:
         try:
@@ -664,27 +680,27 @@ def _parse_cost_report(report_data: dict) -> dict:
             amount = float(row.get("Amount.Out") or 0)
         except (TypeError, ValueError):
             continue
-        if amount <= 0:
+        if amount <= 0 or total <= 0:
             continue
         unit = total / amount
+        day = str(row.get("DateTime.DateTyped") or "")[:10]
 
         product_id = str(row.get("Product.Id") or "").strip()
         num = str(row.get("Product.Num") or "").strip()
-        name = str(row.get("Product.Name") or "").strip()
         if product_id:
-            index["by_id"].setdefault(product_id, unit)
+            _keep("by_id", product_id, day, unit)
         if num:
-            index["by_num"].setdefault(num, unit)
-        if name:
-            index["by_name"].setdefault(_norm_name(name), unit)
-            index["by_name"].setdefault(_norm_name_nosuffix(name), unit)
+            _keep("by_num", num, day, unit)
+
+    for bucket, data in best.items():
+        index[bucket] = {k: v[1] for k, v in data.items()}
     return index
 
 
-def _lookup_cost(index: dict, iiko_id: str, article: str, name: str):
-    """Ищет себестоимость по самому надёжному ключу: сначала GUID, затем
-    артикул и только потом название. Названия в складской номенклатуре и в
-    меню доставки совпадают не всегда — по ним часть позиций терялась."""
+def _lookup_cost(index: dict, iiko_id: str, article: str, name: str = ""):
+    """Ищет себестоимость по GUID, затем по артикулу. По названию не ищем —
+    см. _parse_cost_report. Аргумент name оставлен для совместимости вызовов
+    и используется только в логах."""
     if not index:
         return None
     if iiko_id:
@@ -695,11 +711,6 @@ def _lookup_cost(index: dict, iiko_id: str, article: str, name: str):
         hit = index["by_num"].get(str(article).strip())
         if hit is not None:
             return hit
-    if name:
-        hit = index["by_name"].get(_norm_name(name))
-        if hit is None:
-            hit = index["by_name"].get(_norm_name_nosuffix(name))
-        return hit
     return None
 
 
@@ -889,9 +900,8 @@ def sync_products_from_iiko(
                 raw_report = server.get_cost_report()
                 cost_index = _parse_cost_report(raw_report)
                 logger.info(
-                    "OLAP себестоимость: %d позиций (по GUID %d, по артикулу %d)"
-                    % (len(cost_index["by_id"]), len(cost_index["by_id"]),
-                       len(cost_index["by_num"]))
+                    "OLAP себестоимость: по GUID %d позиций, по артикулу %d"
+                    % (len(cost_index["by_id"]), len(cost_index["by_num"]))
                 )
             except Exception as e:
                 logger.warning(f"OLAP отчёт себестоимости: {e}")
