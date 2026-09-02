@@ -3,7 +3,7 @@ from django.db.models import Q
 import json
 import logging
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from .models import (
@@ -13,7 +13,10 @@ from .models import (
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
     SLOT_TYPES, SLOT_ORDER, SLOT_LABELS, RATION_SLOT_TYPES,
 )
-from .roles import editor_required
+from .roles import (
+    can_edit_claude_group, can_edit_claude_ration, can_manage_claude_rations,
+    editor_required, is_limited_claude_editor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -839,9 +842,22 @@ def _claude_apply(request, ration):
 
 # ── Вкладка «Рационы Claude»: группы ──────────────────────────────────────────
 
+def _claude_denied():
+    """Одинаковый отказ для всех действий вкладки «Рационы Claude»."""
+    return HttpResponseForbidden(
+        "Этот рацион вам недоступен: править можно только свои "
+        "и открытые вам группы."
+    )
+
+
 def claude_group_list(request):
     """Лендинг вкладки: список групп рационов Claude (аналог ration_group_list)."""
-    groups = ClaudeRationGroup.objects.prefetch_related("rations__slots__product").all()
+    groups = (
+        ClaudeRationGroup.objects
+        .select_related("created_by")
+        .prefetch_related("rations__slots__product", "rations__created_by")
+        .all()
+    )
     groups_data = []
     for g in groups:
         rations = list(g.rations.all())
@@ -859,16 +875,21 @@ def claude_group_list(request):
                 "total_kcal": round(total_kcal, 1),
                 "total_cost": round(total_cost, 2),
                 "filled_count": len(filled_slots),
+                # у ограниченного редактора кнопки видны только там, где он вправе
+                "can_edit": can_edit_claude_ration(request.user, r),
             })
         groups_data.append({
             "group": g,
             "rations_info": rations_info,
             "count": len(rations),
             "group_cost": round(group_cost, 2),
+            "can_edit": can_edit_claude_group(request.user, g),
         })
 
     return render(request, "myapp/claude_group_list.html", {
         "groups_data": groups_data,
+        "can_manage_claude": can_manage_claude_rations(request.user),
+        "limited_claude_editor": is_limited_claude_editor(request.user),
         # для модалки заявочного листа: группы замен выбираются наравне с рационами
         "swap_groups": SwapGroup.objects.prefetch_related("items").all(),
         "ration_kcal_choices": CalorieCategory.choices(),
@@ -879,16 +900,23 @@ def claude_group_list(request):
 
 
 def claude_group_create(request):
+    if not can_manage_claude_rations(request.user):
+        return _claude_denied()
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         description = request.POST.get("description", "").strip()
         if name:
-            ClaudeRationGroup.objects.create(name=name, description=description or None)
+            ClaudeRationGroup.objects.create(
+                name=name, description=description or None,
+                created_by=request.user,
+            )
     return redirect("claude_rations")
 
 
 def claude_group_edit(request, group_pk):
     group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if not can_edit_claude_group(request.user, group):
+        return _claude_denied()
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         description = request.POST.get("description", "").strip()
@@ -901,6 +929,8 @@ def claude_group_edit(request, group_pk):
 
 def claude_group_delete(request, group_pk):
     group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if not can_edit_claude_group(request.user, group):
+        return _claude_denied()
     if request.method == "POST":
         group.delete()
     return redirect("claude_rations")
@@ -925,6 +955,15 @@ def claude_ration_reorder(request):
 
     ration = get_object_or_404(ClaudeRation, pk=ration_id)
     target_group = get_object_or_404(ClaudeRationGroup, pk=target_group_id)
+
+    # Тащить можно только свой рацион и только в доступную группу — иначе
+    # ограниченный редактор увёл бы чужой рацион к себе (или свой к чужим).
+    if not (can_edit_claude_ration(request.user, ration)
+            and can_edit_claude_group(request.user, target_group)):
+        return JsonResponse(
+            {"ok": False, "message": "Этот рацион или группа вам недоступны."},
+            status=403,
+        )
 
     # Перемещение в ДРУГУЮ группу — проверяем конфликт по блюдам той же калорийности
     if ration.group_id != target_group.pk:
@@ -969,6 +1008,8 @@ def claude_ration_reorder(request):
 
 def claude_ration_create(request, group_pk):
     group = get_object_or_404(ClaudeRationGroup, pk=group_pk)
+    if not can_edit_claude_group(request.user, group):
+        return _claude_denied()
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
         kcal_category = request.POST.get("kcal_category", "")
@@ -978,6 +1019,7 @@ def claude_ration_create(request, group_pk):
                 group=group, name=name,
                 kcal_category=int(kcal_category),
                 wishes=wishes or None,
+                created_by=request.user,
             )
             # Слоты по приёмам пищи калоража (общий справочник CalorieCategory)
             _seed_slots_from_calorie_category(ration, int(kcal_category), ClaudeRationSlot)
@@ -987,6 +1029,8 @@ def claude_ration_create(request, group_pk):
 
 def claude_ration_delete(request, pk):
     ration = get_object_or_404(ClaudeRation, pk=pk)
+    if not can_edit_claude_ration(request.user, ration):
+        return _claude_denied()
     if request.method == "POST":
         ration.delete()
     return redirect("claude_rations")
@@ -995,6 +1039,8 @@ def claude_ration_delete(request, pk):
 def claude_ration_edit(request, pk):
     """Полный редактор рациона Claude: слоты + пикер блюд + панель сборки Claude."""
     ration = get_object_or_404(ClaudeRation, pk=pk)
+    if request.method == "POST" and not can_edit_claude_ration(request.user, ration):
+        return _claude_denied()
 
     if request.method == "POST":
         action = request.POST.get("action", "")
@@ -1127,6 +1173,8 @@ def claude_ration_edit(request, pk):
     claude_error = request.session.get(f"claude_error_{ration.pk}")
 
     return render(request, "myapp/claude_ration_edit.html", {
+        # чужой рацион ограниченный редактор открывает только на просмотр
+        "can_edit_ration": can_edit_claude_ration(request.user, ration),
         "ration": ration,
         "claude_result": claude_result,
         "claude_error": claude_error,

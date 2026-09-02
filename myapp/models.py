@@ -195,6 +195,13 @@ class UserRights(models.Model):
         help_text="Читатель сможет вносить «Цену прод.» в каталоге. Остальное "
                   "останется только для чтения.",
     )
+    can_edit_claude_rations = models.BooleanField(
+        default=False, verbose_name="Может вести рационы Claude",
+        help_text="Читатель сможет создавать группы и рационы во вкладке "
+                  "«Рационы Claude» и править СВОИ, а также группы, отмеченные "
+                  "галочкой «Открыта ограниченным редакторам». Чужие рационы "
+                  "останутся только для чтения, остальные вкладки — тоже.",
+    )
 
     class Meta:
         verbose_name = "Права пользователя"
@@ -516,6 +523,18 @@ class ClaudeRationGroup(models.Model):
     name = models.CharField(max_length=300, verbose_name="Название группы")
     description = models.TextField(null=True, blank=True, verbose_name="Описание")
     created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="claude_groups",
+        verbose_name="Создал",
+    )
+    # Ограниченный редактор (право «Может вести рационы Claude») правит свои
+    # группы и те, что отмечены здесь. Отмечены группы ДИАБЕТ — их вёл не он.
+    shared_editing = models.BooleanField(
+        default=False, verbose_name="Открыта ограниченным редакторам",
+        help_text="Группу смогут править все, у кого есть право "
+                  "«Может вести рационы Claude», даже если создали её не они.",
+    )
 
     class Meta:
         verbose_name = "Группа рационов Claude"
@@ -541,6 +560,11 @@ class ClaudeRation(models.Model):
     order = models.PositiveIntegerField(default=0, verbose_name="Порядок")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="claude_rations",
+        verbose_name="Создал",
+    )
 
     class Meta:
         verbose_name = "Рацион Claude"

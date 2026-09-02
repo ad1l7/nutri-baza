@@ -26,12 +26,17 @@ class UserRightsInline(admin.StackedInline):
 class UserAdmin(DjangoUserAdmin):
     """Стандартная карточка пользователя плюс блок с точечными правами."""
     inlines = [UserRightsInline]
-    list_display = DjangoUserAdmin.list_display + ("prices_allowed",)
+    list_display = DjangoUserAdmin.list_display + ("prices_allowed", "claude_allowed")
 
     @admin.display(description="Правит цены", boolean=True)
     def prices_allowed(self, user):
         rights = getattr(user, "rights", None)
         return bool(rights and rights.can_edit_prices)
+
+    @admin.display(description="Ведёт рационы Claude", boolean=True)
+    def claude_allowed(self, user):
+        rights = getattr(user, "rights", None)
+        return bool(rights and rights.can_edit_claude_rations)
 
 
 admin.site.unregister(User)
@@ -189,7 +194,9 @@ class ClaudeRationInline(admin.TabularInline):
 
 @admin.register(ClaudeRationGroup)
 class ClaudeRationGroupAdmin(admin.ModelAdmin):
-    list_display = ["name", "get_rations_count", "created_at"]
+    list_display = ["name", "created_by", "shared_editing", "get_rations_count", "created_at"]
+    list_editable = ["shared_editing"]
+    list_filter = ["shared_editing", "created_by"]
     search_fields = ["name"]
     inlines = [ClaudeRationInline]
 
@@ -206,8 +213,8 @@ class ClaudeRationSlotInline(admin.TabularInline):
 
 @admin.register(ClaudeRation)
 class ClaudeRationAdmin(admin.ModelAdmin):
-    list_display = ["name", "group", "kcal_category"]
-    list_filter = ["group", "kcal_category"]
+    list_display = ["name", "group", "kcal_category", "created_by"]
+    list_filter = ["group", "kcal_category", "created_by"]
     search_fields = ["name"]
     inlines = [ClaudeRationSlotInline]
 

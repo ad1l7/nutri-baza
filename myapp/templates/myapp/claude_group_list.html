@@ -43,6 +43,7 @@
   .group-info{flex:1;min-width:0;}
   .group-title{font-size:15px;font-weight:800;color:#fff;}
   .group-desc{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px;}
+  .group-author{font-size:11px;color:rgba(255,255,255,.55);margin-top:3px;font-weight:600;}
   .group-count{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;}
   .grp-del-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
   .grp-del-btn:hover{background:rgba(214,75,42,.65);}
@@ -208,7 +209,7 @@
     <button class="sheet-btn" onclick="openSheetModal()" title="Собрать заявочный лист по выбранным рационам">
       📋 Заявочный лист
     </button>
-    {% if not is_reader %}
+    {% if can_manage_claude %}
     <button class="create-btn" onclick="openGroupModal()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -247,15 +248,16 @@
         <div class="group-info">
           <div class="group-title">{{ g.name }}</div>
           {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
+          <div class="group-author">👤 {% if g.created_by %}{{ g.created_by.username }}{% else %}автор не указан{% endif %}</div>
         </div>
         {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
-        {% if not is_reader %}<button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>{% endif %}
+        {% if gd.can_edit %}<button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>{% endif %}
         <a href="{% url 'claude_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
    title="Просмотр группы" style="text-decoration:none;">👁️</a>
         <a href="{% url 'claude_group_export' g.pk %}" class="grp-export-btn"
    title="Скачать Excel">⬇ Excel</a>
-        {% if not is_reader %}<button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>{% endif %}
+        {% if gd.can_edit %}<button class="grp-del-btn" onclick="confirmDel('group', {{ g.pk }}, '{{ g.name|escapejs }}')" title="Удалить группу">🗑️</button>{% endif %}
       </div>
 
       <div class="rations-list" data-group-id="{{ g.pk }}">
@@ -263,7 +265,7 @@
         {% with r=ri.ration %}
         <div class="ration-item" id="ri-{{ r.pk }}" data-ration-id="{{ r.pk }}" data-kcal="{{ r.kcal_category }}">
           <div class="ration-row">
-            {% if not is_reader %}<span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>{% endif %}
+            {% if ri.can_edit %}<span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>{% endif %}
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
             {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
@@ -271,7 +273,7 @@
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
             </button>
-            {% if not is_reader %}
+            {% if ri.can_edit %}
             <div class="ration-btns">
               <a href="{% url 'claude_ration_edit' r.pk %}" class="r-btn" title="Редактировать">✏️</a>
               <button class="r-btn del" onclick="confirmDel('ration', {{ r.pk }}, '{{ r.name|escapejs }}')" title="Удалить рацион">🗑️</button>
@@ -311,7 +313,7 @@
         {% endwith %}
         {% endfor %}
 
-        {% if not is_reader %}
+        {% if gd.can_edit %}
         <button class="add-ration-btn" onclick="openRationModal({{ g.pk }})">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -330,7 +332,7 @@
     <div class="icon">📋</div>
     <h2>Групп пока нет</h2>
     <p style="font-size:14px;margin-bottom:24px;">Создайте группу — например «Неделя 1» или «1200 ккал январь»</p>
-    {% if not is_reader %}
+    {% if can_manage_claude %}
     <button class="create-btn" onclick="openGroupModal()" style="margin:0 auto;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

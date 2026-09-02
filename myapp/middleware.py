@@ -4,7 +4,7 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.http import HttpResponseForbidden
 
-from .roles import can_edit_prices, is_reader
+from .roles import can_edit_prices, can_manage_claude_rations, is_reader
 
 
 class ReaderReadOnlyMiddleware:
@@ -13,11 +13,16 @@ class ReaderReadOnlyMiddleware:
     на бэкенде — даже если кнопку не спрятали или читатель отправит запрос
     напрямую, изменение не пройдёт.
 
-    Исключение — сохранение цены продажи: оно открывается персонально
-    галочкой «Может менять цены продажи» в карточке пользователя."""
+    Исключения открываются персонально галочками в карточке пользователя:
+    «Может менять цены продажи» — сохранение цены в каталоге, «Может вести
+    рационы Claude» — вкладка рационов Claude. Во втором случае middleware
+    только пропускает запрос дальше: доступ к конкретной группе или рациону
+    проверяют сами вьюхи (roles.can_edit_claude_group / can_edit_claude_ration),
+    иначе читатель правил бы чужие рационы."""
 
     ALLOWED_PATHS = ("/login/", "/logout/")
     SALE_PRICE_PATH = re.compile(r"^/product/\d+/sale-price/$")
+    CLAUDE_PATH = re.compile(r"^/claude/")
     UNSAFE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 
     def __init__(self, get_response):
@@ -30,7 +35,12 @@ class ReaderReadOnlyMiddleware:
             and is_reader(request.user)
         ):
             price_request = self.SALE_PRICE_PATH.match(request.path_info)
-            if not (price_request and can_edit_prices(request.user)):
+            claude_request = self.CLAUDE_PATH.match(request.path_info)
+            allowed = (
+                (price_request and can_edit_prices(request.user))
+                or (claude_request and can_manage_claude_rations(request.user))
+            )
+            if not allowed:
                 return HttpResponseForbidden(
                     "Доступ только для чтения: у вашей роли нет прав на изменение."
                 )

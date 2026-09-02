@@ -252,9 +252,24 @@
   .cl-discard{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--text-mid);border-radius:9px;padding:10px;font-family:var(--font);font-size:12.5px;font-weight:700;cursor:pointer;}
   .cl-discard:hover{border-color:var(--danger);color:var(--danger);}
   .cl-warn{font-size:10.5px;color:var(--muted);margin-top:8px;text-align:center;}
+  /* Режим просмотра: у чужого рациона кнопок действий нет. Бэкенд всё равно
+     вернёт 403 (roles.can_edit_claude_ration), это только чтобы не мозолили глаз. */
+  .ro-banner{background:#fff6e5;border-bottom:1.5px solid #f0d9a8;color:#8a6321;font-size:12.5px;font-weight:700;padding:9px 18px;text-align:center;}
+  body.ro-mode form[method="post"] button:not(.logout-btn),
+  body.ro-mode .add-cat-btn,
+  body.ro-mode .slot-nocat-btn,
+  body.ro-mode .cl-btn,
+  body.ro-mode .cl-apply,
+  body.ro-mode .cl-discard,
+  body.ro-mode .save-btn{display:none !important;}
+  body.ro-mode .slot-head{pointer-events:none;}
 </style>
 </head>
-<body>
+<body class="{% if not can_edit_ration %}ro-mode{% endif %}">
+
+{% if not can_edit_ration %}
+<div class="ro-banner">👁️ Только просмотр: рацион создан другим пользователем — менять его может лишь автор или редактор.</div>
+{% endif %}
 
 <div class="topbar">
   <a href="{% url 'claude_rations' %}" class="back-btn">← Рационы Claude</a>
@@ -266,12 +281,12 @@
     <div class="tpill">У <strong>{{ total_carbs|floatformat:1 }}</strong></div>
     <div class="tpill cost">💰 <strong>{{ total_cost|floatformat:0 }}</strong> ₸</div>
   </div>
-  <button class="del-ration-btn" onclick="openDelModal()">
+  {% if can_edit_ration %}<button class="del-ration-btn" onclick="openDelModal()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
       <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
     </svg>
     Удалить рацион
-  </button>
+  </button>{% endif %}
   <form method="post" action="{% url 'logout' %}" style="display:contents">
     {% csrf_token %}
     <button type="submit" class="logout-btn" title="Выйти из системы">

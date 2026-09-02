@@ -34,6 +34,53 @@ def can_edit_prices(user) -> bool:
     return bool(rights and rights.can_edit_prices)
 
 
+def can_manage_claude_rations(user) -> bool:
+    """Кому вкладка «Рационы Claude» доступна на запись.
+
+    Полноправные редакторы — как и раньше. Читателю право открывается галочкой
+    «Может вести рационы Claude» в его карточке в админке; что именно ему можно
+    править, решают can_edit_claude_group / can_edit_claude_ration."""
+    if not (user and user.is_authenticated):
+        return False
+    if not is_reader(user):
+        return True
+    rights = getattr(user, "rights", None)
+    return bool(rights and rights.can_edit_claude_rations)
+
+
+def is_limited_claude_editor(user) -> bool:
+    """Читатель с правом вести рационы Claude: правит только своё и группы,
+    отмеченные как открытые. Полноправный редактор сюда не попадает."""
+    return is_reader(user) and can_manage_claude_rations(user)
+
+
+def can_edit_claude_group(user, group) -> bool:
+    """Группа рационов Claude: правка, удаление, создание рационов внутри."""
+    if not can_manage_claude_rations(user):
+        return False
+    if not is_limited_claude_editor(user):
+        return True
+    if group is None:
+        return False
+    return bool(group.shared_editing or group.created_by_id == user.id)
+
+
+def can_edit_claude_ration(user, ration) -> bool:
+    """Рацион Claude: свой — всегда; чужой — только внутри доступной группы.
+
+    Рационы, созданные ограниченным редактором, остаются доступны обычным
+    редакторам: у них проверка заканчивается на can_manage_claude_rations."""
+    if not can_manage_claude_rations(user):
+        return False
+    if not is_limited_claude_editor(user):
+        return True
+    if ration is None:
+        return False
+    if ration.created_by_id == user.id:
+        return True
+    return can_edit_claude_group(user, ration.group)
+
+
 def editor_required(view):
     """Страница целиком недоступна читателю — даже на просмотр.
 
