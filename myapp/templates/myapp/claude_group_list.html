@@ -64,7 +64,7 @@
   .group-card.collapsed .group-collapse-arrow{transform:rotate(-90deg);}
   .group-card.collapsed .rations-list{display:none;}
 
-  /* Себестоимость рациона в строке */
+  /* Цена продажи рациона в строке */
   .ration-cost{font-size:11px;color:var(--green-mid);font-weight:800;flex-shrink:0;background:var(--light);border:1.5px solid var(--green-light);border-radius:20px;padding:2px 9px;}
 
   .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;min-height:20px;}
@@ -250,7 +250,7 @@
           {% if g.description %}<div class="group-desc">{{ g.description }}</div>{% endif %}
           <div class="group-author">👤 {% if g.created_by %}{{ g.created_by.username }}{% else %}автор не указан{% endif %}</div>
         </div>
-        {% if gd.group_cost %}<div class="group-cost" title="Сумма себестоимости всех рационов">💰 {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
+        {% if gd.group_price %}<div class="group-cost" title="Сумма цен продажи с ФЗ по всем рационам">💰 {{ gd.group_price|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
         {% if gd.can_edit %}<button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>{% endif %}
         <a href="{% url 'claude_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
@@ -268,7 +268,7 @@
             {% if ri.can_edit %}<span class="drag-handle" title="Перетащите, чтобы изменить порядок или переместить в другую группу">⠿</span>{% endif %}
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
-            {% if ri.total_cost %}<span class="ration-cost" title="Себестоимость рациона">💰 {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
+            {% if ri.total_price %}<span class="ration-cost" title="Цена продажи с ФЗ по рациону">💰 {{ ri.total_price|floatformat:0 }} ₸</span>{% endif %}
             <span class="ration-dish-count">{{ ri.filled_count }} блюд</span>
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
