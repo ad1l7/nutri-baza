@@ -246,7 +246,7 @@
             <th class="c-cat">Категория</th>
             <th class="c-name">Наименование</th>
             <th class="c-weight r">Масса, г</th>
-            <th class="c-cost r">Себест.</th>
+            <th class="c-cost r">Цена прод.</th>
             <th class="c-kcal r">Ккал</th>
             <th class="c-prot r">Белки</th>
             <th class="c-fat r">Жиры</th>
@@ -281,7 +281,7 @@
               {% else %}—{% endif %}
             </td>
             <td class="c-cost">
-              {% if slot.product.cost %}{{ slot.product.cost|floatformat:0 }} ₸{% else %}—{% endif %}
+              {% if slot.product.sale_price %}{{ slot.product.sale_price|floatformat:0 }} ₸{% else %}—{% endif %}
             </td>
             <td class="c-kcal">
               {% if slot.product.kcal_per_serving %}{{ slot.product.kcal_per_serving|floatformat:0 }}{% else %}—{% endif %}

@@ -377,7 +377,7 @@
           <div class="cl-s {% if n %}{% if f.protein %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.protein }}</b><i>Б</i></div>
           <div class="cl-s {% if n %}{% if f.fat %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.fat }}</b><i>Ж</i></div>
           <div class="cl-s {% if n %}{% if f.carbs %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.carbs }}</b><i>У</i></div>
-          <div class="cl-s"><b style="color:#b8860b;">{{ t.cost }}₸</b><i>себест.</i></div>
+          <div class="cl-s"><b style="color:#b8860b;">{{ t.price }}₸</b><i>цена прод.</i></div>
         </div>
         {% endwith %}
         {% for meal in claude_result.meals %}
@@ -388,7 +388,7 @@
             {% if d.photo %}<img src="{{ d.photo }}" class="cl-th" alt="">{% else %}<span class="cl-th cl-ph">🥗</span>{% endif %}
             <div class="cl-di">
               <div class="cl-dn">{{ d.name }}</div>
-              <div class="cl-du">{{ d.kcal }} кк · Б{{ d.protein }} Ж{{ d.fat }} У{{ d.carbs }}{% if d.cost %} · 💰{{ d.cost }}₸{% endif %}</div>
+              <div class="cl-du">{{ d.kcal }} кк · Б{{ d.protein }} Ж{{ d.fat }} У{{ d.carbs }}{% if d.price %} · 💰{{ d.price }}₸{% endif %}</div>
             </div>
           </div>
           {% endfor %}
@@ -452,7 +452,7 @@
                 {% else %}<div class="sph">🥗</div>{% endif %}
                 <div class="spi">
                   <div class="spn">{{ slot.product.name }}{% if slot.product.article %} <span style="color:var(--muted);font-weight:500;font-size:11px;">· {{ slot.product.article }}</span>{% endif %}</div>
-                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г{% if slot.product.cost %} <span style="color:#b8860b;font-weight:700;">· 💰 {{ slot.product.cost|floatformat:0 }} ₸</span>{% endif %}</div>
+                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г{% if slot.product.sale_price %} <span style="color:#b8860b;font-weight:700;">· 💰 {{ slot.product.sale_price|floatformat:0 }} ₸</span>{% endif %}</div>
                 </div>
               {% else %}
                 <div class="sph">❓</div>
@@ -546,9 +546,9 @@
               </div>
             </div>
             <div class="pf-group">
-              <div class="pf-group-title">Себестоимость, ₸</div>
+              <div class="pf-group-title">Цена прод., ₸</div>
               <div class="pf-rows">
-                <div class="pf-row"><span class="pf-l">Цена</span><input type="number" class="pf-in" data-f="cost" data-b="min" placeholder="от" oninput="renderPicker()"><span class="pf-dash">–</span><input type="number" class="pf-in" data-f="cost" data-b="max" placeholder="до" oninput="renderPicker()"></div>
+                <div class="pf-row"><span class="pf-l">Цена</span><input type="number" class="pf-in" data-f="price" data-b="min" placeholder="от" oninput="renderPicker()"><span class="pf-dash">–</span><input type="number" class="pf-in" data-f="price" data-b="max" placeholder="до" oninput="renderPicker()"></div>
               </div>
             </div>
             {% if all_allergens %}
@@ -674,7 +674,7 @@ function renderPicker() {
         const photo = p.photo
           ? `<img src="${p.photo}" class="pthumb" alt="">`
           : `<div class="pph">🥗</div>`;
-        const cost = p.cost ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.cost.toFixed(0)} ₸</span>` : '';
+        const cost = p.price ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.price.toFixed(0)} ₸</span>` : '';
         const alg = (p.allergens && p.allergens.length)
           ? `<div class="pnutr" style="color:var(--danger);opacity:.85;">⚠ ${p.allergens.join(', ')}</div>` : '';
         html += `<div class="pitem ${isCur ? 'cur' : ''}">

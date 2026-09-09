@@ -298,7 +298,7 @@ SLOT_COLORS = {
 
 def _product_picker_dict(p, with_category=False):
     """Данные блюда для пикера в редакторе рациона (КБЖУ на порцию и на 100 г,
-    себестоимость, аллергены) — для фильтров и отображения."""
+    цена продажи с ФЗ, аллергены) — для фильтров и отображения."""
     d = {
         "id": p.pk, "name": p.name, "article": p.article or "",
         # на порцию
@@ -311,7 +311,7 @@ def _product_picker_dict(p, with_category=False):
         "protein100": float(p.protein or 0),
         "fat100":     float(p.fat or 0),
         "carbs100":   float(p.carbs or 0),
-        "cost":      float(p.cost or 0),
+        "price":     float(p.sale_price or 0),
         "allergens": [a.name for a in p.allergens.all()],
         "photo":     p.photo.url if p.photo else "",
     }
@@ -670,7 +670,7 @@ def _resolve_ration_proposal(proposal):
     norm = CalorieCategory.norm_for(kcal_cat)
 
     meals = []
-    tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
+    tot_kcal = tot_p = tot_f = tot_c = tot_price = 0
     for meal in proposal.get("meals", []):
         dishes = []
         for did in meal.get("dish_ids", []):
@@ -681,14 +681,14 @@ def _resolve_ration_proposal(proposal):
             prot = float(p.protein_per_serving or 0)
             fat  = float(p.fat_per_serving or 0)
             carb = float(p.carbs_per_serving or 0)
-            cost = float(p.cost or 0)
-            tot_kcal += kcal; tot_p += prot; tot_f += fat; tot_c += carb; tot_cost += cost
+            price = float(p.sale_price or 0)
+            tot_kcal += kcal; tot_p += prot; tot_f += fat; tot_c += carb; tot_price += price
             dishes.append({
                 "id": p.pk,
                 "name": p.name, "article": p.article or "",
                 "kcal": round(kcal), "protein": round(prot, 1),
                 "fat": round(fat, 1), "carbs": round(carb, 1),
-                "cost": round(cost),
+                "price": round(price),
                 "photo": p.photo.url if p.photo else "",
             })
         meals.append({"name": meal.get("meal_name", ""), "dishes": dishes})
@@ -704,7 +704,7 @@ def _resolve_ration_proposal(proposal):
         "totals": {
             "kcal": round(tot_kcal), "protein": round(tot_p, 1),
             "fat": round(tot_f, 1), "carbs": round(tot_c, 1),
-            "cost": round(tot_cost),
+            "price": round(tot_price),
         },
         "flags": {
             "kcal":    _flag(tot_kcal, norm.kcal_min, norm.kcal_max) if norm else None,
