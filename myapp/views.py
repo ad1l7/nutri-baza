@@ -1247,7 +1247,7 @@ def _export_ration_group_xlsx(group):
 
     headers = [
         "Приём пищи", "Категория блюда", "Наименование", "Артикул",
-        "Масса, г", "Себест., ₸",
+        "Масса, г", "Цена прод., ₸",
         "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
         "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
         "Состав",
@@ -1318,7 +1318,7 @@ def _export_ration_group_xlsx(group):
                     and s.meal_time_id in filled_meal_times)
         ]
 
-        tot_kcal = tot_p = tot_f = tot_c = tot_cost = 0
+        tot_kcal = tot_p = tot_f = tot_c = tot_price = 0
         for slot in slots:
             p = slot.product
             meal = slot.meal_time.name if slot.meal_time_id else "—"
@@ -1327,7 +1327,7 @@ def _export_ration_group_xlsx(group):
                 weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
                 values = [
                     meal, cat, p.name, p.article or "",
-                    weight_g, num(p.cost),
+                    weight_g, num(p.sale_price),
                     num(p.protein_per_serving), num(p.fat_per_serving),
                     num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
                     num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
@@ -1337,7 +1337,7 @@ def _export_ration_group_xlsx(group):
                 tot_p    += float(p.protein_per_serving or 0)
                 tot_f    += float(p.fat_per_serving or 0)
                 tot_c    += float(p.carbs_per_serving or 0)
-                tot_cost += float(p.cost or 0)
+                tot_price += float(p.sale_price or 0)
             else:
                 values = [meal, cat, "— блюдо не выбрано —", ""] + [None] * (ncols - 5) + [""]
 
@@ -1356,7 +1356,7 @@ def _export_ration_group_xlsx(group):
         c = ws.cell(row=row, column=3, value="ИТОГО по рациону:")
         c.font = bold
         c.alignment = Alignment(horizontal="right", vertical="center")
-        totals = {5: None, 6: round(tot_cost, 2),
+        totals = {5: None, 6: round(tot_price, 2),
                   7: round(tot_p, 1), 8: round(tot_f, 1),
                   9: round(tot_c, 1), 10: round(tot_kcal, 1)}
         for col in range(1, ncols + 1):
