@@ -7,7 +7,6 @@ iiko_sync.py — умная синхронизация продуктов из i
   - Новые блюда (нет в БД) → создаём + скачиваем фото
   - Существующие блюда → сравниваем поля, обновляем ТОЛЬКО если что-то изменилось
   - Фото → скачиваем только если URL изменился или фото нет
-  - Аллергены → берём из item.allergens, get_or_create по имени
   - Пропавшие из меню iiko → НЕ удаляем, только пишем в лог кандидатов
 
 Состав блюда — из технологических карт iiko Server
@@ -532,8 +531,7 @@ class IikoServerClient:
 def _extract_menu_items(menu_data: dict) -> dict:
     """
     Возвращает {product_uuid: {name, category_name, packing, weight,
-                               photo_url, allergen_names, КБЖУ...}}
-    allergen_names — список строк с именами аллергенов
+                               photo_url, КБЖУ...}}
     """
     result = {}
 
@@ -590,15 +588,6 @@ def _extract_menu_items(menu_data: dict) -> dict:
         )
         article = str(article).strip()
 
-        # Аллергены — берём из item.allergens
-        # Формат: [{id, code, name, isDeleted}, ...]
-        allergen_names = []
-        for a in item.get("allergens") or []:
-            a_name = a.get("name") or ""
-            a_deleted = str(a.get("isDeleted", "false")).lower()
-            if a_name and a_deleted != "true":
-                allergen_names.append(a_name.strip())
-
         result[product_id] = {
             "name":           name,
             "category_name":  cat_name,
@@ -607,7 +596,6 @@ def _extract_menu_items(menu_data: dict) -> dict:
             "packing":        item.get("measureUnit") or "",
             "weight":         weight_grams,
             "photo_url":      photo_url,
-            "allergen_names": allergen_names,  # список имён аллергенов
             "kcal":           kcal_100,
             "protein":        protein_100,
             "fat":            fat_100,
@@ -739,7 +727,7 @@ def sync_products_from_iiko(
             "errors": [f"Синхронизация запущена слишком часто. Подождите ещё {wait_left} сек."]
         }
 
-    from .models import Product, MealCategory, Allergen
+    from .models import Product, MealCategory
 
     result = {
         "created": 0, "updated": 0, "skipped": 0,
@@ -1100,20 +1088,6 @@ def sync_products_from_iiko(
                         except Exception:
                             pass
                     product.photo.save(filename, ContentFile(photo_data), save=True)
-
-            # ── Аллергены ─────────────────────────────────────────────────────
-            # get_or_create каждого аллергена по имени, затем синхронизируем M2M
-            allergen_names = menu_info.get("allergen_names") or []
-            if allergen_names:
-                allergen_objs = []
-                for a_name in allergen_names:
-                    allergen, _ = Allergen.objects.get_or_create(name=a_name)
-                    allergen_objs.append(allergen)
-                # Полная замена — устанавливаем ровно тех что пришли из iiko
-                product.allergens.set(allergen_objs)
-            else:
-                # Если в iiko аллергенов нет — очищаем
-                product.allergens.clear()
 
             # ── Категория ─────────────────────────────────────────────────────
             if matched_slot_key:

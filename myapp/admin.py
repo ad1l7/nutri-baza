@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 
 from .models import (
     IikoSyncLog,
-    Product, Allergen, MealCategory, MealTime,
+    Product, MealCategory, MealTime,
     RationGroup, Ration, RationSlot,
     CalorieCategory, CalorieCategoryMeal,
     IikoCategoryMap,
@@ -43,11 +43,6 @@ admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
 
 
-@admin.register(Allergen)
-class AllergenAdmin(admin.ModelAdmin):
-    search_fields = ["name"]
-
-
 @admin.register(Material)
 class MaterialAdmin(admin.ModelAdmin):
     list_display = ["name", "article", "unit", "order"]
@@ -70,16 +65,16 @@ class MealTimeAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ["name", "article", "get_categories", "cost", "kcal_per_100", "protein", "fat", "carbs", "packing"]
-    list_filter = ["meal_categories", "packing", "allergens"]
+    list_filter = ["meal_categories", "packing"]
     search_fields = ["name", "article", "composition", "composition_clean"]
     ordering = ["name"]
-    filter_horizontal = ["allergens", "meal_categories"]
+    filter_horizontal = ["meal_categories"]
     # Чистый состав считается из сырого по справочнику — править руками нечего
     readonly_fields = ["composition_clean"]
     fieldsets = [
         ("Основное", {
             "fields": ["name", "article", "photo", "cost", "packing", "net_weight",
-                       "composition", "composition_clean", "allergens", "meal_categories"]
+                       "composition", "composition_clean", "meal_categories"]
         }),
         ("На 100 г", {
             "fields": ["protein", "fat", "carbs", "kcal_per_100", "kj_per_100"]

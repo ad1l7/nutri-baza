@@ -13,7 +13,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import (
-    Allergen, ClaudeRation, ClaudeRationGroup, ClaudeRationSlot,
+    ClaudeRation, ClaudeRationGroup, ClaudeRationSlot,
     MealTime, Product, UserRights,
 )
 from .roles import READERS_GROUP, can_edit_claude_group, can_edit_claude_ration
@@ -145,6 +145,33 @@ class ClaudeEditorRightsTests(TestCase):
         self.assertEqual(self.foreign_ration.group_id, self.foreign.pk)
 
 
+class ClaudeCatalogTests(TestCase):
+    """Каталог, который уходит в Claude при сборке рациона."""
+
+    def test_catalog_carries_composition(self):
+        """Без состава нельзя выполнить «без сахара»: по названию не видно."""
+        from .claude_rations import _build_catalog
+
+        # composition_clean не задаём: он пересчитывается из сырого состава
+        # в Product.save() по справочнику ингредиентов
+        product = Product.objects.create(
+            name="ПП* Упак Поке боул с уткой (1порц)",
+            composition="Киноа, утиное филе, сахар, соус ореховый",
+            kcal_per_serving=Decimal("520"),
+        )
+        row = _build_catalog([product])[0]
+        self.assertIn("ахар", row["composition"])     # «Сахар» после очистки
+        self.assertEqual(row["id"], product.pk)
+
+    def test_catalog_falls_back_to_raw_composition(self):
+        from .claude_rations import _build_catalog
+
+        product = Product.objects.create(
+            name="Блюдо без чистого состава", composition="Сырой состав из iiko",
+        )
+        self.assertEqual(_build_catalog([product])[0]["composition"], "Сырой состав из iiko")
+
+
 class ProductCardTests(TestCase):
     """Карточка блюда, которую открывает клик по блюду в слоте рациона."""
 
@@ -160,7 +187,6 @@ class ProductCardTests(TestCase):
             protein=Decimal("9.5"), fat=Decimal("10.6"),
             carbs=Decimal("13.2"), kcal_per_100=Decimal("186"),
         )
-        self.product.allergens.add(Allergen.objects.create(name="Глютен"))
 
     def test_card_returns_full_info(self):
         self.client.force_login(self.user)
@@ -170,7 +196,7 @@ class ProductCardTests(TestCase):
         self.assertEqual(data["name"], "ПП* Упак Блины с мясом (3шт)")
         self.assertEqual(data["article"], "29272")
         self.assertIn("фарш говяжий", data["composition"])
-        self.assertEqual(data["allergens"], ["Глютен"])
+        self.assertNotIn("allergens", data)      # аллергены с платформы убраны
         self.assertEqual(data["weight_g"], 265.0)      # кг из базы -> граммы
         self.assertEqual(data["sale_price"], 921.0)
         self.assertEqual(data["per_serving"]["kcal"], 494.0)

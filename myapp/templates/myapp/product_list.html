@@ -127,7 +127,6 @@
   .filter-title::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
 
   .cat-list { display: flex; flex-direction: column; gap: 3px; max-height: 180px; overflow-y: auto; padding-right: 2px; }
-  .cat-list.allergen-list { max-height: 160px; }
   .cat-list::-webkit-scrollbar { width: 3px; }
   .cat-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   .cat-item {
@@ -382,16 +381,6 @@
     font-size: 13px; line-height: 1.65; color: var(--text-mid); font-weight: 500;
   }
 
-  .modal-allergen-list { display: flex; flex-wrap: wrap; gap: 7px; }
-  .modal-allergen-tag {
-    background: #fff3e0; border: 1.5px solid #f5c06a;
-    color: #7a4500; border-radius: 20px;
-    padding: 4px 12px; font-size: 12px; font-weight: 700;
-    display: flex; align-items: center; gap: 5px;
-  }
-  .modal-allergen-tag::before { content: '⚠️'; font-size: 11px; }
-  .no-allergens { font-size: 13px; color: var(--muted); font-style: italic; }
-
   .nutr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .nutr-block { background: var(--off-white); border: 1.5px solid var(--border-soft); border-radius: 11px; overflow: hidden; }
   .nutr-block-header { padding: 8px 14px; font-size: 10px; font-weight: 700; letter-spacing: 1.3px; text-transform: uppercase; border-bottom: 1px solid var(--border-soft); }
@@ -583,25 +572,6 @@
 
     <div class="sidebar-divider"></div>
 
-    <!-- Аллергены -->
-    {% if all_allergens %}
-    <div class="filter-group">
-      <div class="filter-title">Аллергены</div>
-      <div class="cat-list allergen-list">
-        {% for allergen in all_allergens %}
-        <label class="cat-item {% if allergen.pk|stringformat:'s' in selected_allergens %}checked{% endif %}">
-          <input type="checkbox" name="allergen" value="{{ allergen.pk }}"
-            {% if allergen.pk|stringformat:'s' in selected_allergens %}checked{% endif %}
-            onchange="toggleCat(this); submitForm()">
-          <span class="cat-cb"></span>
-          <span class="cat-name">{{ allergen.name }}</span>
-        </label>
-        {% endfor %}
-      </div>
-    </div>
-    <div class="sidebar-divider"></div>
-    {% endif %}
-
     <!-- Пищевая ценность -->
     <div class="filter-group">
       <div class="filter-title">Пищевая ценность</div>
@@ -674,7 +644,7 @@
   <main class="main">
 
     {% with f=filters %}
-    {% if f.search or selected_categories or selected_allergens or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing or f.unused or f.used %}
+    {% if f.search or selected_categories or f.cost_min or f.cost_max or f.kcal_min or f.kcal_max or f.protein_min or f.protein_max or f.fat_min or f.fat_max or f.carbs_min or f.carbs_max or f.kcal_s_min or f.kcal_s_max or f.protein_s_min or f.protein_s_max or f.fat_s_min or f.fat_s_max or f.carbs_s_min or f.carbs_s_max or f.packing or f.unused or f.used %}
     <div class="chips-row">
       {% if f.unused %}<div class="chip">🚫 Только неиспользуемые</div>{% endif %}
       {% if f.used %}<div class="chip">✅ Только используемые</div>{% endif %}
@@ -682,7 +652,6 @@
       {% for key in selected_meal_categories %}<div class="chip">🍽️ {{ slot_labels|get_item:key }}</div>{% endfor %}
       {% if f.packing %}<div class="chip">📦 {{ f.packing }}</div>{% endif %}
       {% if f.cost_min or f.cost_max %}<div class="chip">💰 Себест: {{ f.cost_min|default:"0" }} — {{ f.cost_max|default:"∞" }} ₸</div>{% endif %}
-      {% for name in selected_allergen_names %}<div class="chip amber">⚠️ {{ name }}</div>{% endfor %}
       {% if f.kcal_min or f.kcal_max %}<div class="chip">⚡ Ккал/100г: {{ f.kcal_min|default:"0" }} — {{ f.kcal_max|default:"∞" }}</div>{% endif %}
       {% if f.protein_min or f.protein_max %}<div class="chip">💪 Б/100г: {{ f.protein_min|default:"0" }} — {{ f.protein_max|default:"∞" }} г</div>{% endif %}
       {% if f.fat_min or f.fat_max %}<div class="chip">🫙 Ж/100г: {{ f.fat_min|default:"0" }} — {{ f.fat_max|default:"∞" }} г</div>{% endif %}
@@ -991,7 +960,6 @@ const PD = {
     sale:   "{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}",
     photo:  "{% if p.photo %}{{ p.photo.url }}{% endif %}",
     comp:   `{{ p.composition_clean|default:''|escapejs }}`,
-    allergens: [{% for a in p.allergens.all %}"{{ a.name|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
     p:    "{{ p.protein|smart_num }}",
     f:    "{{ p.fat|smart_num }}",
     c:    "{{ p.carbs|smart_num }}",
@@ -1022,10 +990,6 @@ function showDetail(pk) {
       <div class="modal-cat-tag">${d.cat}</div>
       <div class="modal-title">${d.name}</div>
     </div>`;
-
-  const allergenHtml = d.allergens.length
-    ? d.allergens.map(a => `<span class="modal-allergen-tag">${a}</span>`).join('')
-    : `<span class="no-allergens">Не указаны</span>`;
 
   const weightStr = d.weight ? d.weight + ' г' : '—';
 
@@ -1069,11 +1033,6 @@ function showDetail(pk) {
       <div class="modal-section-title">Состав</div>
       <div class="composition-box">${d.comp}</div>
     </div>` : ''}
-
-    <div class="modal-section">
-      <div class="modal-section-title">Аллергены</div>
-      <div class="modal-allergen-list">${allergenHtml}</div>
-    </div>
 
     <div class="modal-section">
       <div class="modal-section-title">Пищевая ценность</div>

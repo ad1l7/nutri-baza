@@ -7,7 +7,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 from .models import (
-    Product, Allergen, MealCategory, MealTime,
+    Product, MealCategory, MealTime,
     CalorieCategory, CalorieCategoryMeal, Material,
     SwapGroup, SwapItem,
     ClaudeRationGroup, ClaudeRation, ClaudeRationSlot,
@@ -24,12 +24,11 @@ logger = logging.getLogger(__name__)
 
 def get_filtered_products(request):
     """Применяет все GET-фильтры каталога.
-    Возвращает (queryset, filters_dict, selected_meal_categories, selected_allergens)."""
-    products = Product.objects.prefetch_related("meal_categories", "allergens").all()
+    Возвращает (queryset, filters_dict, selected_meal_categories)."""
+    products = Product.objects.prefetch_related("meal_categories").all()
 
     search                   = request.GET.get("search", "").strip()
     selected_meal_categories = request.GET.getlist("meal_category")
-    selected_allergens       = request.GET.getlist("allergen")
     cost_min      = request.GET.get("cost_min", "")
     cost_max      = request.GET.get("cost_max", "")
     kcal_min      = request.GET.get("kcal_min", "")
@@ -62,8 +61,6 @@ def get_filtered_products(request):
         )
     if selected_meal_categories:
         products = products.filter(meal_categories__key__in=selected_meal_categories).distinct()
-    if selected_allergens:
-        products = products.filter(allergens__pk__in=selected_allergens).distinct()
     if cost_min:       products = products.filter(cost__gte=cost_min)
     if cost_max:       products = products.filter(cost__lte=cost_max)
     if kcal_min:       products = products.filter(kcal_per_100__gte=kcal_min)
@@ -117,30 +114,24 @@ def get_filtered_products(request):
         "packing": packing, "unused": unused, "used": used,
         "sort": sort_by, "dir": sort_dir,
     }
-    return products, filters, selected_meal_categories, selected_allergens
+    return products, filters, selected_meal_categories
 
 
 def product_list(request):
-    products, filters, selected_meal_categories, selected_allergens = get_filtered_products(request)
+    products, filters, selected_meal_categories = get_filtered_products(request)
     all_meal_categories = MealCategory.objects.all()
-    all_allergens = Allergen.objects.all()
 
     total = products.count()
     packings = (
         Product.objects.values_list("packing", flat=True)
         .distinct().exclude(packing__isnull=True).exclude(packing="").order_by("packing")
     )
-    selected_allergen_names = list(
-        Allergen.objects.filter(pk__in=selected_allergens).values_list("name", flat=True)
-    ) if selected_allergens else []
 
     return render(request, "myapp/product_list.html", {
         "products": products, "total": total,
         "all_meal_categories": all_meal_categories,
-        "all_allergens": all_allergens, "packings": packings,
+        "packings": packings,
         "selected_meal_categories": selected_meal_categories,
-        "selected_allergens": selected_allergens,
-        "selected_allergen_names": selected_allergen_names,
         "slot_labels": SLOT_LABELS,
         "filters": filters,
     })
@@ -154,7 +145,7 @@ def product_export(request):
     from django.http import HttpResponse
     from urllib.parse import quote
 
-    products, _, _, _ = get_filtered_products(request)
+    products, _, _ = get_filtered_products(request)
     products = products.prefetch_related("meal_categories")
 
     wb = openpyxl.Workbook()
@@ -236,11 +227,8 @@ def product_export(request):
 
 def product_card(request, pk):
     """Полная карточка блюда в JSON — для модалки по клику на блюдо в слоте
-    рациона. Отдаём всё, что показываем в каталоге: состав, аллергены, КБЖУ
-    на порцию и на 100 г, массу, цены."""
-    p = get_object_or_404(
-        Product.objects.prefetch_related("allergens", "meal_categories"), pk=pk
-    )
+    рациона: состав, КБЖУ на порцию и на 100 г, масса, цены."""
+    p = get_object_or_404(Product.objects.prefetch_related("meal_categories"), pk=pk)
 
     def num(val):
         if val is None:
@@ -262,7 +250,6 @@ def product_card(request, pk):
         "cost": num(p.cost),
         "sale_price": num(p.sale_price),
         "composition": p.composition_clean or p.composition or "",
-        "allergens": [a.name for a in p.allergens.all()],
         "photo": p.photo.url if p.photo else "",
         "per_serving": {
             "protein": num(p.protein_per_serving), "fat": num(p.fat_per_serving),
@@ -336,7 +323,7 @@ SLOT_COLORS = {
 
 def _product_picker_dict(p, with_category=False):
     """Данные блюда для пикера в редакторе рациона (КБЖУ на порцию и на 100 г,
-    цена продажи с ФЗ, аллергены) — для фильтров и отображения."""
+    цена продажи с ФЗ) — для фильтров и отображения."""
     d = {
         "id": p.pk, "name": p.name, "article": p.article or "",
         # на порцию
@@ -350,7 +337,6 @@ def _product_picker_dict(p, with_category=False):
         "fat100":     float(p.fat or 0),
         "carbs100":   float(p.carbs or 0),
         "price":     float(p.sale_price or 0),
-        "allergens": [a.name for a in p.allergens.all()],
         "photo":     p.photo.url if p.photo else "",
     }
     if with_category:
@@ -516,7 +502,7 @@ def calorie_delete(request, pk):
 
 def swap_list(request):
     groups = list(
-        SwapGroup.objects.prefetch_related("items__product__allergens").all()
+        SwapGroup.objects.prefetch_related("items__product").all()
     )
     groups_data = []
     for g in groups:
@@ -608,7 +594,7 @@ def swap_group_export(request, group_pk):
     from urllib.parse import quote
 
     group = get_object_or_404(SwapGroup, pk=group_pk)
-    items = list(group.items.select_related("product").prefetch_related("product__allergens"))
+    items = list(group.items.select_related("product"))
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -627,7 +613,6 @@ def swap_group_export(request, group_pk):
         "Наименование", "Артикул", "Масса, г", "Себест., ₸",
         "Белки (порц)", "Жиры (порц)", "Углев. (порц)", "Ккал (порц)", "КДж (порц)",
         "Белки/100г", "Жиры/100г", "Углев./100г", "Ккал/100г",
-        "Аллергены",
     ]
     ncols = len(headers)
 
@@ -659,13 +644,11 @@ def swap_group_export(request, group_pk):
     for it in items:
         p = it.product
         weight_g = num(p.net_weight * 1000) if p.net_weight is not None else None
-        allergens = ", ".join(a.name for a in p.allergens.all())
         values = [
             p.name, p.article or "", weight_g, num(p.cost),
             num(p.protein_per_serving), num(p.fat_per_serving),
             num(p.carbs_per_serving), num(p.kcal_per_serving), num(p.kj_per_serving),
             num(p.protein), num(p.fat), num(p.carbs), num(p.kcal_per_100),
-            allergens,
         ]
         for col, val in enumerate(values, start=1):
             c = ws.cell(row=row, column=col, value=val)
@@ -676,7 +659,7 @@ def swap_group_export(request, group_pk):
                 c.alignment = center
         row += 1
 
-    widths = [34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10, 24]
+    widths = [34, 12, 9, 10, 11, 10, 12, 11, 11, 11, 10, 12, 10]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -1181,18 +1164,16 @@ def claude_ration_edit(request, pk):
     for key, _ in RATION_SLOT_TYPES:
         prods = list(
             Product.objects.filter(meal_categories__key=key)
-            .exclude(pk__in=occupied_ids)
-            .prefetch_related("allergens").order_by("name")
+            .exclude(pk__in=occupied_ids).order_by("name")
         )
         meal_cat_map[key] = [_product_picker_dict(p) for p in prods]
 
     all_meal_times = list(MealTime.objects.order_by("order", "name"))
     all_products = list(
-        Product.objects.prefetch_related("meal_categories", "allergens")
+        Product.objects.prefetch_related("meal_categories")
         .exclude(pk__in=occupied_ids).order_by("name")
     )
     all_products_json = [_product_picker_dict(p, with_category=True) for p in all_products]
-    all_allergens = list(Allergen.objects.order_by("name"))
 
     norm = CalorieCategory.norm_for(ration.kcal_category)
     norm_flags = {}
@@ -1236,7 +1217,6 @@ def claude_ration_edit(request, pk):
         "slot_labels_json": json.dumps(SLOT_LABELS, ensure_ascii=False),
         "occupied_count": len(occupied_ids),
         "all_products_json": json.dumps(all_products_json, ensure_ascii=False),
-        "all_allergens": all_allergens,
     })
 
 
@@ -1717,7 +1697,7 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
     rations = list(
         group.rations
         .prefetch_related(
-            "slots__product__allergens",
+            "slots__product",
             "slots__meal_time",
         )
         .order_by("created_at")

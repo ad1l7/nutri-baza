@@ -195,8 +195,6 @@
   .dish-st{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;}
   .dish-st::after{content:'';flex:1;height:1px;background:var(--border-soft);}
   .dish-comp{background:var(--light);border:1.5px solid var(--border-soft);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.65;color:var(--text-mid);white-space:pre-line;}
-  .dish-alg{display:flex;flex-wrap:wrap;gap:6px;}
-  .dish-alg span{background:#fff3ef;border:1.5px solid #f3d3c8;color:#b4502f;font-size:11.5px;font-weight:700;padding:4px 9px;border-radius:20px;}
   .dish-nt{width:100%;border-collapse:collapse;font-size:12.5px;}
   .dish-nt th,.dish-nt td{border:1px solid var(--border-soft);padding:6px 9px;text-align:right;}
   .dish-nt th{background:var(--light);font-weight:800;color:var(--text-mid);}
@@ -234,10 +232,6 @@
   .pf-in{width:100%;min-width:0;background:var(--white);border:1.5px solid var(--border);border-radius:7px;padding:5px 7px;font-family:var(--font);font-size:12px;color:var(--text);outline:none;}
   .pf-in:focus{border-color:var(--green);}
   .pf-dash{color:var(--muted);font-size:11px;flex-shrink:0;}
-  .pf-allergens{display:flex;flex-wrap:wrap;gap:6px;}
-  .pf-chip{background:var(--white);border:1.5px solid var(--border);border-radius:20px;padding:5px 11px;font-family:var(--font);font-size:11px;font-weight:600;color:var(--text-mid);cursor:pointer;transition:all .15s;}
-  .pf-chip:hover{border-color:var(--green);}
-  .pf-chip.active{background:#fff1ee;border-color:#f3c0b3;color:var(--danger);font-weight:700;}
   @media (max-width:920px){ .pf-panel{grid-template-columns:1fr;} }
 
   /* 🤖 Claude-панель */
@@ -581,16 +575,6 @@
                 <div class="pf-row"><span class="pf-l">Цена</span><input type="number" class="pf-in" data-f="price" data-b="min" placeholder="от" oninput="renderPicker()"><span class="pf-dash">–</span><input type="number" class="pf-in" data-f="price" data-b="max" placeholder="до" oninput="renderPicker()"></div>
               </div>
             </div>
-            {% if all_allergens %}
-            <div class="pf-group wide">
-              <div class="pf-group-title">Исключить аллергены</div>
-              <div class="pf-allergens" id="pf-allergens">
-                {% for a in all_allergens %}
-                <button type="button" class="pf-chip" data-allergen="{{ a.name|escapejs }}" onclick="toggleAllergen(this)">{{ a.name }}</button>
-                {% endfor %}
-              </div>
-            </div>
-            {% endif %}
           </div>
         </div>
       </div>
@@ -713,15 +697,12 @@ function renderPicker() {
           ? `<img src="${p.photo}" class="pthumb" alt="">`
           : `<div class="pph">🥗</div>`;
         const cost = p.price ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.price.toFixed(0)} ₸</span>` : '';
-        const alg = (p.allergens && p.allergens.length)
-          ? `<div class="pnutr" style="color:var(--danger);opacity:.85;">⚠ ${p.allergens.join(', ')}</div>` : '';
         html += `<div class="pitem ${isCur ? 'cur' : ''}">
           ${photo}
           <div class="pinfo">
             <div class="pname">${p.name}${p.article ? ` <span style="color:var(--muted);font-weight:500;font-size:11px;">· ${p.article}</span>` : ''}</div>
             <div class="pnutr">Порц: ${p.kcal.toFixed(0)} кк · Б${p.protein.toFixed(1)} Ж${p.fat.toFixed(1)} У${p.carbs.toFixed(1)}${cost}</div>
             <div class="pnutr" style="opacity:.7;">100г: ${(p.kcal100||0).toFixed(0)} кк · Б${(p.protein100||0).toFixed(1)} Ж${(p.fat100||0).toFixed(1)} У${(p.carbs100||0).toFixed(1)}</div>
-            ${alg}
           </div>
           <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
             ${isCur ? '✓ Текущее' : 'Выбрать'}
@@ -746,12 +727,11 @@ function readPFilters() {
     if (isNaN(num)) return;
     (ranges[inp.dataset.f] = ranges[inp.dataset.f] || {})[inp.dataset.b] = num;
   });
-  const excludeAllergens = [...document.querySelectorAll('.pf-chip.active')].map(c => c.dataset.allergen);
-  return { ranges, excludeAllergens };
+  return { ranges };
 }
 
 function applyPFilters(products) {
-  const { ranges, excludeAllergens } = readPFilters();
+  const { ranges } = readPFilters();
   return products.filter(p => {
     for (const field in ranges) {
       const val = p[field] || 0;
@@ -759,17 +739,13 @@ function applyPFilters(products) {
       if (r.min != null && val < r.min) return false;
       if (r.max != null && val > r.max) return false;
     }
-    if (excludeAllergens.length) {
-      const pa = p.allergens || [];
-      if (excludeAllergens.some(a => pa.includes(a))) return false;
-    }
     return true;
   });
 }
 
 function updatePFilterMeta(count) {
-  const { ranges, excludeAllergens } = readPFilters();
-  const active = Object.keys(ranges).length + (excludeAllergens.length ? 1 : 0);
+  const { ranges } = readPFilters();
+  const active = Object.keys(ranges).length;
   const badge = document.getElementById('pf-badge');
   const reset = document.getElementById('pf-reset');
   if (badge) { badge.style.display = active ? 'inline-block' : 'none'; badge.textContent = active; }
@@ -793,11 +769,8 @@ function togglePFilters() {
   document.getElementById('pf-toggle').classList.toggle('open', show);
 }
 
-function toggleAllergen(btn) { btn.classList.toggle('active'); renderPicker(); }
-
 function resetPFilters() {
   document.querySelectorAll('.pf-in').forEach(i => i.value = '');
-  document.querySelectorAll('.pf-chip.active').forEach(c => c.classList.remove('active'));
   renderPicker();
 }
 
@@ -884,10 +857,6 @@ function renderDish(d) {
     ? `<div class="dish-comp">${esc(d.composition)}</div>`
     : '<div class="dish-muted">Состав не заполнен в iiko.</div>';
 
-  const alg = d.allergens && d.allergens.length
-    ? `<div class="dish-alg">${d.allergens.map(a => `<span>${esc(a)}</span>`).join('')}</div>`
-    : '<div class="dish-muted">Аллергены не указаны.</div>';
-
   const s = d.per_serving || {}, h = d.per_100 || {};
   return `
     <div class="dish-head">
@@ -901,10 +870,6 @@ function renderDish(d) {
       <div class="dish-sec">
         <div class="dish-st">Состав</div>
         ${comp}
-      </div>
-      <div class="dish-sec">
-        <div class="dish-st">Аллергены</div>
-        ${alg}
       </div>
       <div class="dish-sec" style="margin-bottom:0;">
         <div class="dish-st">Пищевая ценность</div>

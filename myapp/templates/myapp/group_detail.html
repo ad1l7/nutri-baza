@@ -90,7 +90,6 @@
   col.c-prot   { width:58px; }
   col.c-fat    { width:58px; }
   col.c-carb   { width:62px; }
-  col.c-allerg { width:220px; }
 
   thead.dt-head th{
     background:var(--off-white);
@@ -103,7 +102,6 @@
   }
   thead.dt-head th.r{text-align:right;}
   thead.dt-head th.c-photo{padding-left:14px;}
-  thead.dt-head th.c-allerg{padding-right:14px;}
 
   tr.meal-hd td{
     background:var(--light);
@@ -142,19 +140,9 @@
   td.c-prot{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
   td.c-fat{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
   td.c-carb{text-align:right;color:var(--text-mid);font-weight:600;white-space:nowrap;vertical-align:middle;}
-  td.c-allerg{
-    padding-right:14px !important;
-    white-space:normal; /* аллергены переносятся */
-    line-height:1.6;
-    vertical-align:middle;
-  }
-
   .thumb{width:34px;height:34px;border-radius:7px;object-fit:cover;border:1px solid var(--border);display:block;}
   .thumb-ph{width:34px;height:34px;border-radius:7px;background:var(--light);
     border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:15px;}
-
-  .atag{display:inline-block;background:#fff3e0;border:1px solid #f5c06a;color:#7a4500;
-    border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin:1px 2px 1px 0;}
 
   .rb-foot{padding:8px 16px;border-top:1px solid var(--border-soft);background:var(--off-white);}
   .rb-filled{font-size:11px;color:var(--muted);font-weight:600;}
@@ -238,7 +226,6 @@
           <col class="c-prot">
           <col class="c-fat">
           <col class="c-carb">
-          <col class="c-allerg">
         </colgroup>
         <thead class="dt-head">
           <tr>
@@ -251,14 +238,13 @@
             <th class="c-prot r">Белки</th>
             <th class="c-fat r">Жиры</th>
             <th class="c-carb r">Углев.</th>
-            <th class="c-allerg">Аллергены</th>
           </tr>
         </thead>
         <tbody>
           {% for mg in rd.meal_groups %}
 
           <tr class="meal-hd">
-            <td colspan="10">{{ mg.meal_time.icon }} {{ mg.meal_time.name }}</td>
+            <td colspan="9">{{ mg.meal_time.icon }} {{ mg.meal_time.name }}</td>
           </tr>
 
           {% for slot in mg.slots %}{% if slot.product %}
@@ -295,16 +281,11 @@
             <td class="c-carb">
               {% if slot.product.carbs_per_serving %}{{ slot.product.carbs_per_serving|floatformat:1 }}{% else %}—{% endif %}
             </td>
-            <td class="c-allerg">
-              {% for a in slot.product.allergens.all %}
-                <span class="atag">{{ a.name }}</span>
-              {% empty %}—{% endfor %}
-            </td>
           </tr>
           {% endif %}{% endfor %}
 
           {% empty %}
-          <tr><td colspan="10" style="padding:12px 14px;color:var(--muted);font-style:italic;">Нет приёмов пищи</td></tr>
+          <tr><td colspan="9" style="padding:12px 14px;color:var(--muted);font-style:italic;">Нет приёмов пищи</td></tr>
           {% endfor %}
         </tbody>
       </table>
