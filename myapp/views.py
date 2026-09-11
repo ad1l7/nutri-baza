@@ -234,9 +234,47 @@ def product_export(request):
     return response
 
 
-def product_detail(request, pk):
-    product = get_object_or_404(Product, pk=pk)
-    return render(request, "myapp/product_detail.html", {"product": product})
+def product_card(request, pk):
+    """Полная карточка блюда в JSON — для модалки по клику на блюдо в слоте
+    рациона. Отдаём всё, что показываем в каталоге: состав, аллергены, КБЖУ
+    на порцию и на 100 г, массу, цены."""
+    p = get_object_or_404(
+        Product.objects.prefetch_related("allergens", "meal_categories"), pk=pk
+    )
+
+    def num(val):
+        if val is None:
+            return None
+        try:
+            return round(float(val), 2)
+        except (TypeError, ValueError):
+            return None
+
+    return JsonResponse({
+        "id": p.pk,
+        "name": p.name,
+        "article": p.article or "",
+        "category": p.iiko_category or "",
+        "meal_categories": [str(c) for c in p.meal_categories.all()],
+        "packing": p.packing or "",
+        # масса нетто хранится в кг, показываем в граммах
+        "weight_g": num(p.net_weight * 1000) if p.net_weight is not None else None,
+        "cost": num(p.cost),
+        "sale_price": num(p.sale_price),
+        "composition": p.composition_clean or p.composition or "",
+        "allergens": [a.name for a in p.allergens.all()],
+        "photo": p.photo.url if p.photo else "",
+        "per_serving": {
+            "protein": num(p.protein_per_serving), "fat": num(p.fat_per_serving),
+            "carbs": num(p.carbs_per_serving), "kcal": num(p.kcal_per_serving),
+            "kj": num(p.kj_per_serving),
+        },
+        "per_100": {
+            "protein": num(p.protein), "fat": num(p.fat),
+            "carbs": num(p.carbs), "kcal": num(p.kcal_per_100),
+            "kj": num(p.kj_per_100),
+        },
+    })
 
 
 @require_POST

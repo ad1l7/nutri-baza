@@ -1,4 +1,4 @@
-"""Права на вкладку «Рационы Claude».
+"""Права на вкладку «Рационы Claude» и карточка блюда в редакторе рациона.
 
 Ограниченный редактор — читатель с галочкой «Может вести рационы Claude»:
 правит только свои группы и рационы плюс группы, отмеченные shared_editing
@@ -6,11 +6,16 @@
 как у обычного читателя.
 """
 
+from decimal import Decimal
+
 from django.contrib.auth.models import Group, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import ClaudeRation, ClaudeRationGroup, UserRights
+from .models import (
+    Allergen, ClaudeRation, ClaudeRationGroup, ClaudeRationSlot,
+    MealTime, Product, UserRights,
+)
 from .roles import READERS_GROUP, can_edit_claude_group, can_edit_claude_ration
 
 
@@ -138,3 +143,54 @@ class ClaudeEditorRightsTests(TestCase):
         self.assertEqual(resp.status_code, 403)
         self.foreign_ration.refresh_from_db()
         self.assertEqual(self.foreign_ration.group_id, self.foreign.pk)
+
+
+class ProductCardTests(TestCase):
+    """Карточка блюда, которую открывает клик по блюду в слоте рациона."""
+
+    def setUp(self):
+        self.user = User.objects.create_user("adil", password="x")
+        self.product = Product.objects.create(
+            name="ПП* Упак Блины с мясом (3шт)", article="29272",
+            iiko_category="ПП* ЗАВТРАК", net_weight=Decimal("0.265"),
+            cost=Decimal("551"), sale_price=Decimal("921"),
+            composition="Мука, молоко, фарш говяжий, яйцо, соль",
+            protein_per_serving=Decimal("25.1"), fat_per_serving=Decimal("28.2"),
+            carbs_per_serving=Decimal("35.0"), kcal_per_serving=Decimal("494"),
+            protein=Decimal("9.5"), fat=Decimal("10.6"),
+            carbs=Decimal("13.2"), kcal_per_100=Decimal("186"),
+        )
+        self.product.allergens.add(Allergen.objects.create(name="Глютен"))
+
+    def test_card_returns_full_info(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("product_card", args=[self.product.pk]))
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["name"], "ПП* Упак Блины с мясом (3шт)")
+        self.assertEqual(data["article"], "29272")
+        self.assertIn("фарш говяжий", data["composition"])
+        self.assertEqual(data["allergens"], ["Глютен"])
+        self.assertEqual(data["weight_g"], 265.0)      # кг из базы -> граммы
+        self.assertEqual(data["sale_price"], 921.0)
+        self.assertEqual(data["per_serving"]["kcal"], 494.0)
+        self.assertEqual(data["per_100"]["kcal"], 186.0)
+
+    def test_card_needs_login(self):
+        resp = self.client.get(reverse("product_card", args=[self.product.pk]))
+        self.assertEqual(resp.status_code, 302)        # уводит на /login/
+
+    def test_ration_editor_makes_dish_clickable(self):
+        group = ClaudeRationGroup.objects.create(name="ДИАБЕТ 2200")
+        ration = ClaudeRation.objects.create(
+            group=group, name="Диабет 2200 день 7", kcal_category=2200,
+        )
+        ClaudeRationSlot.objects.create(
+            ration=ration, product=self.product, slot_type="breakfast",
+            meal_time=MealTime.objects.create(name="Завтрак-1"),
+        )
+        self.client.force_login(self.user)
+        html = self.client.get(
+            reverse("claude_ration_edit", args=[ration.pk])
+        ).content.decode()
+        self.assertIn(f"openDishModal({self.product.pk})", html)

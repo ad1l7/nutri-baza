@@ -5,7 +5,7 @@ urlpatterns = [
     # Каталог
     path("", views.product_list, name="product_list"),
     path("export/", views.product_export, name="product_export"),
-    path("product/<int:pk>/", views.product_detail, name="product_detail"),
+    path("product/<int:pk>/card/", views.product_card, name="product_card"),
     path("product/<int:pk>/sale-price/", views.product_set_sale_price, name="product_set_sale_price"),
 
     # Калоражи (только для редакторов)
