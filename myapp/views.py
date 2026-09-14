@@ -307,6 +307,7 @@ SLOT_ICONS = {
     'salad': '🥗',
     'dessert': '🍰',
     'smoothie': '🥤',  'sandwich': '🥪',
+    'jkt': '🌿',
     'extra': '🛒',
 }
 
@@ -317,6 +318,7 @@ SLOT_COLORS = {
     'salad': 'teal',
     'dessert': 'pink',
     'smoothie': 'purple',  'sandwich': 'amber',
+    'jkt': 'teal',
     'extra': 'green',
 }
 

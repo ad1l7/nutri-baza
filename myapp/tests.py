@@ -145,6 +145,43 @@ class ClaudeEditorRightsTests(TestCase):
         self.assertEqual(self.foreign_ration.group_id, self.foreign.pk)
 
 
+class JktCategoryTests(TestCase):
+    """Категория «ЖКТ» и её сопоставление с группой внешнего меню iiko."""
+
+    IIKO_GROUP = "ЖКТ (желудочно кишечный тракт)"
+
+    def test_category_seeded_by_migration(self):
+        from .models import IikoCategoryMap, MealCategory
+
+        category = MealCategory.objects.get(key="jkt")
+        self.assertEqual(str(category), "ЖКТ")
+        self.assertEqual(
+            IikoCategoryMap.objects.get(iiko_name=self.IIKO_GROUP).slot_key, "jkt"
+        )
+
+    def test_sync_maps_iiko_group_to_jkt(self):
+        from .iiko_sync import _build_label_to_key, _pick_category
+
+        cat_display, slot_key = _pick_category(
+            {"category_names": [self.IIKO_GROUP]}, _build_label_to_key()
+        )
+        self.assertEqual(slot_key, "jkt")
+        self.assertEqual(cat_display, self.IIKO_GROUP)
+
+    def test_catalog_filter_finds_jkt_dishes(self):
+        from .models import MealCategory
+
+        user = User.objects.create_user("adil", password="x")
+        dish = Product.objects.create(name="ЖКТ* Упак Винегрет (1порц)", article="11237")
+        dish.meal_categories.set([MealCategory.objects.get(key="jkt")])
+        Product.objects.create(name="ПП* Упак Бигус (1порц)", article="00381")
+
+        self.client.force_login(user)
+        html = self.client.get(reverse("product_list"), {"meal_category": "jkt"}).content.decode()
+        self.assertIn("Винегрет", html)
+        self.assertNotIn("Бигус", html)
+
+
 class OrderSheetAppendixTests(TestCase):
     """Шапка «Приложение к договору поставки» в заявочном листе."""
 
