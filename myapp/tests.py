@@ -145,6 +145,47 @@ class ClaudeEditorRightsTests(TestCase):
         self.assertEqual(self.foreign_ration.group_id, self.foreign.pk)
 
 
+class OrderSheetAppendixTests(TestCase):
+    """Шапка «Приложение к договору поставки» в заявочном листе."""
+
+    def _sheet(self, with_price):
+        import io
+        from openpyxl import load_workbook
+        from .views import _build_order_sheet_xlsx
+
+        product = Product.objects.create(
+            name="ПП* Упак Блины с мясом (3шт)", article="29272",
+            packing="порц", sale_price=Decimal("921"),
+        )
+        resp = _build_order_sheet_xlsx([product], with_price=with_price)
+        return load_workbook(io.BytesIO(resp.content)).active
+
+    def test_without_price_is_appendix_1(self):
+        ws = self._sheet(with_price=False)
+        self.assertEqual(ws["C1"].value, "ПРИЛОЖЕНИЕ № 1")
+        self.assertTrue(ws["C1"].font.bold)
+        self.assertEqual(ws["C2"].value, "к Договору поставки № ______")
+        self.assertEqual(ws["C3"].value, "от «____» __________ 20___ г.")
+        self.assertEqual(ws["C1"].alignment.horizontal, "right")
+        # тянется до последней колонки «ИТОГО»
+        self.assertIn("C1:D1", [str(r) for r in ws.merged_cells.ranges])
+
+    def test_with_price_is_appendix_2(self):
+        ws = self._sheet(with_price=True)
+        self.assertEqual(ws["C1"].value, "ПРИЛОЖЕНИЕ № 2")
+        self.assertIn("C1:E1", [str(r) for r in ws.merged_cells.ranges])
+
+    def test_existing_header_stays_in_place(self):
+        """Шапка приложения не сдвигает строки ручного файла."""
+        ws = self._sheet(with_price=True)
+        self.assertEqual(ws["A1"].value, 1)
+        self.assertEqual(ws["B1"].value, 'Заявочный лист "Фуд завод"')
+        self.assertEqual(ws["B4"].value, "O-Live")
+        self.assertEqual(ws["A8"].value, "Артикул")
+        self.assertEqual(ws["D8"].value, "Цена прод.")
+        self.assertEqual(ws["A11"].value, "29272")
+
+
 class ClaudeCatalogTests(TestCase):
     """Каталог, который уходит в Claude при сборке рациона."""
 

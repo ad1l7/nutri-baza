@@ -1529,6 +1529,21 @@ def _build_order_sheet_xlsx(products, with_price=False):
     # Строка 4 — «Компания», заполняем сразу
     ws.cell(row=4, column=2, value=ORDER_SHEET_COMPANY).font = small
 
+    # ── Правый верхний угол: приложение к договору поставки ──
+    # Заявочный лист без цен — Приложение № 1, с ценами — № 2. Кладём в свободные
+    # ячейки справа от шапки (от «Кратность заказа» до последней колонки), ничего
+    # не сдвигая: строки 1–10 повторяют ручной файл и остаются на своих местах.
+    appendix_right = Alignment(horizontal="right", vertical="center")
+    for r, text, bold in (
+        (1, f"ПРИЛОЖЕНИЕ № {2 if with_price else 1}", True),
+        (2, "к Договору поставки № ______", False),
+        (3, "от «____» __________ 20___ г.", False),
+    ):
+        ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=ncols)
+        c = ws.cell(row=r, column=3, value=text)
+        c.font = Font(name="Times New Roman", size=12, bold=bold)
+        c.alignment = appendix_right
+
     for col, title in enumerate(headers, start=1):
         c = ws.cell(row=8, column=col, value=title)
         c.font = head_font
