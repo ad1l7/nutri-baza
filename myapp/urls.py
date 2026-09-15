@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import export_api, views
 
 urlpatterns = [
     # Каталог
@@ -45,4 +45,7 @@ urlpatterns = [
     # iiko
     path("iiko/sync/", views.iiko_sync_view, name="iiko_sync"),
     path("iiko/status/", views.iiko_sync_status, name="iiko_sync_status"),
+
+    # Выгрузка всей базы для общей базы в Supabase (вход по токену, не по логину)
+    path("api/export/", export_api.export_all, name="export_all"),
 ]

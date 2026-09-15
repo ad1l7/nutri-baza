@@ -50,7 +50,8 @@ class ReaderReadOnlyMiddleware:
 class LoginRequiredMiddleware:
     """
     Перенаправляет неавторизованных пользователей на страницу логина.
-    Исключения: сама страница /login/ и /admin/.
+    Исключения: сама страница /login/, /admin/ и /api/ — у API своя
+    авторизация по токену (см. export_api.py).
     """
 
     def __init__(self, get_response):
@@ -60,9 +61,9 @@ class LoginRequiredMiddleware:
         login_url = getattr(settings, "LOGIN_URL", "/login/")
         path = request.path_info
 
-        # Пропускаем: страница входа и Django-админка
+        # Пропускаем: страница входа, Django-админка и API
         if not request.user.is_authenticated:
-            if not (path == login_url or path.startswith("/admin/")):
+            if not (path == login_url or path.startswith(("/admin/", "/api/"))):
                 next_url = path
                 return redirect(f"{login_url}?next={next_url}")
 

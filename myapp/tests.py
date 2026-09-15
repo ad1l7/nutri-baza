@@ -9,7 +9,7 @@
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import (
@@ -298,3 +298,62 @@ class ProductCardTests(TestCase):
             reverse("claude_ration_edit", args=[ration.pk])
         ).content.decode()
         self.assertIn(f"openDishModal({self.product.pk})", html)
+
+
+@override_settings(EXPORT_API_TOKEN="secret-token", EXPORT_PUBLIC_BASE_URL="https://olive-nutri-baza.kz")
+class ExportApiTests(TestCase):
+    """GET /api/export/ — выгрузка всей базы для общей базы в Supabase."""
+
+    def setUp(self):
+        self.url = reverse("export_all")
+        self.product = Product.objects.create(
+            name="Суп-пюре тыквенный", article="30001",
+            net_weight=Decimal("0.300"), cost=Decimal("300"),
+            kcal_per_100=Decimal("55"), composition="Тыква, сливки",
+        )
+        User.objects.create_user("adil", password="x")
+        meal = MealTime.objects.create(name="Обед")
+        group = ClaudeRationGroup.objects.create(name="ДИАБЕТ 1800")
+        ration = ClaudeRation.objects.create(group=group, name="День 1", kcal_category=1800)
+        ClaudeRationSlot.objects.create(
+            ration=ration, meal_time=meal, slot_type="soup", product=self.product,
+        )
+
+    def get(self, token=None):
+        headers = {"HTTP_AUTHORIZATION": f"Bearer {token}"} if token else {}
+        return self.client.get(self.url, **headers)
+
+    def test_needs_token(self):
+        self.assertEqual(self.get().status_code, 401)
+        self.assertEqual(self.get("wrong").status_code, 401)
+
+    @override_settings(EXPORT_API_TOKEN="")
+    def test_disabled_without_configured_token(self):
+        self.assertEqual(self.get("").status_code, 503)
+        self.assertEqual(self.get("anything").status_code, 503)
+
+    def test_exports_all_tables(self):
+        resp = self.get("secret-token")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["schema_version"], 1)
+        self.assertEqual(data["counts"]["products"], 1)
+
+        product = data["products"][0]
+        self.assertEqual(product["net_weight_g"], 300.0)       # кг из базы -> граммы
+        self.assertEqual(product["sale_price"], 501.0)          # автонаценка 67%
+        self.assertEqual(product["kcal_100"], 55.0)
+
+        slot = data["ration_slots"][0]
+        self.assertEqual(slot["product_id"], product["id"])
+        self.assertEqual(data["rations"][0]["kcal"], 1800)
+        self.assertIn("soup", {c["key"] for c in data["meal_categories"]})
+
+    def test_no_user_data_leaks(self):
+        body = self.get("secret-token").content.decode()
+        self.assertNotIn("password", body)
+        self.assertNotIn("users", self.get("secret-token").json())
+
+    def test_post_not_allowed(self):
+        resp = self.client.post(self.url, HTTP_AUTHORIZATION="Bearer secret-token")
+        self.assertEqual(resp.status_code, 405)

@@ -57,6 +57,12 @@ IIKO_SERVER_PASSWORD  = config("IIKO_SERVER_PASSWORD")
 # ── Claude (Anthropic API) ────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default="")
 
+# ── Выгрузка для общей базы (Supabase) ────────────────────────────────────────
+# GET /api/export/ с заголовком «Authorization: Bearer <токен>». Пока токен
+# пустой, выгрузка выключена (503). Базовый адрес нужен для ссылок на фото.
+EXPORT_API_TOKEN = config("EXPORT_API_TOKEN", default="")
+EXPORT_PUBLIC_BASE_URL = config("EXPORT_PUBLIC_BASE_URL", default="https://olive-nutri-baza.kz")
+
 # ── Логи ──────────────────────────────────────────────────────────────────────
 # Пишем в stdout: gunicorn его перехватывает, читать через
 #   journalctl -u gunicorn -f | grep claude
