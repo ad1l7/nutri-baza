@@ -697,14 +697,16 @@ function renderPicker() {
           ? `<img src="${p.photo}" class="pthumb" alt="">`
           : `<div class="pph">🥗</div>`;
         const cost = p.price ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.price.toFixed(0)} ₸</span>` : '';
-        html += `<div class="pitem ${isCur ? 'cur' : ''}">
+        html += `<div class="pitem ${isCur ? 'cur' : ''}" onclick="openDishModal(${p.id})"
+                      title="Показать состав и КБЖУ">
           ${photo}
           <div class="pinfo">
             <div class="pname">${p.name}${p.article ? ` <span style="color:var(--muted);font-weight:500;font-size:11px;">· ${p.article}</span>` : ''}</div>
             <div class="pnutr">Порц: ${p.kcal.toFixed(0)} кк · Б${p.protein.toFixed(1)} Ж${p.fat.toFixed(1)} У${p.carbs.toFixed(1)}${cost}</div>
             <div class="pnutr" style="opacity:.7;">100г: ${(p.kcal100||0).toFixed(0)} кк · Б${(p.protein100||0).toFixed(1)} Ж${(p.fat100||0).toFixed(1)} У${(p.carbs100||0).toFixed(1)}</div>
           </div>
-          <button class="psel ${isCur ? 'cur' : ''}" onclick="assignProduct(${p.id})" type="button">
+          <button class="psel ${isCur ? 'cur' : ''}" type="button"
+                  onclick="event.stopPropagation();assignProduct(${p.id})">
             ${isCur ? '✓ Текущее' : 'Выбрать'}
           </button>
         </div>`;
