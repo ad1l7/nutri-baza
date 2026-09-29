@@ -1056,7 +1056,7 @@ def sync_products_from_iiko(
                 # КБЖУ на порцию — от точного веса, масса — в целых граммах
                 # (половина вверх): в карточках встречается 251.5 или 229.997 г
                 grams = Decimal(str(weight_g)).quantize(Decimal("1"), ROUND_HALF_UP)
-                new_fields["net_weight"] = grams / 1000
+                new_fields["net_weight"] = float(grams) / 1000
             for src, dst in [
                 ("kcal",      "kcal_per_100"),
                 ("protein",   "protein"),
