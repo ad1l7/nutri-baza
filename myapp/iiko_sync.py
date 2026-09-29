@@ -18,7 +18,7 @@ description продукта.
 """
 
 import re
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import time
 import hashlib
 import requests
@@ -136,6 +136,13 @@ def _safe_float(val):
         return float(val) if val is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def _per_serving(val_100, weight_g):
+    """Значение на порцию из значения на 100 г."""
+    if val_100 is not None and weight_g:
+        return round(val_100 * weight_g / 100, 2)
+    return None
 
 
 def _round_for_compare(val):
@@ -568,9 +575,7 @@ def _extract_menu_items(menu_data: dict) -> dict:
         kj_100      = round(kcal_100 * 4.184, 2) if kcal_100 is not None else None
 
         def per_serving(val):
-            if val is not None and weight_grams:
-                return round(val * weight_grams / 100, 2)
-            return None
+            return _per_serving(val, weight_grams)
 
         photo_url = (
             size.get("buttonImageUrl")
@@ -796,6 +801,10 @@ def sync_products_from_iiko(
 
     # ── Шаг 3: iiko Server — состав + себестоимость ──────────────────────────
     server_composition = {}
+    # Масса нетто (г) из карточки iiko Server («вес единицы», unitWeight).
+    # Вес порции во внешнем меню заполняется вручную и бывает с тарой
+    # (баклажан пармиджано: 380 г в меню при 320 г по карточке и ТК).
+    server_unit_weight = {}
     cost_index = {}
     if server_url and server_login:
         server = None
@@ -852,6 +861,9 @@ def sync_products_from_iiko(
                             name_by_article += 1
                 if sp is None:
                     continue
+                uw = _safe_float(sp.get("unitWeight"))
+                if uw and uw > 0:
+                    server_unit_weight[pid] = float(Decimal(str(uw)) * 1000)
                 nm = (sp.get("name") or "").strip()
                 if nm:
                     uuid_to_name[pid] = nm
@@ -1029,8 +1041,22 @@ def sync_products_from_iiko(
             }
             if menu_info.get("packing"):
                 new_fields["packing"] = menu_info["packing"]
-            if menu_info.get("weight") is not None:
-                new_fields["net_weight"] = menu_info["weight"] / 1000
+            weight_g = server_unit_weight.get(uuid)
+            if weight_g is not None:
+                # КБЖУ на порцию во внешнем меню посчитаны от веса меню —
+                # пересчитываем от массы нетто из карточки
+                menu_info = dict(menu_info)
+                for k100, ks in (("kcal", "kcal_s"), ("protein", "protein_s"),
+                                 ("fat", "fat_s"), ("carbs", "carbs_s"),
+                                 ("kj_100", "kj_s")):
+                    menu_info[ks] = _per_serving(menu_info.get(k100), weight_g)
+            else:
+                weight_g = menu_info.get("weight")
+            if weight_g is not None:
+                # КБЖУ на порцию — от точного веса, масса — в целых граммах
+                # (половина вверх): в карточках встречается 251.5 или 229.997 г
+                grams = Decimal(str(weight_g)).quantize(Decimal("1"), ROUND_HALF_UP)
+                new_fields["net_weight"] = grams / 1000
             for src, dst in [
                 ("kcal",      "kcal_per_100"),
                 ("protein",   "protein"),

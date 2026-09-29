@@ -357,3 +357,58 @@ class ExportApiTests(TestCase):
     def test_post_not_allowed(self):
         resp = self.client.post(self.url, HTTP_AUTHORIZATION="Bearer secret-token")
         self.assertEqual(resp.status_code, 405)
+
+
+class SyncNetWeightTests(TestCase):
+    """Масса нетто — из карточки iiko Server (unitWeight), а не из веса порции
+    внешнего меню: там бывает вес с тарой."""
+
+    PID = "3f8f2ba7-b29e-4a2b-8ca1-c1250eb87504"
+
+    def _run_sync(self, unit_weight):
+        from unittest import mock
+        from myapp import iiko_sync
+
+        menu = {"itemCategories": [{"name": "ПП* ЗАВТРАК", "items": [{
+            "itemId": self.PID, "name": "Баклажан пармиджано", "sku": "00516",
+            "itemSizes": [{
+                "portionWeightGrams": 380,
+                "nutritionPerHundredGrams": {
+                    "energy": 100, "proteins": 5, "fats": 4, "carbs": 10,
+                },
+            }],
+        }]}]}
+        cloud = mock.Mock()
+        cloud.get_menu_by_id.return_value = menu
+        cloud.get_nomenclature.return_value = {"products": []}
+        server = mock.Mock()
+        server.get_products.return_value = [{
+            "id": self.PID, "num": "00516", "name": "ПП* Упак Баклажан пармиджано",
+            "unitWeight": unit_weight,
+            "containers": [{"fullContainerWeight": 0.38}],
+        }]
+        server.get_assembly_tree.return_value = []
+        server.get_cost_report.return_value = {}
+
+        iiko_sync._last_sync_time = 0
+        with mock.patch.object(iiko_sync, "IikoCloudClient", return_value=cloud), \
+             mock.patch.object(iiko_sync, "IikoServerClient", return_value=server):
+            res = iiko_sync.sync_products_from_iiko(
+                "key", "org", "menu", "http://srv", "login", "pass")
+        self.assertEqual(res["errors"], [])
+        return Product.objects.get(iiko_id=self.PID)
+
+    def test_weight_and_per_serving_from_server_card(self):
+        p = self._run_sync(0.32)
+        self.assertEqual(p.net_weight, Decimal("0.320"))
+        self.assertEqual(float(p.kcal_per_serving), 320.0)
+        self.assertEqual(float(p.protein_per_serving), 16.0)
+
+    def test_fallback_to_menu_weight_without_unit_weight(self):
+        p = self._run_sync(0)
+        self.assertEqual(p.net_weight, Decimal("0.380"))
+        self.assertEqual(float(p.kcal_per_serving), 380.0)
+
+    def test_fractional_unit_weight_rounded_half_up(self):
+        p = self._run_sync(0.2865)
+        self.assertEqual(p.net_weight, Decimal("0.287"))
