@@ -251,7 +251,7 @@
   .cl-preview{background:var(--white);border:1.5px solid var(--green-light);border-radius:12px;padding:12px;}
   .cl-prev-head{margin-bottom:10px;}
   .cl-badge{background:var(--green-dark);color:#fff;font-size:12px;font-weight:800;padding:5px 12px;border-radius:16px;}
-  .cl-sum{display:grid;grid-template-columns:repeat(5,1fr);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
+  .cl-sum{display:grid;grid-template-columns:repeat(6,1fr);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;}
   .cl-s{padding:8px 4px;text-align:center;}
   .cl-s+.cl-s{border-left:1px solid var(--border-soft);}
   .cl-s b{display:block;font-size:14px;font-weight:800;color:var(--text);}
@@ -302,6 +302,7 @@
     <div class="tpill">Ж <strong>{{ total_fat|floatformat:1 }}</strong></div>
     <div class="tpill">У <strong>{{ total_carbs|floatformat:1 }}</strong></div>
     <div class="tpill cost" title="Цена продажи с ФЗ по рациону">💰 <strong>{{ total_price|floatformat:0 }}</strong> ₸</div>
+    <div class="tpill" title="Себестоимость ФЗ по рациону">🧾 себ. <strong>{{ total_cost|floatformat:0 }}</strong> ₸</div>
   </div>
   {% if can_edit_ration %}<button class="del-ration-btn" onclick="openDelModal()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -368,6 +369,7 @@
         {% if norm %}<div class="ns-t">норма {{ norm.carbs_min }}–{{ norm.carbs_max }}</div>{% endif %}
       </div>
       <div class="ns"><div class="ns-v" style="color:#b8860b;">{{ total_price|floatformat:0 }} ₸</div><div class="ns-l">Цена прод.</div></div>
+      <div class="ns"><div class="ns-v">{{ total_cost|floatformat:0 }} ₸</div><div class="ns-l">Себестоим.</div></div>
     </div>
 
     <!-- 🤖 Claude: сборка рациона -->
@@ -400,6 +402,7 @@
           <div class="cl-s {% if n %}{% if f.fat %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.fat }}</b><i>Ж</i></div>
           <div class="cl-s {% if n %}{% if f.carbs %}out{% else %}ok{% endif %}{% endif %}"><b>{{ t.carbs }}</b><i>У</i></div>
           <div class="cl-s"><b style="color:#b8860b;">{{ t.price }}₸</b><i>цена прод.</i></div>
+          <div class="cl-s"><b>{{ t.cost }}₸</b><i>себест.</i></div>
         </div>
         {% endwith %}
         {% for meal in claude_result.meals %}
@@ -410,7 +413,7 @@
             {% if d.photo %}<img src="{{ d.photo }}" class="cl-th" alt="">{% else %}<span class="cl-th cl-ph">🥗</span>{% endif %}
             <div class="cl-di">
               <div class="cl-dn">{{ d.name }}</div>
-              <div class="cl-du">{{ d.kcal }} кк · Б{{ d.protein }} Ж{{ d.fat }} У{{ d.carbs }}{% if d.price %} · 💰{{ d.price }}₸{% endif %}</div>
+              <div class="cl-du">{{ d.kcal }} кк · Б{{ d.protein }} Ж{{ d.fat }} У{{ d.carbs }}{% if d.price %} · 💰{{ d.price }}₸{% endif %}{% if d.cost %} · себ. {{ d.cost }}₸{% endif %}</div>
             </div>
           </div>
           {% endfor %}
@@ -476,7 +479,7 @@
                 {% else %}<div class="sph">🥗</div>{% endif %}
                 <div class="spi">
                   <div class="spn">{{ slot.product.name }}{% if slot.product.article %} <span style="color:var(--muted);font-weight:500;font-size:11px;">· {{ slot.product.article }}</span>{% endif %}</div>
-                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г{% if slot.product.sale_price %} <span style="color:#b8860b;font-weight:700;">· 💰 {{ slot.product.sale_price|floatformat:0 }} ₸</span>{% endif %}</div>
+                  <div class="spp">Б:{{ sm.protein|floatformat:1 }} Ж:{{ sm.fat|floatformat:1 }} У:{{ sm.carbs|floatformat:1 }} г{% if slot.product.sale_price %} <span style="color:#b8860b;font-weight:700;">· 💰 {{ slot.product.sale_price|floatformat:0 }} ₸</span>{% endif %}{% if slot.product.cost %} <span style="color:var(--muted);font-weight:600;">· себ. {{ slot.product.cost|floatformat:0 }} ₸</span>{% endif %}</div>
                 </div>
               {% else %}
                 <div class="sph">❓</div>
@@ -696,7 +699,8 @@ function renderPicker() {
         const photo = p.photo
           ? `<img src="${p.photo}" class="pthumb" alt="">`
           : `<div class="pph">🥗</div>`;
-        const cost = p.price ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.price.toFixed(0)} ₸</span>` : '';
+        const cost = (p.price ? ` · <span style="color:#b8860b;font-weight:700;">💰 ${p.price.toFixed(0)} ₸</span>` : '')
+                   + (p.cost ? ` · <span style="color:var(--muted);font-weight:600;">себ. ${p.cost.toFixed(0)} ₸</span>` : '');
         html += `<div class="pitem ${isCur ? 'cur' : ''}" onclick="openDishModal(${p.id})"
                       title="Показать состав и КБЖУ">
           ${photo}

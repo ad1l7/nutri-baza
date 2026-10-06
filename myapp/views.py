@@ -339,6 +339,7 @@ def _product_picker_dict(p, with_category=False):
         "fat100":     float(p.fat or 0),
         "carbs100":   float(p.carbs or 0),
         "price":     float(p.sale_price or 0),
+        "cost":      float(p.cost or 0),
         "photo":     p.photo.url if p.photo else "",
     }
     if with_category:
@@ -693,7 +694,7 @@ def _resolve_ration_proposal(proposal):
     norm = CalorieCategory.norm_for(kcal_cat)
 
     meals = []
-    tot_kcal = tot_p = tot_f = tot_c = tot_price = 0
+    tot_kcal = tot_p = tot_f = tot_c = tot_price = tot_cost = 0
     for meal in proposal.get("meals", []):
         dishes = []
         for did in meal.get("dish_ids", []):
@@ -705,13 +706,16 @@ def _resolve_ration_proposal(proposal):
             fat  = float(p.fat_per_serving or 0)
             carb = float(p.carbs_per_serving or 0)
             price = float(p.sale_price or 0)
+            cost  = float(p.cost or 0)
             tot_kcal += kcal; tot_p += prot; tot_f += fat; tot_c += carb; tot_price += price
+            tot_cost += cost
             dishes.append({
                 "id": p.pk,
                 "name": p.name, "article": p.article or "",
                 "kcal": round(kcal), "protein": round(prot, 1),
                 "fat": round(fat, 1), "carbs": round(carb, 1),
                 "price": round(price),
+                "cost": round(cost),
                 "photo": p.photo.url if p.photo else "",
             })
         meals.append({"name": meal.get("meal_name", ""), "dishes": dishes})
@@ -728,6 +732,7 @@ def _resolve_ration_proposal(proposal):
             "kcal": round(tot_kcal), "protein": round(tot_p, 1),
             "fat": round(tot_f, 1), "carbs": round(tot_c, 1),
             "price": round(tot_price),
+            "cost": round(tot_cost),
         },
         "flags": {
             "kcal":    _flag(tot_kcal, norm.kcal_min, norm.kcal_max) if norm else None,
@@ -1130,7 +1135,7 @@ def claude_ration_edit(request, pk):
     )
 
     meal_time_groups = {}
-    total_kcal = total_protein = total_fat = total_carbs = total_price = 0
+    total_kcal = total_protein = total_fat = total_carbs = total_price = total_cost = 0
     for slot in slots:
         mt_id = slot.meal_time_id
         if mt_id not in meal_time_groups:
@@ -1141,8 +1146,9 @@ def claude_ration_edit(request, pk):
         fat     = float(p.fat_per_serving or 0) if p else 0
         carbs   = float(p.carbs_per_serving or 0) if p else 0
         price   = float(p.sale_price or 0) if p else 0   # цена продажи с ФЗ
+        cost    = float(p.cost or 0) if p else 0         # себестоимость ФЗ
         total_kcal += kcal; total_protein += protein; total_fat += fat
-        total_carbs += carbs; total_price += price
+        total_carbs += carbs; total_price += price; total_cost += cost
         meal_time_groups[mt_id]["slots"].append({
             "slot": slot,
             "label": SLOT_LABELS.get(slot.slot_type, slot.slot_type) if slot.slot_type else None,
@@ -1206,6 +1212,7 @@ def claude_ration_edit(request, pk):
         "total_fat": round(total_fat, 1),
         "total_carbs": round(total_carbs, 1),
         "total_price": round(total_price, 2),
+        "total_cost": round(total_cost, 2),
         "norm": norm,
         "norm_flags": norm_flags,
         "slot_types": RATION_SLOT_TYPES,
