@@ -56,6 +56,7 @@
 
   /* Бейдж себестоимости группы */
   .group-cost{background:rgba(255,210,80,.22);color:#ffe08a;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;flex-shrink:0;white-space:nowrap;}
+  .group-cost.self{background:rgba(255,255,255,.14);color:#fff;}
 
   /* Кнопка сворачивания группы */
   .group-collapse-btn{background:rgba(255,255,255,.12);border:none;border-radius:8px;width:28px;height:28px;color:#fff;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
@@ -66,6 +67,7 @@
 
   /* Цена продажи рациона в строке */
   .ration-cost{font-size:11px;color:var(--green-mid);font-weight:800;flex-shrink:0;background:var(--light);border:1.5px solid var(--green-light);border-radius:20px;padding:2px 9px;}
+  .ration-cost.self{color:var(--muted);background:var(--off-white);border-color:var(--border);}
 
   .rations-list{padding:10px 14px;display:flex;flex-direction:column;gap:6px;min-height:20px;}
 
@@ -251,6 +253,7 @@
           <div class="group-author">👤 {% if g.created_by %}{{ g.created_by.username }}{% else %}автор не указан{% endif %}</div>
         </div>
         {% if gd.group_price %}<div class="group-cost" title="Сумма цен продажи с ФЗ по всем рационам">💰 {{ gd.group_price|floatformat:0 }} ₸</div>{% endif %}
+        {% if gd.group_cost %}<div class="group-cost self" title="Сумма себестоимости ФЗ по всем рационам">🧾 себ. {{ gd.group_cost|floatformat:0 }} ₸</div>{% endif %}
         <div class="group-count">{{ gd.count }} рацион{{ gd.count|pluralize:",,ов" }}</div>
         {% if gd.can_edit %}<button class="grp-del-btn grp-view-btn" onclick="openEditGroupModal({{ g.pk }}, '{{ g.name|escapejs }}', '{{ g.description|default:''|escapejs }}')" title="Редактировать группу">✏️</button>{% endif %}
         <a href="{% url 'claude_group_detail' g.pk %}" class="grp-del-btn grp-view-btn"
@@ -269,6 +272,7 @@
             <span class="ration-kcal">{{ r.kcal_category }} ккал</span>
             <span class="ration-name">{{ r.name }}</span>
             {% if ri.total_price %}<span class="ration-cost" title="Цена продажи с ФЗ по рациону">💰 {{ ri.total_price|floatformat:0 }} ₸</span>{% endif %}
+            {% if ri.total_cost %}<span class="ration-cost self" title="Себестоимость ФЗ по рациону">🧾 себ. {{ ri.total_cost|floatformat:0 }} ₸</span>{% endif %}
             <span class="ration-dish-count">{{ ri.filled_count }} блюд</span>
             <button class="accordion-btn" onclick="toggleAccordion({{ r.pk }})" title="Показать блюда">
               <span class="accordion-arrow">▼</span>
@@ -298,6 +302,8 @@
                 {% if slot.product and slot.product.kcal_per_serving %}
                   <span class="ps-kcal">{{ slot.product.kcal_per_serving|floatformat:0 }} кк</span>
                 {% endif %}
+                {% if slot.product.sale_price %}<span class="ps-kcal" style="color:#b8860b;" title="Цена продажи с ФЗ">💰 {{ slot.product.sale_price|floatformat:0 }} ₸</span>{% endif %}
+                {% if slot.product.cost %}<span class="ps-kcal" style="color:var(--muted);" title="Себестоимость ФЗ">себ. {{ slot.product.cost|floatformat:0 }} ₸</span>{% endif %}
               </div>
               {% endfor %}
             </div>

@@ -890,19 +890,22 @@ def claude_group_list(request):
     for g in groups:
         rations = list(g.rations.all())
         rations_info = []
-        group_price = 0
+        group_price = group_cost = 0
         for r in rations:
             slots = list(r.slots.select_related("product", "meal_time").order_by("order", "meal_time__order"))
             filled_slots = [s for s in slots if s.product_id]
             total_kcal = sum(float(s.product.kcal_per_serving or 0) for s in filled_slots)
             # Считаем по цене продажи с ФЗ, а не по себестоимости
             total_price = sum(float(s.product.sale_price or 0) for s in filled_slots)
+            total_cost = sum(float(s.product.cost or 0) for s in filled_slots)
             group_price += total_price
+            group_cost += total_cost
             rations_info.append({
                 "ration": r,
                 "slots": filled_slots,
                 "total_kcal": round(total_kcal, 1),
                 "total_price": round(total_price, 2),
+                "total_cost": round(total_cost, 2),
                 "filled_count": len(filled_slots),
                 # у ограниченного редактора кнопки видны только там, где он вправе
                 "can_edit": can_edit_claude_ration(request.user, r),
@@ -912,6 +915,7 @@ def claude_group_list(request):
             "rations_info": rations_info,
             "count": len(rations),
             "group_price": round(group_price, 2),
+            "group_cost": round(group_cost, 2),
             "can_edit": can_edit_claude_group(request.user, g),
         })
 
@@ -1731,6 +1735,7 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
     total_slots  = 0
     filled_slots = 0
     group_price  = 0
+    group_cost   = 0
 
     for r in rations:
         # Используем prefetch — НЕ делаем новый select_related
@@ -1739,7 +1744,7 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
         slots.sort(key=lambda s: (s.order, s.meal_time.order if s.meal_time else 0))
 
         meal_groups_map = {}
-        total_kcal = total_protein = total_fat = total_carbs = total_price = 0
+        total_kcal = total_protein = total_fat = total_carbs = total_price = total_cost = 0
         filled = 0
 
         for slot in slots:
@@ -1760,12 +1765,14 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
                 total_fat     += float(slot.product.fat_per_serving or 0)
                 total_carbs   += float(slot.product.carbs_per_serving or 0)
                 total_price   += float(slot.product.sale_price or 0)
+                total_cost    += float(slot.product.cost or 0)
                 filled += 1
 
         valid_slots  = [s for s in slots if s.meal_time_id]
         total_slots  += len(valid_slots)
         filled_slots += filled
         group_price  += total_price
+        group_cost   += total_cost
 
         rations_data.append({
             "ration":        r,
@@ -1775,6 +1782,7 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
             "total_fat":     round(total_fat, 1),
             "total_carbs":   round(total_carbs, 1),
             "total_price":   round(total_price, 2),
+            "total_cost":    round(total_cost, 2),
             "filled":        filled,
             "total":         len(valid_slots),
         })
@@ -1785,6 +1793,7 @@ def _render_group_detail(request, group, back_url_name, back_label, edit_url_nam
         "total_slots":  total_slots,
         "filled_slots": filled_slots,
         "group_price":  round(group_price, 2),
+        "group_cost":   round(group_cost, 2),
         "back_url_name": back_url_name,
         "back_label":    back_label,
         "edit_url_name": edit_url_name,

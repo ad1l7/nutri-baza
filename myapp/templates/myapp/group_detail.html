@@ -182,6 +182,7 @@
       <div class="gh-stat"><div class="gh-sv">{{ total_slots }}</div><div class="gh-sl">Слотов</div></div>
       <div class="gh-stat"><div class="gh-sv">{{ filled_slots }}</div><div class="gh-sl">Заполнено</div></div>
       <div class="gh-stat"><div class="gh-sv" style="color:#b8860b;">{{ group_price|floatformat:0 }} ₸</div><div class="gh-sl">Цена прод. всего</div></div>
+      <div class="gh-stat"><div class="gh-sv">{{ group_cost|floatformat:0 }} ₸</div><div class="gh-sl">Себестоим. всего</div></div>
     </div>
   </div>
 
@@ -208,6 +209,7 @@
       <div class="rn"><div class="rn-v">{{ rd.total_fat|floatformat:1 }}</div><div class="rn-l">Жиры г</div></div>
       <div class="rn"><div class="rn-v">{{ rd.total_carbs|floatformat:1 }}</div><div class="rn-l">Углев. г</div></div>
       <div class="rn"><div class="rn-v" style="color:#b8860b;">{{ rd.total_price|floatformat:0 }} ₸</div><div class="rn-l">Цена прод.</div></div>
+      <div class="rn"><div class="rn-v">{{ rd.total_cost|floatformat:0 }} ₸</div><div class="rn-l">Себестоим.</div></div>
       <div class="rn"><div class="rn-v">{{ rd.filled }}</div><div class="rn-l">Блюд</div></div>
     </div>
 
@@ -222,6 +224,7 @@
           <col class="c-name">
           <col class="c-weight">
           <col class="c-cost">
+          <col class="c-cost">
           <col class="c-kcal">
           <col class="c-prot">
           <col class="c-fat">
@@ -234,6 +237,7 @@
             <th class="c-name">Наименование</th>
             <th class="c-weight r">Масса, г</th>
             <th class="c-cost r">Цена прод.</th>
+            <th class="c-cost r">Себест.</th>
             <th class="c-kcal r">Ккал</th>
             <th class="c-prot r">Белки</th>
             <th class="c-fat r">Жиры</th>
@@ -244,7 +248,7 @@
           {% for mg in rd.meal_groups %}
 
           <tr class="meal-hd">
-            <td colspan="9">{{ mg.meal_time.icon }} {{ mg.meal_time.name }}</td>
+            <td colspan="10">{{ mg.meal_time.icon }} {{ mg.meal_time.name }}</td>
           </tr>
 
           {% for slot in mg.slots %}{% if slot.product %}
@@ -269,6 +273,9 @@
             <td class="c-cost">
               {% if slot.product.sale_price %}{{ slot.product.sale_price|floatformat:0 }} ₸{% else %}—{% endif %}
             </td>
+            <td class="c-cost" style="color:var(--muted);">
+              {% if slot.product.cost %}{{ slot.product.cost|floatformat:0 }} ₸{% else %}—{% endif %}
+            </td>
             <td class="c-kcal">
               {% if slot.product.kcal_per_serving %}{{ slot.product.kcal_per_serving|floatformat:0 }}{% else %}—{% endif %}
             </td>
@@ -285,7 +292,7 @@
           {% endif %}{% endfor %}
 
           {% empty %}
-          <tr><td colspan="9" style="padding:12px 14px;color:var(--muted);font-style:italic;">Нет приёмов пищи</td></tr>
+          <tr><td colspan="10" style="padding:12px 14px;color:var(--muted);font-style:italic;">Нет приёмов пищи</td></tr>
           {% endfor %}
         </tbody>
       </table>
