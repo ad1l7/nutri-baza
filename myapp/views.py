@@ -134,6 +134,7 @@ def product_list(request):
         "selected_meal_categories": selected_meal_categories,
         "slot_labels": SLOT_LABELS,
         "filters": filters,
+        "markup_target_pct": Product.MARKUP_TARGET_PCT,
     })
 
 

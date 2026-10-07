@@ -289,7 +289,7 @@
   }
   .sale-inp:hover  { border-color: var(--green-mid); }
   .sale-inp:focus  { outline: none; border-color: var(--green-dark); box-shadow: 0 0 0 2px rgba(46,125,50,.12); }
-  /* Ручная цена — жирнее и с янтарной рамкой, чтобы отличать от автоматической 67% */
+  /* Ручная цена — жирнее и с янтарной рамкой, чтобы отличать от автоматической наценки */
   .sale-inp.manual { border-color: #e0b93a; background: #fffcf0; }
   .sale-inp.manual:hover { border-color: #c9a52c; }
   .sale-inp.saving { border-color: var(--green-mid); background: #f6fbf2; }
@@ -765,7 +765,7 @@
               {% else %}
                 <input type="number" min="0" step="0.01" id="sale-{{ p.pk }}"
                        class="sale-inp{% if p.sale_price_manual %} manual{% endif %}"
-                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку 67%{% else %}Наценка 67% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
+                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ markup_target_pct }}%{% else %}Наценка {{ markup_target_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
                        value="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        data-saved="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        placeholder="—"
@@ -1084,13 +1084,13 @@ function saveSaleCell(pk) {
         input.title = d.message || 'Не удалось сохранить';
         return;
       }
-      // Очистили поле — сервер вернул автоцену (67%), показываем её сразу
+      // Очистили поле — сервер вернул автоцену, показываем её сразу
       const shown = d.sale_price !== null ? String(d.sale_price) : '';
       input.value = shown;
       input.dataset.saved = shown;
       input.title = d.manual
-        ? 'Цена задана вручную. Очистите поле, чтобы вернуть наценку 67%'
-        : 'Наценка 67% — считается сама. Впишите своё значение, чтобы зафиксировать цену';
+        ? 'Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ markup_target_pct }}%'
+        : 'Наценка {{ markup_target_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену';
       const mark = d.manual ? ' manual' : '';
       input.className = 'sale-inp saved' + mark;
       setTimeout(() => { input.className = 'sale-inp' + mark; }, 900);

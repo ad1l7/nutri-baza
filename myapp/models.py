@@ -103,9 +103,9 @@ class Product(models.Model):
     iiko_synced_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя синхронизация")
 
     # Ниже этой наценки себестоимость подсвечивается красным в каталоге
-    MARKUP_MIN_PCT = 40
+    MARKUP_MIN_PCT = 3
     # Целевая наценка: на неё считается цена продажи, пока её не задали руками
-    MARKUP_TARGET_PCT = 67
+    MARKUP_TARGET_PCT = 3
 
     class Meta:
         verbose_name = "Продукт"
