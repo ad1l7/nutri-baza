@@ -33,7 +33,9 @@ else:
             'NAME': config('DB_NAME', default='myproject_db'),
             'USER': config('DB_USER', default='postgres'),
             'PASSWORD': config('DB_PASSWORD', default='postgres'),
-            'HOST': 'localhost',
+            # На сервере hoster.kz служба хостера переписывает /etc/hosts, и
+            # «localhost» может уйти на внешний IP — там в .env DB_HOST=127.0.0.1.
+            'HOST': config('DB_HOST', default='localhost'),
             'PORT': '5432',
         }
     }
