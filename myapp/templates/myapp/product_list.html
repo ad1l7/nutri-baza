@@ -765,7 +765,7 @@
               {% else %}
                 <input type="number" min="0" step="0.01" id="sale-{{ p.pk }}"
                        class="sale-inp{% if p.sale_price_manual %} manual{% endif %}"
-                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ markup_target_pct }}%{% else %}Наценка {{ markup_target_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
+                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ p.target_markup_pct }}%{% else %}Наценка {{ p.target_markup_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
                        value="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        data-saved="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        placeholder="—"
@@ -1089,8 +1089,8 @@ function saveSaleCell(pk) {
       input.value = shown;
       input.dataset.saved = shown;
       input.title = d.manual
-        ? 'Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ markup_target_pct }}%'
-        : 'Наценка {{ markup_target_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену';
+        ? `Цена задана вручную. Очистите поле, чтобы вернуть наценку ${d.target_pct}%`
+        : `Наценка ${d.target_pct}% — считается сама. Впишите своё значение, чтобы зафиксировать цену`;
       const mark = d.manual ? ' manual' : '';
       input.className = 'sale-inp saved' + mark;
       setTimeout(() => { input.className = 'sale-inp' + mark; }, 900);

@@ -14,7 +14,7 @@ from django.urls import reverse
 
 from .models import (
     ClaudeRation, ClaudeRationGroup, ClaudeRationSlot,
-    MealTime, Product, UserRights,
+    MealCategory, MealTime, Product, UserRights,
 )
 from .roles import READERS_GROUP, can_edit_claude_group, can_edit_claude_ration
 
@@ -250,6 +250,33 @@ class ClaudeCatalogTests(TestCase):
         self.assertEqual(_build_catalog([product])[0]["composition"], "Сырой состав из iiko")
 
 
+class MarkupTests(TestCase):
+    """Наценка: 67% на блюда, 15% на напитки («Доп. товары»), вверх до тенге."""
+
+    def test_dish_gets_67_percent(self):
+        p = Product.objects.create(name="Салат", cost=Decimal("396"))
+        self.assertEqual(p.sale_price, Decimal("662"))        # 661.32 -> 662
+        self.assertFalse(p.markup_is_low)
+
+    def test_drink_gets_15_percent_when_category_set_after_create(self):
+        # так делает синхронизация: сначала create, потом категория
+        extra, _ = MealCategory.objects.get_or_create(key="extra")
+        p = Product.objects.create(name="Боржоми", cost=Decimal("644"))
+        self.assertEqual(p.sale_price, Decimal("1076"))       # пока блюдо, 67%
+        p.meal_categories.set([extra])
+        p.refresh_from_db()
+        self.assertEqual(p.sale_price, Decimal("741"))        # 740.6 -> 741
+        self.assertFalse(p.markup_is_low)                     # 15% для напитка — норма
+
+    def test_manual_price_kept_on_category_change(self):
+        extra, _ = MealCategory.objects.get_or_create(key="extra")
+        p = Product.objects.create(name="Вода", cost=Decimal("100"),
+                                   sale_price=Decimal("150"), sale_price_manual=True)
+        p.meal_categories.set([extra])
+        p.refresh_from_db()
+        self.assertEqual(p.sale_price, Decimal("150"))
+
+
 class ProductCardTests(TestCase):
     """Карточка блюда, которую открывает клик по блюду в слоте рациона."""
 
@@ -258,7 +285,7 @@ class ProductCardTests(TestCase):
         self.product = Product.objects.create(
             name="ПП* Упак Блины с мясом (3шт)", article="29272",
             iiko_category="ПП* ЗАВТРАК", net_weight=Decimal("0.265"),
-            cost=Decimal("551"), sale_price=Decimal("568"),
+            cost=Decimal("551"), sale_price=Decimal("921"),
             composition="Мука, молоко, фарш говяжий, яйцо, соль",
             protein_per_serving=Decimal("25.1"), fat_per_serving=Decimal("28.2"),
             carbs_per_serving=Decimal("35.0"), kcal_per_serving=Decimal("494"),
@@ -276,7 +303,7 @@ class ProductCardTests(TestCase):
         self.assertIn("фарш говяжий", data["composition"])
         self.assertNotIn("allergens", data)      # аллергены с платформы убраны
         self.assertEqual(data["weight_g"], 265.0)      # кг из базы -> граммы
-        self.assertEqual(data["sale_price"], 568.0)    # 551 + наценка 3%, вверх
+        self.assertEqual(data["sale_price"], 921.0)    # 551 + наценка 67%, вверх
         self.assertEqual(data["per_serving"]["kcal"], 494.0)
         self.assertEqual(data["per_100"]["kcal"], 186.0)
 
@@ -341,7 +368,7 @@ class ExportApiTests(TestCase):
 
         product = data["products"][0]
         self.assertEqual(product["net_weight_g"], 300.0)       # кг из базы -> граммы
-        self.assertEqual(product["sale_price"], 309.0)          # автонаценка 3%
+        self.assertEqual(product["sale_price"], 501.0)          # автонаценка 67%
         self.assertEqual(product["kcal_100"], 55.0)
 
         slot = data["ration_slots"][0]

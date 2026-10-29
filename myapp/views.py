@@ -134,7 +134,6 @@ def product_list(request):
         "selected_meal_categories": selected_meal_categories,
         "slot_labels": SLOT_LABELS,
         "filters": filters,
-        "markup_target_pct": Product.MARKUP_TARGET_PCT,
     })
 
 
@@ -295,6 +294,7 @@ def product_set_sale_price(request, pk):
         "markup":      float(product.markup) if product.markup is not None else None,
         "markup_pct":  round(product.markup_pct, 1) if product.markup_pct is not None else None,
         "markup_low":  product.markup_is_low,
+        "target_pct":  product.target_markup_pct,
         "manual":      product.sale_price_manual,
     })
 

@@ -2,6 +2,8 @@ from decimal import Decimal, ROUND_CEILING
 
 from django.conf import settings
 from django.db import models
+from django.db.models.signals import m2m_changed
+from django.dispatch import receiver
 from django.utils import timezone
 
 from .ingredient_aliases import clean_composition
@@ -103,9 +105,13 @@ class Product(models.Model):
     iiko_synced_at = models.DateTimeField(null=True, blank=True, verbose_name="Последняя синхронизация")
 
     # Ниже этой наценки себестоимость подсвечивается красным в каталоге
-    MARKUP_MIN_PCT = 3
+    MARKUP_MIN_PCT = 40
     # Целевая наценка: на неё считается цена продажи, пока её не задали руками
-    MARKUP_TARGET_PCT = 3
+    MARKUP_TARGET_PCT = 67
+    # Напитки — категория «Доп. товары» (Боржоми, EXPONENTA): своя наценка,
+    # она же и нижняя граница подсветки. Смузи сюда не входят — они блюда.
+    DRINKS_CATEGORY_KEY = "extra"
+    MARKUP_DRINKS_PCT = 15
 
     class Meta:
         verbose_name = "Продукт"
@@ -116,7 +122,7 @@ class Product(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Цена продажи всегда держит наценку MARKUP_TARGET_PCT — кроме блюд,
+        """Цена продажи всегда держит целевую наценку (target_markup_pct) — кроме блюд,
         где её задали вручную, и блюд без себестоимости (там ставить не из чего).
         Пересчёт живёт здесь, чтобы срабатывать и на синхронизации с iiko, и в
         админке — везде, где меняется себестоимость."""
@@ -149,13 +155,31 @@ class Product(models.Model):
         return Decimal(str(value))
 
     @property
+    def is_drink(self):
+        """Напиток (категория «Доп. товары»). У нового, ещё не сохранённого
+        блюда категорий нет — оно считается блюдом, а когда синхронизация
+        проставит категорию, цену пересчитает сигнал _reprice_on_category_change."""
+        if not self.pk:
+            return False
+        # через .all(), чтобы в каталоге работал prefetch_related
+        return any(c.key == self.DRINKS_CATEGORY_KEY for c in self.meal_categories.all())
+
+    @property
+    def target_markup_pct(self):
+        return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_TARGET_PCT
+
+    @property
+    def min_markup_pct(self):
+        return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_MIN_PCT
+
+    @property
     def auto_sale_price(self):
         """Цена продажи с целевой наценкой, округлённая вверх до целых тенге.
         Округляем именно вверх — наценка не должна оказаться ниже целевой.
         None, если себестоимости нет: нулевой себес — это тоже «нет данных»."""
         if not self.cost:
             return None
-        factor = Decimal(1) + Decimal(self.MARKUP_TARGET_PCT) / Decimal(100)
+        factor = Decimal(1) + Decimal(self.target_markup_pct) / Decimal(100)
         return (self._decimal(self.cost) * factor).quantize(
             Decimal("1"), rounding=ROUND_CEILING)
 
@@ -179,7 +203,22 @@ class Product(models.Model):
     def markup_is_low(self):
         """Наценка меньше нормы — повод подсветить себестоимость."""
         pct = self.markup_pct
-        return pct is not None and pct < self.MARKUP_MIN_PCT
+        return pct is not None and pct < self.min_markup_pct
+
+
+@receiver(m2m_changed, sender=Product.meal_categories.through)
+def _reprice_on_category_change(sender, instance, action, reverse, pk_set, **kwargs):
+    """Категория решает, напиток это или блюдо, а значит и наценку. Синхронизация
+    с iiko и админка ставят категории уже после save() — пересчитываем здесь."""
+    if action not in ("post_add", "post_remove", "post_clear"):
+        return
+    if reverse:
+        products = Product.objects.filter(pk__in=pk_set or ())
+    else:
+        products = [instance]
+    for p in products:
+        if not p.sale_price_manual and p.auto_sale_price != p.sale_price:
+            p.save(update_fields=["sale_price"])
 
 
 # ── Точечные права пользователя ──────────────────────────────────────────────
