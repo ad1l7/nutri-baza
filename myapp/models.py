@@ -108,9 +108,9 @@ class Product(models.Model):
     MARKUP_MIN_PCT = 40
     # Целевая наценка: на неё считается цена продажи, пока её не задали руками
     MARKUP_TARGET_PCT = 67
-    # Напитки — категория «Доп. товары» (Боржоми, EXPONENTA): своя наценка,
-    # она же и нижняя граница подсветки. Смузи сюда не входят — они блюда.
-    DRINKS_CATEGORY_KEY = "extra"
+    # Напитки — категории «Доп. товары» (Боржоми, EXPONENTA) и «Смузи»: своя
+    # наценка, она же и нижняя граница подсветки.
+    DRINKS_CATEGORY_KEYS = {"extra", "smoothie"}
     MARKUP_DRINKS_PCT = 15
 
     class Meta:
@@ -156,13 +156,13 @@ class Product(models.Model):
 
     @property
     def is_drink(self):
-        """Напиток (категория «Доп. товары»). У нового, ещё не сохранённого
+        """Напиток (категория «Доп. товары» или «Смузи»). У нового, ещё не сохранённого
         блюда категорий нет — оно считается блюдом, а когда синхронизация
         проставит категорию, цену пересчитает сигнал _reprice_on_category_change."""
         if not self.pk:
             return False
         # через .all(), чтобы в каталоге работал prefetch_related
-        return any(c.key == self.DRINKS_CATEGORY_KEY for c in self.meal_categories.all())
+        return any(c.key in self.DRINKS_CATEGORY_KEYS for c in self.meal_categories.all())
 
     @property
     def target_markup_pct(self):
