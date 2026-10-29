@@ -251,7 +251,7 @@ class ClaudeCatalogTests(TestCase):
 
 
 class MarkupTests(TestCase):
-    """Наценка: 67% на блюда, 15% на напитки («Доп. товары», «Смузи»), вверх до тенге."""
+    """Наценка: 67% на блюда и смузи, 15% на напитки («Доп. товары»), вверх до тенге."""
 
     def test_dish_gets_67_percent(self):
         p = Product.objects.create(name="Салат", cost=Decimal("396"))
@@ -268,12 +268,12 @@ class MarkupTests(TestCase):
         self.assertEqual(p.sale_price, Decimal("741"))        # 740.6 -> 741
         self.assertFalse(p.markup_is_low)                     # 15% для напитка — норма
 
-    def test_smoothie_gets_15_percent(self):
+    def test_smoothie_gets_67_percent(self):
         smoothie, _ = MealCategory.objects.get_or_create(key="smoothie")
         p = Product.objects.create(name="Смузи", cost=Decimal("300"))
         p.meal_categories.set([smoothie])
         p.refresh_from_db()
-        self.assertEqual(p.sale_price, Decimal("345"))        # 300 * 1.15
+        self.assertEqual(p.sale_price, Decimal("501"))        # 300 * 1.67
 
     def test_manual_price_kept_on_category_change(self):
         extra, _ = MealCategory.objects.get_or_create(key="extra")
