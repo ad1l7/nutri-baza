@@ -1651,32 +1651,46 @@ def iiko_sync_view(request):
             "remaining": remaining,
         }, status=429)
 
-    cloud_api_key    = getattr(settings, "IIKO_CLOUD_API_KEY", "")
-    org_id           = getattr(settings, "IIKO_ORG_ID", "")
-    external_menu_id = getattr(settings, "IIKO_EXTERNAL_MENU_ID", "")
-    server_url       = getattr(settings, "IIKO_SERVER_URL", "")
-    server_login     = getattr(settings, "IIKO_SERVER_LOGIN", "")
-    server_password  = getattr(settings, "IIKO_SERVER_PASSWORD", "")
-    cloud_app_id        = getattr(settings, "IIKO_APP_ID", "")
-    cloud_client_secret = getattr(settings, "IIKO_CLIENT_SECRET", "")
+    if getattr(settings, "PRODUCT_SOURCE", "iiko") == "oerp":
+        # Блюда из O·ERP (myapp/oerp_sync.py) — вместо iiko после сверки
+        from .oerp_sync import sync_products_from_oerp
+        if not settings.OERP_API_KEY:
+            return JsonResponse({
+                "ok": False, "message": "Не задан OERP_API_KEY в .env",
+            }, status=400)
 
-    if not cloud_api_key or not org_id or not external_menu_id:
-        return JsonResponse({
-            "ok": False,
-            "message": "Не заданы IIKO_CLOUD_API_KEY, IIKO_ORG_ID или IIKO_EXTERNAL_MENU_ID в settings.py",
-        }, status=400)
+        def run_sync():
+            return sync_products_from_oerp(settings.OERP_API_KEY, settings.OERP_API_URL)
+    else:
+        cloud_api_key    = getattr(settings, "IIKO_CLOUD_API_KEY", "")
+        org_id           = getattr(settings, "IIKO_ORG_ID", "")
+        external_menu_id = getattr(settings, "IIKO_EXTERNAL_MENU_ID", "")
+        server_url       = getattr(settings, "IIKO_SERVER_URL", "")
+        server_login     = getattr(settings, "IIKO_SERVER_LOGIN", "")
+        server_password  = getattr(settings, "IIKO_SERVER_PASSWORD", "")
+        cloud_app_id        = getattr(settings, "IIKO_APP_ID", "")
+        cloud_client_secret = getattr(settings, "IIKO_CLIENT_SECRET", "")
+
+        if not cloud_api_key or not org_id or not external_menu_id:
+            return JsonResponse({
+                "ok": False,
+                "message": "Не заданы IIKO_CLOUD_API_KEY, IIKO_ORG_ID или IIKO_EXTERNAL_MENU_ID в settings.py",
+            }, status=400)
+
+        def run_sync():
+            return sync_products_from_iiko(
+                cloud_api_key=cloud_api_key,
+                org_id=org_id,
+                external_menu_id=external_menu_id,
+                server_url=server_url,
+                server_login=server_login,
+                server_password=server_password,
+                cloud_app_id=cloud_app_id,
+                cloud_client_secret=cloud_client_secret,
+            )
 
     try:
-        result = sync_products_from_iiko(
-            cloud_api_key=cloud_api_key,
-            org_id=org_id,
-            external_menu_id=external_menu_id,
-            server_url=server_url,
-            server_login=server_login,
-            server_password=server_password,
-            cloud_app_id=cloud_app_id,
-            cloud_client_secret=cloud_client_secret,
-        )
+        result = run_sync()
 
         IikoSyncLog.objects.create(
             created_count=result.get("created", 0),

@@ -446,3 +446,128 @@ class SyncNetWeightTests(TestCase):
     def test_fractional_unit_weight_rounded_half_up(self):
         p = self._run_sync(0.2865)
         self.assertEqual(p.net_weight, Decimal("0.287"))
+
+
+class OerpSyncTests(TestCase):
+    """Загрузка блюд из O·ERP (myapp/oerp_sync.py) на ответах в формате export-API."""
+
+    ROOT, BREAKFAST, BREAKFAST_EMPTY, NESTED, DRINKS, FMD = (
+        "g-root", "g-breakfast", "g-breakfast-empty", "g-nested", "g-drinks", "g-fmd")
+
+    GROUPS = [
+        {"id": "g-gp", "parentId": None, "name": "Фудзавод ГП", "deleted": False},
+        {"id": ROOT, "parentId": "g-gp", "name": "ЗДОРОВОЕ ПИТАНИЕ", "deleted": False},
+        {"id": BREAKFAST, "parentId": ROOT, "name": "1ПП* ЗАВТРАК", "deleted": False},
+        {"id": BREAKFAST_EMPTY, "parentId": ROOT, "name": "1ПП* ЗАВТРАК", "deleted": False},
+        {"id": NESTED, "parentId": BREAKFAST, "name": "Сырники", "deleted": False},
+        {"id": DRINKS, "parentId": ROOT, "name": "ПП* ДОП.ТОВАРЫ", "deleted": False},
+        {"id": FMD, "parentId": ROOT, "name": "ФМД (диета)", "deleted": False},
+    ]
+
+    DISH = {
+        "id": "d-1", "code": "00516", "name": "ПП* Упак Каша овсяная", "kind": "dish",
+        "groupId": NESTED, "deleted": False, "baseUomName": "порц",
+        "unitWeightKg": "0.320000000", "description": None,
+        "nutrition": {"per100g": {"kcal": "150", "protein": "5.5", "fat": "3", "carbs": "25"},
+                      "perUnit": None},
+    }
+    DRINK = {
+        "id": "w-1", "code": "00900", "name": "С* Вода Боржоми 0,5", "kind": "goods",
+        "groupId": DRINKS, "deleted": False, "baseUomName": "шт",
+        "unitWeightKg": "0.500", "description": None, "nutrition": None,
+    }
+    FMD_DISH = dict(DISH, id="f-1", code="07000", name="ФМД суп", groupId=FMD)
+
+    TECH_CARDS = [
+        {"productId": "d-1", "code": "00516", "name": "Каша", "dateFrom": "2026-01-01", "dateTo": None,
+         "items": [
+             # выход 0 текстом — берём нетто, как у iiko
+             {"productId": "p-base", "name": "П* Основа каши", "amountIn": "0.3",
+              "amountMiddle": "0.3", "amountOut": "0.000"},
+             {"productId": "u-box", "name": "У* Контейнер", "amountIn": "1",
+              "amountMiddle": "1", "amountOut": "1"},
+         ]},
+        {"productId": "p-base", "code": "P1", "name": "Основа каши", "dateFrom": "2026-01-01", "dateTo": None,
+         "items": [
+             {"productId": "r-oat", "name": "С* Хлопья овсяные", "amountIn": "0.1",
+              "amountMiddle": "0.1", "amountOut": "0.1"},
+             {"productId": "r-milk", "name": "С* Молоко 3,2%", "amountIn": "0.2",
+              "amountMiddle": "0.2", "amountOut": "0.2"},
+         ]},
+    ]
+
+    def setUp(self):
+        for key in ("breakfast", "extra"):
+            MealCategory.objects.get_or_create(key=key)
+        self.costs = [
+            {"id": "d-1", "code": "00516", "ssc": "396.004", "kind": "dish"},
+        ]
+        self.goods_costs = [{"id": "w-1", "code": "00900", "ssc": "452", "kind": "goods"}]
+
+    def _fetch(self, resource, page_size, **params):
+        if resource == "groups":
+            return self.GROUPS
+        if resource == "products":
+            return {"dish": [self.DISH, self.FMD_DISH], "goods": [self.DRINK]}[params["kind"]]
+        if resource == "tech-cards":
+            return self.TECH_CARDS
+        if resource == "dish-costs":
+            return self.goods_costs if params.get("kind") == "goods" else self.costs
+        raise AssertionError(resource)
+
+    def _sync(self):
+        from unittest.mock import patch
+        from .oerp_sync import OerpClient, sync_products_from_oerp
+        with patch.object(OerpClient, "fetch_all", self._fetch):
+            return sync_products_from_oerp("erpk_test")
+
+    def test_folder_names_match_iiko_menu_categories(self):
+        from .oerp_sync import _category_map, _folder_key
+        cmap = _category_map()
+        self.assertEqual(cmap[_folder_key("1ПП* ЗАВТРАК")], "breakfast")
+        self.assertEqual(cmap[_folder_key("3ПП* ГОРЯЧЕЕ 400-500 ккал")], "hot_400")
+        self.assertEqual(cmap[_folder_key("ПП* ДОП.ТОВАРЫ")], "extra")   # в iiko «ПП* Доп. товары»
+        self.assertNotIn(_folder_key("ФМД (диета)"), cmap)
+
+    def test_sync_creates_dishes_from_mapped_folders_only(self):
+        result = self._sync()
+        self.assertEqual(result["created"], 2)                 # ФМД не берём
+        self.assertFalse(Product.objects.filter(iiko_id="f-1").exists())
+
+        p = Product.objects.get(iiko_id="d-1")
+        self.assertEqual(p.article, "00516")
+        self.assertEqual(p.iiko_category, "ПП* ЗАВТРАК")       # без цифры порядка
+        self.assertEqual(list(p.meal_categories.values_list("key", flat=True)), ["breakfast"])
+        self.assertEqual(p.net_weight, Decimal("0.320"))
+        self.assertEqual(float(p.kcal_per_serving), 480.0)     # 150 × 320 / 100
+        self.assertEqual(p.composition, "Молоко 3,2%, Хлопья овсяные")
+        self.assertEqual(p.cost, Decimal("396.00"))
+        self.assertEqual(p.sale_price, Decimal("662"))         # 67%
+
+        drink = Product.objects.get(iiko_id="w-1")
+        self.assertEqual(list(drink.meal_categories.values_list("key", flat=True)), ["extra"])
+        self.assertEqual(drink.sale_price, Decimal("520"))     # 452 × 1.15 = 519.8 → вверх
+
+    def test_resync_updates_by_article_and_keeps_cost_when_not_calculated(self):
+        Product.objects.create(name="Старое имя", article="00516", iiko_id="old-guid",
+                               cost=Decimal("380"))
+        self.costs = [{"id": "d-1", "code": "00516", "ssc": None, "kind": "dish"}]
+        result = self._sync()
+        self.assertEqual(result["updated"], 1)
+        p = Product.objects.get(article="00516")
+        self.assertEqual(p.name, "ПП* Упак Каша овсяная")
+        self.assertEqual(p.cost, Decimal("380"))               # null из O·ERP — не 0
+
+    def test_compare_reports_differences_without_writing(self):
+        from unittest.mock import patch
+        from .oerp_sync import OerpClient, collect_from_oerp, compare_with_db
+        Product.objects.create(name="ПП* Упак Каша овсяная", article="00516", iiko_id="d-1",
+                               cost=Decimal("350"))
+        with patch.object(OerpClient, "fetch_all", self._fetch):
+            report = compare_with_db(collect_from_oerp(OerpClient("erpk_test")))
+        self.assertEqual(report["matched"], 1)
+        self.assertEqual(report["same_id"], 1)
+        self.assertEqual(report["new"], ["С* Вода Боржоми 0,5"])
+        self.assertEqual([d[3] for d in report["diffs"]["cost"]], [Decimal("396.00")])
+        self.assertEqual(report["diffs"]["name"], [])
+        self.assertEqual(Product.objects.get(article="00516").cost, Decimal("350"))

@@ -56,6 +56,15 @@ IIKO_SERVER_URL       = config("IIKO_SERVER_URL")
 IIKO_SERVER_LOGIN     = config("IIKO_SERVER_LOGIN")
 IIKO_SERVER_PASSWORD  = config("IIKO_SERVER_PASSWORD")
 
+# ── O·ERP ────────────────────────────────────────────────────────────────────
+# Источник блюд вместо iiko (myapp/oerp_sync.py, docs/oerp-source.md). Ключ
+# erpk_… выдаёт администратор O·ERP, он только читает. Кнопка синхронизации
+# в каталоге берёт данные из PRODUCT_SOURCE: «iiko» (пока по умолчанию) или
+# «oerp» — переключать после сверки `manage.py oerp_sync --compare`.
+OERP_API_URL   = config("OERP_API_URL", default="https://new.erp-system-fz.kz/api/v1/export")
+OERP_API_KEY   = config("OERP_API_KEY", default="")
+PRODUCT_SOURCE = config("PRODUCT_SOURCE", default="iiko")
+
 # ── Claude (Anthropic API) ────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = config("ANTHROPIC_API_KEY", default="")
 
