@@ -37,6 +37,14 @@ logger = logging.getLogger(__name__)
 OERP_DEFAULT_URL = "https://new.erp-system-fz.kz/api/v1/export"
 ROOT_FOLDER = "ЗДОРОВОЕ ПИТАНИЕ"
 
+# Отдельные блюда из папок без категории сайта (ФМД и т. п.), которые Olive всё
+# же нужны: {артикул O·ERP: slot_key}. 17.11.2026 — вишнёвый трайфл из «ФМД
+# (диета)» кладут раз в неделю в пакет подарком, он нужен в заявочном листе.
+# Остальная ФМД по-прежнему не грузится.
+EXTRA_DISHES = {
+    "93295": "dessert",     # ФМД* Упак Вишневый трайфл с гранолой (1порц)
+}
+
 # Наибольшие страницы, которые принимает O·ERP (export.dto.ts / use-cases)
 PAGE_PRODUCTS = 1000
 PAGE_GROUPS = 1000
@@ -205,10 +213,15 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
     if not folders:
         raise OerpError(f"В O·ERP не найдена папка «{ROOT_FOLDER}» с известными подпапками")
 
+    group_names = {g["id"]: _folder_display(g.get("name")) for g in groups}
+
+    def wanted(r):
+        return r.get("groupId") in folders or str(r.get("code") or "").strip() in EXTRA_DISHES
+
     rows = []
     for kind in ("dish", "goods"):          # «ПП* ДОП.ТОВАРЫ» — товары, не блюда
         rows += [r for r in client.fetch_all("products", PAGE_PRODUCTS, kind=kind)
-                 if r.get("groupId") in folders and not r.get("deleted")]
+                 if wanted(r) and not r.get("deleted")]
 
     # Себестоимость: блюда/заготовки и отдельно товары
     cost_by_id, cost_by_code = {}, {}
@@ -244,7 +257,10 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
     for r in rows:
         pid = r["id"]
         code = str(r.get("code") or "").strip()
-        display, slot_key = folders[r["groupId"]]
+        if r.get("groupId") in folders:
+            display, slot_key = folders[r["groupId"]]
+        else:                               # EXTRA_DISHES: папка своя, категория — из правила
+            display, slot_key = group_names.get(r.get("groupId"), ""), EXTRA_DISHES[code]
         fields = {
             "name": (r.get("name") or "").strip(),
             "article": code,

@@ -544,6 +544,25 @@ class OerpSyncTests(TestCase):
         self.assertEqual(p.cost, Decimal("396.00"))
         self.assertEqual(p.sale_price, Decimal("662"))         # 67%
 
+    def test_extra_dish_from_fmd_goes_to_its_slot(self):
+        from unittest.mock import patch
+        MealCategory.objects.get_or_create(key="dessert")
+        trifle = dict(self.FMD_DISH, id="f-2", code="93295", name="ФМД* Упак Вишневый трайфл с гранолой (1порц)")
+        fetch = self._fetch
+
+        def _fetch(client, resource, page_size, **params):
+            rows = fetch(resource, page_size, **params)
+            return rows + [trifle] if resource == "products" and params["kind"] == "dish" else rows
+
+        from .oerp_sync import OerpClient, sync_products_from_oerp
+        with patch.object(OerpClient, "fetch_all", _fetch):
+            result = sync_products_from_oerp("erpk_test")
+        self.assertEqual(result["created"], 3, result)                 # трайфл — да, «ФМД суп» — нет
+        self.assertFalse(Product.objects.filter(iiko_id="f-1").exists())
+        p = Product.objects.get(iiko_id="f-2")
+        self.assertEqual(p.iiko_category, "ФМД (диета)")
+        self.assertEqual(list(p.meal_categories.values_list("key", flat=True)), ["dessert"])
+
         drink = Product.objects.get(iiko_id="w-1")
         self.assertEqual(list(drink.meal_categories.values_list("key", flat=True)), ["extra"])
         self.assertEqual(drink.sale_price, Decimal("520"))     # 452 × 1.15 = 519.8 → вверх
