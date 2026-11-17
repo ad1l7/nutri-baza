@@ -497,7 +497,7 @@ class OerpSyncTests(TestCase):
     ]
 
     def setUp(self):
-        for key in ("breakfast", "extra"):
+        for key in ("breakfast", "extra", "fmd"):
             MealCategory.objects.get_or_create(key=key)
         self.costs = [
             {"id": "d-1", "code": "00516", "ssc": "396.004", "kind": "dish"},
@@ -527,12 +527,14 @@ class OerpSyncTests(TestCase):
         self.assertEqual(cmap[_folder_key("1ПП* ЗАВТРАК")], "breakfast")
         self.assertEqual(cmap[_folder_key("3ПП* ГОРЯЧЕЕ 400-500 ккал")], "hot_400")
         self.assertEqual(cmap[_folder_key("ПП* ДОП.ТОВАРЫ")], "extra")   # в iiko «ПП* Доп. товары»
-        self.assertNotIn(_folder_key("ФМД (диета)"), cmap)
+        self.assertEqual(cmap[_folder_key("ФМД (диета)")], "fmd")
 
     def test_sync_creates_dishes_from_mapped_folders_only(self):
         result = self._sync()
-        self.assertEqual(result["created"], 2)                 # ФМД не берём
-        self.assertFalse(Product.objects.filter(iiko_id="f-1").exists())
+        self.assertEqual(result["created"], 3)                 # ФМД — своя категория
+        fmd = Product.objects.get(iiko_id="f-1")
+        self.assertEqual(fmd.iiko_category, "ФМД (диета)")
+        self.assertEqual(list(fmd.meal_categories.values_list("key", flat=True)), ["fmd"])
 
         p = Product.objects.get(iiko_id="d-1")
         self.assertEqual(p.article, "00516")
@@ -543,25 +545,6 @@ class OerpSyncTests(TestCase):
         self.assertEqual(p.composition, "Молоко 3,2%, Хлопья овсяные")
         self.assertEqual(p.cost, Decimal("396.00"))
         self.assertEqual(p.sale_price, Decimal("662"))         # 67%
-
-    def test_extra_dish_from_fmd_goes_to_its_slot(self):
-        from unittest.mock import patch
-        MealCategory.objects.get_or_create(key="dessert")
-        trifle = dict(self.FMD_DISH, id="f-2", code="93295", name="ФМД* Упак Вишневый трайфл с гранолой (1порц)")
-        fetch = self._fetch
-
-        def _fetch(client, resource, page_size, **params):
-            rows = fetch(resource, page_size, **params)
-            return rows + [trifle] if resource == "products" and params["kind"] == "dish" else rows
-
-        from .oerp_sync import OerpClient, sync_products_from_oerp
-        with patch.object(OerpClient, "fetch_all", _fetch):
-            result = sync_products_from_oerp("erpk_test")
-        self.assertEqual(result["created"], 3, result)                 # трайфл — да, «ФМД суп» — нет
-        self.assertFalse(Product.objects.filter(iiko_id="f-1").exists())
-        p = Product.objects.get(iiko_id="f-2")
-        self.assertEqual(p.iiko_category, "ФМД (диета)")
-        self.assertEqual(list(p.meal_categories.values_list("key", flat=True)), ["dessert"])
 
         drink = Product.objects.get(iiko_id="w-1")
         self.assertEqual(list(drink.meal_categories.values_list("key", flat=True)), ["extra"])
@@ -586,7 +569,7 @@ class OerpSyncTests(TestCase):
             report = compare_with_db(collect_from_oerp(OerpClient("erpk_test")))
         self.assertEqual(report["matched"], 1)
         self.assertEqual(report["same_id"], 1)
-        self.assertEqual(report["new"], ["С* Вода Боржоми 0,5"])
+        self.assertEqual(sorted(report["new"]), ["С* Вода Боржоми 0,5", "ФМД суп"])
         self.assertEqual([d[3] for d in report["diffs"]["cost"]], [Decimal("396.00")])
         self.assertEqual(report["diffs"]["name"], [])
         self.assertEqual(Product.objects.get(article="00516").cost, Decimal("350"))
