@@ -124,6 +124,10 @@ class Product(models.Model):
     # она же и нижняя граница подсветки. Смузи сюда не входят — они блюда, 67%.
     DRINKS_CATEGORY_KEYS = {"extra"}
     MARKUP_DRINKS_PCT = 15
+    # Материалы (упаковка, вода со вкладки «Материалы») отпускаются по
+    # себестоимости — наценка 0%, она же порог подсветки (25.11.2026).
+    MATERIALS_CATEGORY_KEY = "materials"
+    MARKUP_MATERIALS_PCT = 0
 
     class Meta:
         verbose_name = "Продукт"
@@ -178,9 +182,18 @@ class Product(models.Model):
         return any(c.key in self.DRINKS_CATEGORY_KEYS for c in self.meal_categories.all())
 
     @property
+    def is_material(self):
+        """Материал (категория «Материалы»); у несохранённого — нет, как в is_drink."""
+        if not self.pk:
+            return False
+        return any(c.key == self.MATERIALS_CATEGORY_KEY for c in self.meal_categories.all())
+
+    @property
     def target_markup_pct(self):
         if self.custom_markup_pct is not None:
             return self.custom_markup_pct
+        if self.is_material:
+            return self.MARKUP_MATERIALS_PCT
         return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_TARGET_PCT
 
     @property
@@ -188,6 +201,8 @@ class Product(models.Model):
         # своя наценка — она же порог: ниже неё цена «отстала» от себестоимости
         if self.custom_markup_pct is not None:
             return self.custom_markup_pct
+        if self.is_material:
+            return self.MARKUP_MATERIALS_PCT
         return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_MIN_PCT
 
     def lock_markup_from_price(self):
