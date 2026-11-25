@@ -134,6 +134,8 @@ def product_list(request):
         "selected_meal_categories": selected_meal_categories,
         "slot_labels": SLOT_LABELS,
         "filters": filters,
+        # откуда кнопка синхронизации берёт блюда (PRODUCT_SOURCE)
+        "sync_source": "O·ERP" if getattr(settings, "PRODUCT_SOURCE", "iiko") == "oerp" else "iiko",
     })
 
 

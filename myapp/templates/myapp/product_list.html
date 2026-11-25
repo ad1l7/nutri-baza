@@ -473,7 +473,7 @@
       <polyline points="1 20 1 14 7 14"/>
       <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
     </svg>
-    <span id="iiko-sync-label">Обновить из iiko</span>
+    <span id="iiko-sync-label">Обновить из {{ sync_source }}</span>
   </button>
   <!-- Счётчик попыток -->
   <div id="iiko-counter" title="Осталось синхронизаций сегодня"
@@ -937,7 +937,7 @@ function runIikoSync() {
   .then(r => r.json())
   .then(data => {
     btn.classList.remove('loading');
-    label.textContent = 'Обновить из iiko';
+    label.textContent = 'Обновить из {{ sync_source }}';
  
     // Обновляем счётчик
     if (data.remaining !== undefined) {
@@ -969,7 +969,7 @@ function runIikoSync() {
   })
   .catch(err => {
     btn.classList.remove('loading');
-    label.textContent = 'Обновить из iiko';
+    label.textContent = 'Обновить из {{ sync_source }}';
     const toast = document.getElementById('iiko-toast');
     toast.className = 'iiko-toast error';
     toast.innerHTML = '❌ Ошибка соединения';
