@@ -268,21 +268,76 @@ def product_card(request, pk):
 
 @require_POST
 def products_reprice(request):
-    """Кнопка «Пересчитать цены» в каталоге: цена продажи всех блюд — заново по
-    наценке (67% / напитки 15%) от текущей себестоимости. Сама цена от
-    синхронизации не меняется (Product.save), обновляют её только здесь,
-    когда решат. Ручные цены не трогаем."""
+    """Кнопка «Пересчитать цены» в каталоге: цена продажи — заново по наценке
+    (67% / напитки 15%) от текущей себестоимости. Сама цена от синхронизации
+    не меняется (Product.save), обновляют её только здесь, когда решат.
+
+    Без `ids` — все блюда, кроме ручных цен. С `ids` (JSON {"ids": [...]}) —
+    только выбранные в окне пересчёта; выбранную ручную цену тоже
+    пересчитываем и снимаем с неё ручной режим — её выбрали явно."""
     from .roles import can_edit_prices
     if not can_edit_prices(request.user):
         return JsonResponse({"ok": False, "message": "Нет права менять цены"}, status=403)
+    ids = None
+    if request.content_type == "application/json" and request.body:
+        try:
+            ids = json.loads(request.body).get("ids")
+        except (ValueError, AttributeError):
+            return JsonResponse({"ok": False, "message": "Некорректный запрос"}, status=400)
+    qs = Product.objects.prefetch_related("meal_categories")
+    if ids is not None:
+        qs = qs.filter(pk__in=[int(i) for i in ids])
     changed = 0
-    for p in Product.objects.prefetch_related("meal_categories"):
-        if p.reprice():
+    for p in qs:
+        if ids is not None and p.sale_price_manual:
+            p.sale_price_manual = False
+            p.reprice()
+            p.save(update_fields=["sale_price", "sale_price_manual"])
+            changed += 1
+        elif p.reprice():
             p.save(update_fields=["sale_price"])
             changed += 1
-    logger.info(f"Пересчёт цен по наценке ({request.user}): изменено {changed}")
+    scope = f"выбранные {len(ids)}" if ids is not None else "все"
+    logger.info(f"Пересчёт цен по наценке ({request.user}), {scope}: изменено {changed}")
     return JsonResponse({"ok": True, "changed": changed,
                          "message": f"Цены пересчитаны по наценке: изменено {changed}"})
+
+
+@require_GET
+def products_reprice_preview(request):
+    """Данные для окна «Пересчитать цены»: по каждому блюду текущая цена и цена
+    по наценке от текущей себестоимости — чтобы выбрать, что пересчитывать.
+    Ничего не меняет."""
+    from .roles import can_edit_prices
+    if not can_edit_prices(request.user):
+        return JsonResponse({"ok": False, "message": "Нет права менять цены"}, status=403)
+
+    def num(v):
+        return float(v) if v is not None else None
+
+    rows = []
+    for p in Product.objects.prefetch_related("meal_categories").order_by("name"):
+        cats = [c.key for c in p.meal_categories.all()]
+        pct = p.markup_pct
+        rows.append({
+            "id": p.pk,
+            "name": p.name,
+            "article": p.article or "",
+            "cats": cats,
+            "cat": ", ".join(SLOT_LABELS.get(k, k) for k in cats),
+            "cost": num(p.cost),
+            "price": num(p.sale_price),
+            "new_price": num(p.auto_sale_price),
+            "target_pct": p.target_markup_pct,
+            "markup_pct": round(pct, 1) if pct is not None else None,
+            "low": p.markup_is_low,
+            "manual": p.sale_price_manual,
+        })
+    return JsonResponse({
+        "ok": True,
+        "products": rows,
+        "categories": [{"key": k, "label": v} for k, v in SLOT_TYPES],
+    })
 
 
 @require_POST

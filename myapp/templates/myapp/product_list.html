@@ -320,6 +320,56 @@
     backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;
   }
   .modal-overlay.open { display: flex; animation: fadeIn .2s ease; }
+
+  /* Окно «Пересчитать цены»: выбор — все или отдельные блюда */
+  /* окно прижато к верху, чтобы не прыгало, когда фильтр меняет длину списка */
+  #rp-modal { align-items: flex-start; padding-top: 5vh; }
+  .rp-modal { max-width: 1040px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+  .rp-head { background: var(--green-dark); color: #fff; padding: 20px 24px; position: relative; flex-shrink: 0; }
+  .rp-head h3 { font-size: 19px; font-weight: 800; margin: 0 40px 4px 0; }
+  .rp-head p { font-size: 12.5px; opacity: .8; margin: 0; }
+  .rp-body { padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0; }
+  .rp-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .rp-card { border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; cursor: pointer;
+             background: var(--white); text-align: left; font-family: var(--font); transition: all .15s; }
+  .rp-card:hover { border-color: var(--green); background: var(--light); }
+  .rp-card b { display: block; font-size: 15px; color: var(--text); margin-bottom: 6px; }
+  .rp-card span { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .rp-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .rp-search { flex: 1 1 220px; border: 1.5px solid var(--border); border-radius: 9px; padding: 8px 12px;
+               font-family: var(--font); font-size: 13px; }
+  .rp-search:focus, .rp-select:focus { outline: none; border-color: var(--green); }
+  .rp-select { border: 1.5px solid var(--border); border-radius: 9px; padding: 8px 10px;
+               font-family: var(--font); font-size: 13px; background: var(--white); }
+  .rp-chip { border: 1.5px solid var(--border); border-radius: 20px; padding: 6px 12px; background: var(--white);
+             font-family: var(--font); font-size: 12px; font-weight: 700; color: var(--text-mid); cursor: pointer; }
+  .rp-chip.on { background: var(--green-dark); border-color: var(--green-dark); color: #fff; }
+  .rp-chip.red.on { background: var(--danger); border-color: var(--danger); }
+  .rp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rp-table th { position: sticky; top: 0; background: var(--off-white); text-align: left; padding: 8px;
+                 font-size: 11px; color: var(--muted); font-weight: 700; border-bottom: 1.5px solid var(--border); }
+  .rp-table td { padding: 7px 8px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  .rp-table tr.sel td { background: var(--light); }
+  .rp-table tbody tr { cursor: pointer; }
+  .rp-table .r { text-align: right; white-space: nowrap; }
+  .rp-name { font-weight: 700; color: var(--text); }
+  .rp-sub { font-size: 11px; color: var(--muted); }
+  .rp-low { color: var(--danger); font-weight: 800; }
+  .rp-up { color: var(--danger); }
+  .rp-down { color: var(--green-mid); }
+  .rp-tag { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 10px; background: var(--amber-bg); color: var(--amber); }
+  .rp-wrap { max-height: 52vh; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 12px; }
+  .rp-foot { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 14px 24px;
+             border-top: 1.5px solid var(--border); background: var(--off-white); flex-shrink: 0; flex-wrap: wrap; }
+  .rp-btn { border: none; border-radius: 10px; padding: 10px 18px; font-family: var(--font); font-size: 13px;
+            font-weight: 800; cursor: pointer; background: var(--green-dark); color: #fff; }
+  .rp-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .rp-btn.ghost { background: var(--white); color: var(--text-mid); border: 1.5px solid var(--border); }
+  .rp-empty { text-align: center; color: var(--muted); padding: 30px; }
+  @media (max-width: 700px) {
+    .rp-choice { grid-template-columns: 1fr; }
+    .rp-table .hide-sm { display: none; }
+  }
   @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
 
   .modal {
@@ -485,8 +535,8 @@
   {% endif %}
   {% if can_edit_prices %}
   <!-- Цены фиксированные: синхронизация их не трогает, пересчёт — только здесь -->
-  <button type="button" id="reprice-btn" class="iiko-sync-btn" onclick="repriceAll()"
-          title="Цены продажи не меняются сами при синхронизации. Кнопка ставит всем блюдам цену по наценке 67% (напиткам 15%) от текущей себестоимости. Ручные цены не трогает.">
+  <button type="button" id="reprice-btn" class="iiko-sync-btn" onclick="openReprice()"
+          title="Цены продажи не меняются сами при синхронизации. Здесь их можно пересчитать по наценке 67% (напиткам 15%) от текущей себестоимости — все или выбранные блюда.">
     ₸ <span id="reprice-label">Пересчитать цены</span>
   </button>
   {% endif %}
@@ -831,6 +881,69 @@
 </form>
 
 <!-- MODAL -->
+{% if can_edit_prices %}
+<!-- Окно «Пересчитать цены»: все или выбранные блюда (данные — /products/reprice/preview/) -->
+<div class="modal-overlay" id="rp-modal" onclick="if(event.target===this)closeReprice()">
+  <div class="modal rp-modal">
+    <div class="rp-head">
+      <button class="modal-close" type="button" onclick="closeReprice()">✕</button>
+      <h3>Пересчитать цены по наценке</h3>
+      <p>Блюда — себестоимость + 67%, напитки «Доп. товары» — + 15%, вверх до целого тенге.
+         Себестоимость — та, что сейчас на сайте (с последнего «Обновить из O·ERP»).</p>
+    </div>
+
+    <!-- Шаг 1: все или выбрать -->
+    <div class="rp-body" id="rp-step-choice">
+      <div class="rp-choice">
+        <button type="button" class="rp-card" onclick="repriceAllConfirm()">
+          <b>Пересчитать все цены</b>
+          <span id="rp-all-hint">Загрузка…</span>
+        </button>
+        <button type="button" class="rp-card" onclick="showRepricePick()">
+          <b>Пересчитать выбранные</b>
+          <span>Выбрать блюда по одному: поиск, категории, только красные (низкая наценка)
+                или только те, где цена изменится.</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Шаг 2: выбор блюд -->
+    <div class="rp-body" id="rp-step-pick" style="display:none">
+      <div class="rp-tools">
+        <input type="search" class="rp-search" id="rp-q" placeholder="Поиск по названию или артикулу" oninput="renderReprice()">
+        <select class="rp-select" id="rp-cat" onchange="renderReprice()"><option value="">Все категории</option></select>
+      </div>
+      <div class="rp-tools">
+        <button type="button" class="rp-chip on" data-f="all" onclick="setRepriceFilter('all')">Все</button>
+        <button type="button" class="rp-chip red" data-f="low" onclick="setRepriceFilter('low')">Красные — низкая наценка</button>
+        <button type="button" class="rp-chip" data-f="changed" onclick="setRepriceFilter('changed')">Цена изменится</button>
+        <button type="button" class="rp-chip" data-f="manual" onclick="setRepriceFilter('manual')">Ручные цены</button>
+      </div>
+      <div class="rp-wrap">
+        <table class="rp-table">
+          <thead><tr>
+            <th style="width:30px"><input type="checkbox" id="rp-all-vis" onchange="toggleRepriceVisible(this.checked)" title="Выбрать все в списке"></th>
+            <th>Блюдо</th>
+            <th class="r hide-sm">Себест.</th>
+            <th class="r">Цена сейчас</th>
+            <th class="r hide-sm">Наценка</th>
+            <th class="r">Новая цена</th>
+            <th class="r">Разница</th>
+          </tr></thead>
+          <tbody id="rp-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="rp-foot" id="rp-foot" style="display:none">
+      <button type="button" class="rp-btn ghost" onclick="showRepriceChoice()">← Назад</button>
+      <span id="rp-count" style="font-size:13px;color:var(--text-mid);font-weight:700;"></span>
+      <button type="button" class="rp-btn" id="rp-apply" onclick="repriceSelected()" disabled>Пересчитать выбранные</button>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-header" id="m-header">
@@ -891,34 +1004,174 @@ function updateCounter(data) {
   }
 }
  
-function repriceAll() {
-  if (!confirm('Пересчитать цены продажи всех блюд по наценке 67% (напитки 15%) от текущей себестоимости?
+// ── Окно «Пересчитать цены»: все или выбранные блюда ─────────────────────────
+let RP = { rows: [], sel: new Set(), filter: 'all', loaded: false };
 
-' +
-               'Цены в заявочном листе изменятся. Цены, введённые вручную, останутся.')) return;
+function rpMoney(v) {
+  return v === null || v === undefined ? '—' : Math.round(v).toLocaleString('ru-RU') + ' ₸';
+}
+function rpEsc(s) {
+  return String(s || '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+}
+// Цена изменится — есть новая цена и она отличается от текущей
+function rpChanges(r) {
+  return r.new_price !== null && r.new_price !== r.price;
+}
+
+function openReprice() {
+  document.getElementById('rp-modal').classList.add('open');
+  showRepriceChoice();
+  if (RP.loaded) return;
+  fetch('/products/reprice/preview/')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { document.getElementById('rp-all-hint').textContent = d.message || 'Ошибка загрузки'; return; }
+      RP.rows = d.products;
+      RP.loaded = true;
+      const sel = document.getElementById('rp-cat');
+      d.categories.forEach(c => {
+        if (RP.rows.some(r => r.cats.includes(c.key))) sel.add(new Option(c.label, c.key));
+      });
+      const auto = RP.rows.filter(r => !r.manual && rpChanges(r)).length;
+      const manual = RP.rows.filter(r => r.manual).length;
+      document.getElementById('rp-all-hint').textContent =
+        `Изменится цен: ${auto} из ${RP.rows.length}.` +
+        (manual ? ` Ручные цены (${manual}) не тронет.` : ' Ручные цены не тронет.');
+      renderReprice();
+    })
+    .catch(() => { document.getElementById('rp-all-hint').textContent = 'Ошибка загрузки'; });
+}
+
+function closeReprice() {
+  document.getElementById('rp-modal').classList.remove('open');
+}
+
+function showRepriceChoice() {
+  document.getElementById('rp-step-choice').style.display = '';
+  document.getElementById('rp-step-pick').style.display = 'none';
+  document.getElementById('rp-foot').style.display = 'none';
+}
+
+function showRepricePick() {
+  document.getElementById('rp-step-choice').style.display = 'none';
+  document.getElementById('rp-step-pick').style.display = '';
+  document.getElementById('rp-foot').style.display = '';
+  renderReprice();
+  document.getElementById('rp-q').focus();
+}
+
+function setRepriceFilter(f) {
+  RP.filter = f;
+  document.querySelectorAll('#rp-step-pick .rp-chip').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  renderReprice();
+}
+
+function rpVisible() {
+  const q = document.getElementById('rp-q').value.trim().toLowerCase();
+  const cat = document.getElementById('rp-cat').value;
+  return RP.rows.filter(r => {
+    if (q && !(r.name.toLowerCase().includes(q) || r.article.toLowerCase().includes(q))) return false;
+    if (cat && !r.cats.includes(cat)) return false;
+    if (RP.filter === 'low' && !r.low) return false;
+    if (RP.filter === 'changed' && !rpChanges(r)) return false;
+    if (RP.filter === 'manual' && !r.manual) return false;
+    return true;
+  });
+}
+
+function renderReprice() {
+  if (!RP.loaded) return;
+  const rows = rpVisible();
+  const body = document.getElementById('rp-rows');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7" class="rp-empty">Ничего не найдено</td></tr>';
+  } else {
+    body.innerHTML = rows.map(r => {
+      const diff = (r.new_price !== null && r.price !== null) ? r.new_price - r.price : null;
+      const diffCls = diff > 0 ? 'rp-up' : (diff < 0 ? 'rp-down' : '');
+      const diffTxt = diff === null ? '—' : (diff > 0 ? '+' : '') + Math.round(diff).toLocaleString('ru-RU') + ' ₸';
+      const pct = r.markup_pct === null ? '—' : r.markup_pct + '%';
+      return `<tr class="${RP.sel.has(r.id) ? 'sel' : ''}" onclick="toggleRepriceRow(${r.id})">
+        <td><input type="checkbox" ${RP.sel.has(r.id) ? 'checked' : ''} ${r.new_price === null ? 'disabled' : ''}
+                   onclick="event.stopPropagation(); toggleRepriceRow(${r.id})"></td>
+        <td><div class="rp-name">${rpEsc(r.name)} ${r.manual ? '<span class="rp-tag">ручная</span>' : ''}</div>
+            <div class="rp-sub">${rpEsc(r.article)}${r.cat ? ' · ' + rpEsc(r.cat) : ''} · наценка ${r.target_pct}%</div></td>
+        <td class="r hide-sm">${rpMoney(r.cost)}</td>
+        <td class="r">${rpMoney(r.price)}</td>
+        <td class="r hide-sm ${r.low ? 'rp-low' : ''}">${pct}</td>
+        <td class="r"><b>${rpMoney(r.new_price)}</b></td>
+        <td class="r ${diffCls}">${diffTxt}</td>
+      </tr>`;
+    }).join('');
+  }
+  const selectable = rows.filter(r => r.new_price !== null);
+  const allVis = document.getElementById('rp-all-vis');
+  allVis.checked = selectable.length > 0 && selectable.every(r => RP.sel.has(r.id));
+  rpUpdateCount();
+}
+
+function toggleRepriceRow(id) {
+  const r = RP.rows.find(x => x.id === id);
+  if (!r || r.new_price === null) return;   // нет себестоимости — считать не из чего
+  RP.sel.has(id) ? RP.sel.delete(id) : RP.sel.add(id);
+  renderReprice();
+}
+
+function toggleRepriceVisible(on) {
+  rpVisible().forEach(r => {
+    if (r.new_price === null) return;
+    on ? RP.sel.add(r.id) : RP.sel.delete(r.id);
+  });
+  renderReprice();
+}
+
+function rpUpdateCount() {
+  const n = RP.sel.size;
+  document.getElementById('rp-count').textContent = n ? `Выбрано: ${n}` : 'Ничего не выбрано';
+  const btn = document.getElementById('rp-apply');
+  btn.disabled = n === 0;
+  btn.textContent = n ? `Пересчитать выбранные (${n})` : 'Пересчитать выбранные';
+}
+
+function repriceAllConfirm() {
+  if (!RP.loaded) return;
+  const auto = RP.rows.filter(r => !r.manual && rpChanges(r)).length;
+  const text = 'Пересчитать цены ВСЕХ блюд по наценке? Изменится цен: ' + auto + '.\n\n' +
+               'Цены в заявочном листе изменятся. Цены, введённые вручную, останутся.';
+  if (!confirm(text)) return;
+  rpSend(null);
+}
+
+function repriceSelected() {
+  const ids = Array.from(RP.sel);
+  if (!ids.length) return;
+  const manual = RP.rows.filter(r => RP.sel.has(r.id) && r.manual).length;
+  const text = 'Пересчитать цены выбранных блюд (' + ids.length + ') по наценке?' +
+               (manual ? '\n\nСреди них ручных цен: ' + manual + ' — они тоже пересчитаются.' : '');
+  if (!confirm(text)) return;
+  rpSend(ids);
+}
+
+function rpSend(ids) {
   const btn = document.getElementById('reprice-btn');
-  const label = document.getElementById('reprice-label');
   btn.classList.add('loading');
-  label.textContent = 'Пересчёт…';
   fetch('/products/reprice/', {
     method: 'POST',
-    headers: { 'X-CSRFToken': getCsrfToken() },
+    headers: { 'X-CSRFToken': getCsrfToken(), 'Content-Type': 'application/json' },
+    body: ids ? JSON.stringify({ ids: ids }) : '',
   })
   .then(r => r.json())
   .then(data => {
     btn.classList.remove('loading');
-    label.textContent = 'Пересчитать цены';
+    closeReprice();
     const toast = document.getElementById('iiko-toast');
     toast.className = data.ok ? 'iiko-toast' : 'iiko-toast error';
-    toast.innerHTML = (data.ok ? '✅ ' : '❌ ') + data.message;
+    toast.textContent = (data.ok ? '✅ ' : '❌ ') + data.message;
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 5000);
-    if (data.ok && data.changed > 0) setTimeout(() => window.location.reload(), 1800);
+    if (data.ok && data.changed > 0) setTimeout(() => window.location.reload(), 1500);
   })
-  .catch(() => {
-    btn.classList.remove('loading');
-    label.textContent = 'Пересчитать цены';
-  });
+  .catch(() => { btn.classList.remove('loading'); });
 }
 
 function runIikoSync() {
@@ -1196,7 +1449,7 @@ function saveSalePrice(pk) {
 
 function closeModal(e) { if (e.target === document.getElementById('modal')) closeModalDirect(); }
 function closeModalDirect() { document.getElementById('modal').classList.remove('open'); }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModalDirect(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModalDirect(); if (document.getElementById('rp-modal')) closeReprice(); } });
 
 function switchTab(tab) {
   const is100 = tab === '100';

@@ -6,6 +6,7 @@
 как у обычного читателя.
 """
 
+import json
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, User
@@ -311,6 +312,53 @@ class MarkupTests(TestCase):
         auto.refresh_from_db(); manual.refresh_from_db()
         self.assertEqual(auto.sale_price, Decimal("835"))
         self.assertEqual(manual.sale_price, Decimal("150"))
+
+    def test_reprice_selected_only(self):
+        admin = User.objects.create_superuser("boss", password="x")
+        a = Product.objects.create(name="Салат", cost=Decimal("396"))
+        b = Product.objects.create(name="Суп", cost=Decimal("300"))
+        manual = Product.objects.create(name="Вода", cost=Decimal("100"),
+                                        sale_price=Decimal("150"), sale_price_manual=True)
+        Product.objects.filter(pk__in=[a.pk, b.pk]).update(cost=Decimal("500"))
+        self.client.force_login(admin)
+        resp = self.client.post(reverse("products_reprice"),
+                                data=json.dumps({"ids": [a.pk, manual.pk]}),
+                                content_type="application/json")
+        self.assertEqual(resp.json()["changed"], 2)
+        a.refresh_from_db(); b.refresh_from_db(); manual.refresh_from_db()
+        self.assertEqual(a.sale_price, Decimal("835"))
+        self.assertEqual(b.sale_price, Decimal("501"))        # не выбран — без изменений
+        self.assertEqual(manual.sale_price, Decimal("167"))   # выбран явно — по наценке
+        self.assertFalse(manual.sale_price_manual)
+
+    def test_reprice_preview(self):
+        admin = User.objects.create_superuser("boss", password="x")
+        p = Product.objects.create(name="Салат", article="00772", cost=Decimal("396"))
+        Product.objects.filter(pk=p.pk).update(cost=Decimal("785"))
+        self.client.force_login(admin)
+        row = self.client.get(reverse("products_reprice_preview")).json()["products"][0]
+        self.assertEqual((row["price"], row["new_price"]), (662.0, 1311.0))
+        self.assertTrue(row["low"])                           # наценка < 40% — красная
+        self.assertEqual(Product.objects.get(pk=p.pk).sale_price, Decimal("662"))
+
+    def test_catalog_scripts_parse(self):
+        """Скрипты каталога без синтаксических ошибок: одна такая (перенос строки
+        внутри строки JS) уже роняла все кнопки каталога."""
+        import re, shutil, subprocess, tempfile, os
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("нет node")
+        self.client.force_login(User.objects.create_superuser("boss", password="x"))
+        html = self.client.get(reverse("product_list")).content.decode()
+        for block in re.findall(r"<script>(.*?)</script>", html, re.S):
+            fd, path = tempfile.mkstemp(suffix=".js")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(block)
+            try:
+                res = subprocess.run([node, "--check", path], capture_output=True, text=True)
+            finally:
+                os.remove(path)
+            self.assertEqual(res.returncode, 0, res.stderr[:500])
 
     def test_reprice_button_closed_to_plain_reader(self):
         readers, _ = Group.objects.get_or_create(name=READERS_GROUP)

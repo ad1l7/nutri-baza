@@ -8,6 +8,7 @@ urlpatterns = [
     path("product/<int:pk>/card/", views.product_card, name="product_card"),
     path("product/<int:pk>/sale-price/", views.product_set_sale_price, name="product_set_sale_price"),
     path("products/reprice/", views.products_reprice, name="products_reprice"),
+    path("products/reprice/preview/", views.products_reprice_preview, name="products_reprice_preview"),
 
     # Калоражи (только для редакторов)
     path("calories/", views.calorie_list, name="calorie_list"),
