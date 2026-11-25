@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Q
 import json
+from pathlib import Path
 import logging
 from django.conf import settings
 from django.http import HttpResponseForbidden, JsonResponse
@@ -1690,15 +1691,153 @@ def _build_order_sheet_xlsx(products, with_price=False):
     return response
 
 
+# ── Прайс-лист «Приложение №2» ────────────────────────────────────────────────
+
+# Оформление — myapp/xlsx_templates/price_list.xlsx: шапка прайса фудзавода
+# (логотип, «ПРИЛОЖЕНИЕ №2», колонки, пустые разделы фабрики до «Здоровое
+# Питание») в строках 1–35, ниже — строки-образцы и подвал с подписями.
+# Собран из прайса пользователя «Приложение №2 ПП 06.08.2026» без его данных.
+PRICE_LIST_TEMPLATE = Path(__file__).resolve().parent / "xlsx_templates" / "price_list.xlsx"
+PRICE_LIST_FIRST_ROW = 36
+# строки-образцы шаблона
+(PL_SECTION, PL_ITEM, PL_SWAP_HEAD, PL_SWAP_PARENT, PL_SWAP_SUB,
+ PL_MAT_HEAD, PL_MAT_ITEM, PL_RAW) = range(36, 44)
+PL_FOOTER_FROM = 44
+# Разделы «Здоровое Питание» — названия и порядок как в прайсе
+PRICE_LIST_SECTIONS = [
+    ("breakfast", "Завтрак"), ("hot_400", "Горячее 400-500"), ("hot_500", "Горячее 500-600"),
+    ("soup", "Суп"), ("salad", "Салат"), ("dessert", "Выпечка/Десерт"), ("smoothie", "Смузи"),
+    ("extra", "Напитки"), ("sandwich", "Сэндвичи"), ("jkt", "ЖКТ"), ("fmd", "ФМД"),
+]
+
+
+def _swap_heading(name):
+    """«Блюда на замену VIP- завтраки» → («VIP- завтраки», «Завтраки»): подгруппа
+    и общий заголовок над VIP/Sport/Маржа, как в прайсе; у прочих групп
+    («Смузи», «ПП Десерты») общего заголовка нет."""
+    import re
+    sub = re.sub(r"^\s*Блюда на замену\s*", "", name or "").strip() or (name or "")
+    m = re.match(r"^(VIP|Sport|Маржа)\s*-\s*(.+)$", sub, re.IGNORECASE)
+    if not m:
+        return sub, None
+    parent = re.sub(r"\s*/\s*", "/", m.group(2).strip())
+    return sub, parent[:1].upper() + parent[1:]
+
+
+def _build_price_list_xlsx(ration_products, swap_groups):
+    """Прайс «Приложение №2»: «Здоровое Питание» — блюда отмеченных рационов по
+    категориям, «Блюда на замену» — отмеченные группы, затем материалы, «Сырье»
+    и подписи. Цена — «Цена прод.» с сайта (у материалов — их позиции в каталоге)."""
+    import copy
+    import openpyxl
+    from django.http import HttpResponse
+    from urllib.parse import quote
+
+    wb = openpyxl.load_workbook(PRICE_LIST_TEMPLATE)
+    ws = wb.active
+
+    def snapshot(r):
+        return (ws.row_dimensions[r].height,
+                [(copy.copy(c.font), copy.copy(c.fill), copy.copy(c.border),
+                  copy.copy(c.alignment), c.number_format, c.value) for c in ws[r][:6]])
+
+    protos = {r: snapshot(r) for r in range(PL_SECTION, PL_RAW + 1)}
+    footer = [snapshot(r) for r in range(PL_FOOTER_FROM, ws.max_row + 1)]
+    for rng in list(ws.merged_cells.ranges):
+        if rng.min_row >= PRICE_LIST_FIRST_ROW:
+            ws.unmerge_cells(str(rng))
+    ws.delete_rows(PRICE_LIST_FIRST_ROW, ws.max_row - PRICE_LIST_FIRST_ROW + 1)
+    ws["D4"] = f"от «____» ________ {timezone.localdate().year} г."
+
+    row = PRICE_LIST_FIRST_ROW
+
+    def put(proto, values=(), merge=False, keep_values=False):
+        nonlocal row
+        height, cells = proto
+        ws.row_dimensions[row].height = height
+        for col, (font, fill, border, align, fmt, val) in enumerate(cells, start=1):
+            c = ws.cell(row=row, column=col)
+            c.font, c.fill, c.border, c.alignment = font, fill, border, align
+            c.number_format = fmt
+            c.value = val if keep_values else (values[col - 1] if col <= len(values) else None)
+        if merge:
+            ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
+        row += 1
+
+    def item(proto, article, name, price):
+        put(proto, [article or "", None, name, None,
+                    float(price) if price is not None else None])
+        ws.cell(row=row - 1, column=5).number_format = "General"   # цена — числом
+
+    by_section = {}
+    for p in ration_products:
+        keys = {c.key for c in p.meal_categories.all()}
+        key = next((k for k, _ in PRICE_LIST_SECTIONS if k in keys), None)
+        by_section.setdefault(key, []).append(p)
+    sections = PRICE_LIST_SECTIONS + [(None, "Прочее")]
+    for key, label in sections:
+        items = sorted(by_section.get(key, []), key=lambda p: (p.name or "").lower())
+        if not items:
+            continue
+        put(protos[PL_SECTION], [label])
+        for p in items:
+            item(protos[PL_ITEM], p.article, p.name, p.sale_price)
+
+    if swap_groups:
+        put(protos[PL_SWAP_HEAD], ["Блюда на замену"], merge=True)
+        parent = None
+        for g in swap_groups:
+            sub, group_parent = _swap_heading(g.name)
+            if group_parent and group_parent != parent:
+                put(protos[PL_SWAP_PARENT], [group_parent], merge=True)
+            parent = group_parent
+            put(protos[PL_SWAP_SUB], [sub])
+            for it in g.items.select_related("product").order_by("order", "pk"):
+                item(protos[PL_ITEM], it.product.article, it.product.name, it.product.sale_price)
+
+    put(protos[PL_MAT_HEAD], ["Материалы"])
+    material_price = {
+        (p.article or "").strip(): p.sale_price
+        for p in Product.objects.filter(meal_categories__key="materials").exclude(article="")
+    }
+    for m in Material.objects.all():
+        item(protos[PL_MAT_ITEM], m.article, m.name, material_price.get((m.article or "").strip()))
+    put(protos[PL_RAW], ["Сырье"])
+    for f in footer:
+        put(f, keep_values=True)
+
+    filename = f"Приложение №2 ПП {timezone.localdate().strftime('%d.%m.%Y')}.xlsx"
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+    wb.save(response)
+    return response
+
+
 def claude_order_sheet(request):
     """Собирает заявочный лист по отмеченным рационам Claude и группам замен.
 
     Блюдо попадает в лист один раз, даже если стоит в нескольких рационах и
-    ещё и в заменах. Порядок — по алфавиту, подгруппы не выводятся."""
+    ещё и в заменах. Порядок — по алфавиту, подгруппы не выводятся.
+
+    С галочкой «цена» — прайс «Приложение №2» (_build_price_list_xlsx):
+    разделы по категориям и группам замен, как в прайсе фудзавода."""
     ration_ids = request.GET.getlist("ration")
     swap_ids   = request.GET.getlist("swap_group")
     if not ration_ids and not swap_ids:
         return redirect("claude_rations")
+
+    if request.GET.get("price"):
+        ration_product_ids = set(
+            ClaudeRationSlot.objects
+            .filter(ration_id__in=ration_ids, product__isnull=False)
+            .values_list("product_id", flat=True)
+        )
+        return _build_price_list_xlsx(
+            list(Product.objects.filter(pk__in=ration_product_ids).prefetch_related("meal_categories")),
+            list(SwapGroup.objects.filter(pk__in=swap_ids).order_by("order", "name")),
+        )
 
     product_ids = set(
         ClaudeRationSlot.objects

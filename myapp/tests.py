@@ -798,3 +798,65 @@ class OerpSyncTests(TestCase):
         self.assertEqual([d[3] for d in report["diffs"]["cost"]], [Decimal("396.00")])
         self.assertEqual(report["diffs"]["name"], [])
         self.assertEqual(Product.objects.get(article="00516").cost, Decimal("350"))
+
+
+class PriceListTests(TestCase):
+    """Прайс «Приложение №2» — заявочный лист с галочкой «цена»."""
+
+    def _rows(self, response):
+        import io
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(response.content))
+        ws = wb.active
+        return ws, [tuple(c.value for c in r[:5]) for r in ws.iter_rows()]
+
+    def test_price_list_layout(self):
+        from .models import SwapGroup, SwapItem
+        from .views import _build_price_list_xlsx
+        cats = {k: MealCategory.objects.get_or_create(key=k)[0]
+                for k in ("breakfast", "soup", "materials")}
+        pancakes = Product.objects.create(name="ПП* Упак Панкейки", article="00792", cost=Decimal("600"))
+        pancakes.meal_categories.set([cats["breakfast"]])
+        borsch = Product.objects.create(name="ПП* Упак Борщ", article="44928", cost=Decimal("300"))
+        borsch.meal_categories.set([cats["soup"]])
+        vip = SwapGroup.objects.create(name="Блюда на замену VIP- завтраки", order=1)
+        sport = SwapGroup.objects.create(name="Блюда на замену Sport- завтраки", order=2)
+        SwapItem.objects.create(swap_group=vip, product=pancakes)
+        SwapItem.objects.create(swap_group=sport, product=borsch)
+        Material.objects.create(article="96374", name="С* Вода Esen")
+        water = Product.objects.create(name="С* Вода Esen", article="96374", cost=Decimal("192"))
+        water.meal_categories.set([cats["materials"]])
+        water.reprice(); water.save()                              # как синхронизация после категории
+
+        resp = _build_price_list_xlsx([borsch, pancakes], [vip, sport])
+        from urllib.parse import unquote
+        self.assertIn("Приложение №2 ПП ", unquote(resp["Content-Disposition"]))
+        ws, rows = self._rows(resp)
+        self.assertEqual(len(ws._images), 1)                       # логотип
+        self.assertEqual(rows[8][:5], ("Артикул", "ШК ", "Наименование товара", "Срок годности",
+                                       rows[8][4]))
+        self.assertTrue(rows[8][4].startswith("Цена в тенге"))
+        body = [r for r in rows[35:] if any(v is not None for v in r)]
+        names = [r[0] if r[2] is None else r[2] for r in body]
+        self.assertEqual(names[:6], ["Завтрак", "ПП* Упак Панкейки", "Суп", "ПП* Упак Борщ",
+                                     "Блюда на замену", "Завтраки"])
+        self.assertEqual(names[6:10], ["VIP- завтраки", "ПП* Упак Панкейки",
+                                       "Sport- завтраки", "ПП* Упак Борщ"])   # «Завтраки» — один раз
+        self.assertIn(("00792", None, "ПП* Упак Панкейки", None, 1002), body)  # 600 × 1.67
+        self.assertIn(("96374", None, "С* Вода Esen", None, 221), body)        # материал 15%
+        flat = [v for r in body for v in r if isinstance(v, str)]
+        for text in ("Материалы", "Сырье", "ОРГАНИЗАЦИЯ:", "Управляющий директор"):
+            self.assertIn(text, flat)
+
+    def test_order_sheet_view_with_price_gives_price_list(self):
+        from .models import SwapGroup, SwapItem
+        admin = User.objects.create_superuser("boss", password="x")
+        g = SwapGroup.objects.create(name="Смузи")
+        SwapItem.objects.create(swap_group=g, product=Product.objects.create(name="Смузи", cost=Decimal("300")))
+        self.client.force_login(admin)
+        with_price = self.client.get(reverse("claude_order_sheet"), {"swap_group": g.pk, "price": 1})
+        plain = self.client.get(reverse("claude_order_sheet"), {"swap_group": g.pk})
+        self.assertIn("%D0%9F%D1%80%D0%B8%D0%BB%D0%BE%D0%B6%D0%B5%D0%BD%D0%B8%D0%B5",
+                      with_price["Content-Disposition"])               # «Приложение»
+        self.assertIn("%D0%97%D0%B0%D1%8F%D0%B2%D0%BE%D1%87%D0%BD%D1%8B%D0%B9",
+                      plain["Content-Disposition"])                    # «Заявочный»
