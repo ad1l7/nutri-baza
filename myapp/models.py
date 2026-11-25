@@ -2,8 +2,6 @@ from decimal import Decimal, ROUND_CEILING
 
 from django.conf import settings
 from django.db import models
-from django.db.models.signals import m2m_changed
-from django.dispatch import receiver
 from django.utils import timezone
 
 from .ingredient_aliases import clean_composition
@@ -69,8 +67,9 @@ class Product(models.Model):
     name = models.CharField(max_length=300, verbose_name="Наименование")
     photo = models.ImageField(upload_to="products/", null=True, blank=True, verbose_name="Фото")
     cost = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Себестоимость ФЗ")
-    # По умолчанию считается автоматически (наценка MARKUP_TARGET_PCT), но
-    # введённая руками цена фиксируется флагом ниже и больше не пересчитывается.
+    # Ставится по наценке (target_markup_pct) один раз и дальше не меняется сама —
+    # см. save() и reprice(). Введённая руками цена помечается флагом ниже, её не
+    # трогает и пересчёт.
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Цена продажи с ФЗ")
     sale_price_manual = models.BooleanField(default=False, verbose_name="Цена задана вручную")
     net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
@@ -124,13 +123,14 @@ class Product(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
-        """Цена продажи всегда держит целевую наценку (target_markup_pct) — кроме блюд,
-        где её задали вручную, и блюд без себестоимости (там ставить не из чего).
-        Пересчёт живёт здесь, чтобы срабатывать и на синхронизации с iiko, и в
-        админке — везде, где меняется себестоимость."""
-        if not self.sale_price_manual:
+        """Цена продажи фиксированная: по наценке (target_markup_pct) она ставится
+        только блюду без цены — новому или с очищенным полем. Дальше изменение
+        себестоимости (синхронизация с O·ERP) цену не трогает: в заявочных листах
+        для бухгалтерии цены не должны плясать от каждой накладной. Пересчитать
+        по наценке — reprice() / кнопка «Пересчитать цены» в каталоге."""
+        if not self.sale_price_manual and self.sale_price is None:
             auto = self.auto_sale_price
-            if auto is not None and auto != self.sale_price:
+            if auto is not None:
                 self.sale_price = auto
                 update_fields = kwargs.get("update_fields")
                 if update_fields is not None:
@@ -185,6 +185,18 @@ class Product(models.Model):
         return (self._decimal(self.cost) * factor).quantize(
             Decimal("1"), rounding=ROUND_CEILING)
 
+    def reprice(self) -> bool:
+        """Цена по наценке от текущей себестоимости — для кнопки «Пересчитать
+        цены» и новых блюд из синхронизации. Ручную цену не трогает. True — цена
+        изменилась (сохранять вызывающему)."""
+        if self.sale_price_manual:
+            return False
+        auto = self.auto_sale_price
+        if auto is None or auto == self.sale_price:
+            return False
+        self.sale_price = auto
+        return True
+
     @property
     def markup(self):
         """Наценка в тенге: цена продажи − себестоимость.
@@ -206,21 +218,6 @@ class Product(models.Model):
         """Наценка меньше нормы — повод подсветить себестоимость."""
         pct = self.markup_pct
         return pct is not None and pct < self.min_markup_pct
-
-
-@receiver(m2m_changed, sender=Product.meal_categories.through)
-def _reprice_on_category_change(sender, instance, action, reverse, pk_set, **kwargs):
-    """Категория решает, напиток это или блюдо, а значит и наценку. Синхронизация
-    с iiko и админка ставят категории уже после save() — пересчитываем здесь."""
-    if action not in ("post_add", "post_remove", "post_clear"):
-        return
-    if reverse:
-        products = Product.objects.filter(pk__in=pk_set or ())
-    else:
-        products = [instance]
-    for p in products:
-        if not p.sale_price_manual and p.auto_sale_price != p.sale_price:
-            p.save(update_fields=["sale_price"])
 
 
 # ── Точечные права пользователя ──────────────────────────────────────────────

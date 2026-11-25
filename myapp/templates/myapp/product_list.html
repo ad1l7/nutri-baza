@@ -483,6 +483,13 @@
     — / 5
   </div>
   {% endif %}
+  {% if can_edit_prices %}
+  <!-- Цены фиксированные: синхронизация их не трогает, пересчёт — только здесь -->
+  <button type="button" id="reprice-btn" class="iiko-sync-btn" onclick="repriceAll()"
+          title="Цены продажи не меняются сами при синхронизации. Кнопка ставит всем блюдам цену по наценке 67% (напиткам 15%) от текущей себестоимости. Ручные цены не трогает.">
+    ₸ <span id="reprice-label">Пересчитать цены</span>
+  </button>
+  {% endif %}
   <div class="count-badge">Найдено: <strong>{{ total }}</strong> продуктов</div>
   <button type="button" class="export-btn" onclick="exportCatalog()" title="Скачать каталог в Excel (с учётом фильтров)">
     ⬇ Excel
@@ -765,7 +772,7 @@
               {% else %}
                 <input type="number" min="0" step="0.01" id="sale-{{ p.pk }}"
                        class="sale-inp{% if p.sale_price_manual %} manual{% endif %}"
-                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы вернуть наценку {{ p.target_markup_pct }}%{% else %}Наценка {{ p.target_markup_pct }}% — считается сама. Впишите своё значение, чтобы зафиксировать цену{% endif %}"
+                       title="{% if p.sale_price_manual %}Цена задана вручную. Очистите поле, чтобы поставить цену по наценке {{ p.target_markup_pct }}%{% else %}Цена по наценке {{ p.target_markup_pct }}%, фиксированная: при синхронизации не меняется. Обновить — «Пересчитать цены» или очистить поле{% endif %}"
                        value="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        data-saved="{% if p.sale_price %}{{ p.sale_price|floatformat:'-2' }}{% endif %}"
                        placeholder="—"
@@ -884,6 +891,36 @@ function updateCounter(data) {
   }
 }
  
+function repriceAll() {
+  if (!confirm('Пересчитать цены продажи всех блюд по наценке 67% (напитки 15%) от текущей себестоимости?
+
+' +
+               'Цены в заявочном листе изменятся. Цены, введённые вручную, останутся.')) return;
+  const btn = document.getElementById('reprice-btn');
+  const label = document.getElementById('reprice-label');
+  btn.classList.add('loading');
+  label.textContent = 'Пересчёт…';
+  fetch('/products/reprice/', {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCsrfToken() },
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.classList.remove('loading');
+    label.textContent = 'Пересчитать цены';
+    const toast = document.getElementById('iiko-toast');
+    toast.className = data.ok ? 'iiko-toast' : 'iiko-toast error';
+    toast.innerHTML = (data.ok ? '✅ ' : '❌ ') + data.message;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 5000);
+    if (data.ok && data.changed > 0) setTimeout(() => window.location.reload(), 1800);
+  })
+  .catch(() => {
+    btn.classList.remove('loading');
+    label.textContent = 'Пересчитать цены';
+  });
+}
+
 function runIikoSync() {
   const btn   = document.getElementById('iiko-sync-btn');
   const label = document.getElementById('iiko-sync-label');
@@ -1089,8 +1126,8 @@ function saveSaleCell(pk) {
       input.value = shown;
       input.dataset.saved = shown;
       input.title = d.manual
-        ? `Цена задана вручную. Очистите поле, чтобы вернуть наценку ${d.target_pct}%`
-        : `Наценка ${d.target_pct}% — считается сама. Впишите своё значение, чтобы зафиксировать цену`;
+        ? `Цена задана вручную. Очистите поле, чтобы поставить цену по наценке ${d.target_pct}%`
+        : `Цена по наценке ${d.target_pct}%, фиксированная: при синхронизации не меняется. Обновить — «Пересчитать цены» или очистить поле`;
       const mark = d.manual ? ' manual' : '';
       input.className = 'sale-inp saved' + mark;
       setTimeout(() => { input.className = 'sale-inp' + mark; }, 900);

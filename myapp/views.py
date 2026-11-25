@@ -265,11 +265,30 @@ def product_card(request, pk):
 
 
 @require_POST
+def products_reprice(request):
+    """Кнопка «Пересчитать цены» в каталоге: цена продажи всех блюд — заново по
+    наценке (67% / напитки 15%) от текущей себестоимости. Сама цена от
+    синхронизации не меняется (Product.save), обновляют её только здесь,
+    когда решат. Ручные цены не трогаем."""
+    from .roles import can_edit_prices
+    if not can_edit_prices(request.user):
+        return JsonResponse({"ok": False, "message": "Нет права менять цены"}, status=403)
+    changed = 0
+    for p in Product.objects.prefetch_related("meal_categories"):
+        if p.reprice():
+            p.save(update_fields=["sale_price"])
+            changed += 1
+    logger.info(f"Пересчёт цен по наценке ({request.user}): изменено {changed}")
+    return JsonResponse({"ok": True, "changed": changed,
+                         "message": f"Цены пересчитаны по наценке: изменено {changed}"})
+
+
+@require_POST
 def product_set_sale_price(request, pk):
     """Сохраняет «Цену продажи с ФЗ» блюда из каталога (колонка в таблице
-    или модалка). Введённая цена фиксируется как ручная и больше не
-    пересчитывается автоматически; пустое поле снимает ручной режим и
-    возвращает цену с целевой наценкой. Наценка в БД не хранится — считается
+    или модалка). Введённая цена фиксируется как ручная, её не трогает и
+    «Пересчитать цены»; пустое поле снимает ручной режим и ставит цену по
+    наценке от текущей себестоимости. Наценка в БД не хранится — считается
     и возвращается в ответе, чтобы обновить строку без перезагрузки."""
     from decimal import Decimal, InvalidOperation
     product = get_object_or_404(Product, pk=pk)

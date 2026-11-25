@@ -21,7 +21,7 @@ class ReaderReadOnlyMiddleware:
     иначе читатель правил бы чужие рационы."""
 
     ALLOWED_PATHS = ("/login/", "/logout/")
-    SALE_PRICE_PATH = re.compile(r"^/product/\d+/sale-price/$")
+    SALE_PRICE_PATH = re.compile(r"^/(product/\d+/sale-price|products/reprice)/$")
     CLAUDE_PATH = re.compile(r"^/claude/")
     UNSAFE_METHODS = ("POST", "PUT", "PATCH", "DELETE")
 

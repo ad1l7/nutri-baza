@@ -404,7 +404,8 @@ def sync_products_from_oerp(api_key: str, base_url: str = OERP_DEFAULT_URL) -> d
             slot_key = fields["_slot_key"]
             new_fields = {k: v for k, v in fields.items() if not k.startswith("_")}
             product = matched.get(pid)
-            if product is None:
+            created = product is None
+            if created:
                 product = Product.objects.create(**new_fields, iiko_sku=pid, iiko_synced_at=now)
                 result["created"] += 1
             else:
@@ -422,6 +423,11 @@ def sync_products_from_oerp(api_key: str, base_url: str = OERP_DEFAULT_URL) -> d
             cat = categories.get(slot_key)
             if cat and set(product.meal_categories.values_list("pk", flat=True)) != {cat.pk}:
                 product.meal_categories.set([cat])
+            # Новому блюду цена ставилась при создании, когда категории ещё не
+            # было (наценка блюда) — для напитка пересчитываем уже с категорией.
+            # У существующих цена фиксированная и от синхронизации не меняется.
+            if created and product.reprice():
+                product.save(update_fields=["sale_price"])
         except Exception as e:
             msg = f"'{fields.get('name', pid)}': {e}"
             logger.error(f"O·ERP: {msg}")

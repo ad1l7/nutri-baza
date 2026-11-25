@@ -251,20 +251,31 @@ class ClaudeCatalogTests(TestCase):
 
 
 class MarkupTests(TestCase):
-    """Наценка: 67% на блюда и смузи, 15% на напитки («Доп. товары»), вверх до тенге."""
+    """Наценка: 67% на блюда и смузи, 15% на напитки («Доп. товары»), вверх до тенге.
+    Цена фиксированная: ставится новому блюду, дальше меняется только reprice()."""
 
     def test_dish_gets_67_percent(self):
         p = Product.objects.create(name="Салат", cost=Decimal("396"))
         self.assertEqual(p.sale_price, Decimal("662"))        # 661.32 -> 662
         self.assertFalse(p.markup_is_low)
 
-    def test_drink_gets_15_percent_when_category_set_after_create(self):
-        # так делает синхронизация: сначала create, потом категория
+    def test_cost_change_keeps_price_until_reprice(self):
+        # себестоимость из O·ERP плавает — цена в заявочном листе не должна
+        p = Product.objects.create(name="Салат", cost=Decimal("396"))
+        p.cost = Decimal("500")
+        p.save()
+        p.refresh_from_db()
+        self.assertEqual(p.sale_price, Decimal("662"))
+        self.assertTrue(p.reprice())
+        self.assertEqual(p.sale_price, Decimal("835"))        # 500 * 1.67
+        self.assertFalse(p.reprice())                         # уже по наценке
+
+    def test_drink_reprice_uses_15_percent(self):
         extra, _ = MealCategory.objects.get_or_create(key="extra")
         p = Product.objects.create(name="Боржоми", cost=Decimal("644"))
-        self.assertEqual(p.sale_price, Decimal("1076"))       # пока блюдо, 67%
+        self.assertEqual(p.sale_price, Decimal("1076"))       # без категории — блюдо, 67%
         p.meal_categories.set([extra])
-        p.refresh_from_db()
+        self.assertTrue(p.reprice())
         self.assertEqual(p.sale_price, Decimal("741"))        # 740.6 -> 741
         self.assertFalse(p.markup_is_low)                     # 15% для напитка — норма
 
@@ -272,16 +283,67 @@ class MarkupTests(TestCase):
         smoothie, _ = MealCategory.objects.get_or_create(key="smoothie")
         p = Product.objects.create(name="Смузи", cost=Decimal("300"))
         p.meal_categories.set([smoothie])
-        p.refresh_from_db()
+        p.reprice()
         self.assertEqual(p.sale_price, Decimal("501"))        # 300 * 1.67
 
-    def test_manual_price_kept_on_category_change(self):
-        extra, _ = MealCategory.objects.get_or_create(key="extra")
+    def test_reprice_keeps_manual_price(self):
         p = Product.objects.create(name="Вода", cost=Decimal("100"),
                                    sale_price=Decimal("150"), sale_price_manual=True)
-        p.meal_categories.set([extra])
-        p.refresh_from_db()
+        self.assertFalse(p.reprice())
         self.assertEqual(p.sale_price, Decimal("150"))
+
+    def test_cleared_price_is_set_by_markup(self):
+        p = Product.objects.create(name="Салат", cost=Decimal("396"),
+                                   sale_price=Decimal("700"), sale_price_manual=True)
+        p.sale_price, p.sale_price_manual = None, False       # очистили поле в каталоге
+        p.save()
+        self.assertEqual(p.sale_price, Decimal("662"))
+
+    def test_reprice_button(self):
+        admin = User.objects.create_superuser("boss", password="x")
+        auto = Product.objects.create(name="Салат", cost=Decimal("396"))
+        manual = Product.objects.create(name="Вода", cost=Decimal("100"),
+                                        sale_price=Decimal("150"), sale_price_manual=True)
+        Product.objects.filter(pk=auto.pk).update(cost=Decimal("500"))
+        self.client.force_login(admin)
+        resp = self.client.post(reverse("products_reprice"))
+        self.assertEqual(resp.json()["changed"], 1)
+        auto.refresh_from_db(); manual.refresh_from_db()
+        self.assertEqual(auto.sale_price, Decimal("835"))
+        self.assertEqual(manual.sale_price, Decimal("150"))
+
+    def test_reprice_button_closed_to_plain_reader(self):
+        readers, _ = Group.objects.get_or_create(name=READERS_GROUP)
+        reader = User.objects.create_user("reader", password="x")
+        reader.groups.add(readers)
+        self.client.force_login(reader)
+        self.assertEqual(self.client.post(reverse("products_reprice")).status_code, 403)
+
+    def test_prices_from_order_sheet(self):
+        import io, os, tempfile
+        import openpyxl
+        from django.core.management import call_command
+        p = Product.objects.create(name="Салат", article="00772", cost=Decimal("792"))
+        other = Product.objects.create(name="Суп", article="00100", cost=Decimal("300"))
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append(["Компания", "O-Live"])
+        ws.append(["Артикул", "Наименование продукта", "Кратность заказа", "Цена прод.", "ИТОГО"])
+        ws.append(["Здоровое Питание", None, None, None, None])
+        ws.append(["00772", "Салат", "1 порц", 1320, None])
+        ws.append(["99999", "Нет на сайте", "1 порц", 100, None])
+        fd, path = tempfile.mkstemp(suffix=".xlsx"); os.close(fd)
+        try:
+            wb.save(path)
+            call_command("set_prices_from_sheet", path, stdout=io.StringIO())
+            p.refresh_from_db()
+            self.assertEqual(p.sale_price, Decimal("1323"))   # без --apply не пишет
+            call_command("set_prices_from_sheet", path, "--apply", stdout=io.StringIO())
+        finally:
+            os.remove(path)
+        p.refresh_from_db(); other.refresh_from_db()
+        self.assertEqual(p.sale_price, Decimal("1320"))
+        self.assertFalse(p.sale_price_manual)
+        self.assertEqual(other.sale_price, Decimal("501"))    # вне листа — без изменений
 
 
 class ProductCardTests(TestCase):
@@ -559,6 +621,14 @@ class OerpSyncTests(TestCase):
         p = Product.objects.get(article="00516")
         self.assertEqual(p.name, "ПП* Упак Каша овсяная")
         self.assertEqual(p.cost, Decimal("380"))               # null из O·ERP — не 0
+
+    def test_resync_new_cost_keeps_fixed_price(self):
+        self._sync()
+        self.costs = [{"id": "d-1", "code": "00516", "ssc": "500", "kind": "dish"}]
+        self._sync()
+        p = Product.objects.get(iiko_id="d-1")
+        self.assertEqual(p.cost, Decimal("500.00"))
+        self.assertEqual(p.sale_price, Decimal("662"))         # цена с первой загрузки
 
     def test_compare_reports_differences_without_writing(self):
         from unittest.mock import patch
