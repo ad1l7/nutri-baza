@@ -15,7 +15,7 @@ from django.urls import reverse
 
 from .models import (
     ClaudeRation, ClaudeRationGroup, ClaudeRationSlot,
-    MealCategory, MealTime, Product, UserRights,
+    MealCategory, MealTime, Material, Product, UserRights,
 )
 from .roles import READERS_GROUP, can_edit_claude_group, can_edit_claude_ration
 
@@ -286,6 +286,73 @@ class MarkupTests(TestCase):
         p.meal_categories.set([smoothie])
         p.reprice()
         self.assertEqual(p.sale_price, Decimal("501"))        # 300 * 1.67
+
+    def test_custom_markup_from_price(self):
+        # прайс: термопакет 154 ₸ при себестоимости 152.80 — наценка 0.785…%
+        p = Product.objects.create(name="Термопакет", cost=Decimal("152.80"), sale_price=Decimal("154"))
+        self.assertTrue(p.lock_markup_from_price())
+        p.save()
+        self.assertFalse(p.reprice())                         # та же себестоимость — та же цена
+        self.assertEqual(p.sale_price, Decimal("154"))
+        p.cost = Decimal("160")                               # себестоимость выросла
+        p.save()
+        self.assertTrue(p.markup_is_low)                      # цена отстала от своей наценки
+        self.assertTrue(p.reprice())
+        self.assertEqual(p.sale_price, Decimal("162"))        # 160 × 1.00785… = 161.26 → вверх
+        self.assertFalse(p.markup_is_low)
+
+    def test_negative_custom_markup_kept(self):
+        # одноразовый набор продаётся ниже себестоимости: 29 ₸ при 36.72
+        p = Product.objects.create(name="Набор", cost=Decimal("36.72"), sale_price=Decimal("29"))
+        p.lock_markup_from_price(); p.save()
+        self.assertLess(p.custom_markup_pct, 0)
+        self.assertFalse(p.reprice())
+        self.assertEqual(p.sale_price, Decimal("29"))
+        p.cost = Decimal("40")
+        p.reprice()
+        self.assertEqual(p.sale_price, Decimal("32"))         # 40 × 0.7897… = 31.59 → вверх
+
+    def test_material_price_in_order_sheet(self):
+        import io
+        import openpyxl
+        from .views import _build_order_sheet_xlsx
+        cat, _ = MealCategory.objects.get_or_create(key="materials")
+        Material.objects.create(article="27602", name="У* Термопакет серый", unit="1 шт")
+        p = Product.objects.create(name="У* Термопакет серый", article="27602",
+                                   cost=Decimal("152.8"), sale_price=Decimal("154"))
+        p.meal_categories.set([cat])
+        ws = openpyxl.load_workbook(io.BytesIO(_build_order_sheet_xlsx([], with_price=True).content)).active
+        row = next(r for r in ws.iter_rows(values_only=True) if r[0] == "27602")
+        self.assertEqual(row[3], 154)
+
+    def test_lock_markup_from_price_list(self):
+        import io, os, tempfile
+        import openpyxl
+        from django.core.management import call_command
+        cat, _ = MealCategory.objects.get_or_create(key="materials")
+        bag = Product.objects.create(name="У* Термопакет", article="27605", cost=Decimal("172.44"))
+        dish = Product.objects.create(name="Суп", article="44928", cost=Decimal("300"))
+        bag.meal_categories.set([cat])
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append([None, None, "АССОРТИМЕНТ И СТОИМОСТЬ ТОВАРА"])
+        ws.append(["Артикул", "ШК ", "Наименование товара", "Срок годности",
+                   "Цена в тенге, \nв т.ч. НДС (отпускная)"])
+        ws.append([44928, None, "Суп", None, 537])
+        ws.append(["Материалы", None, None, None, None])
+        ws.append([27605, None, "У* Термопакет", None, "172"])
+        fd, path = tempfile.mkstemp(suffix=".xlsx"); os.close(fd)
+        try:
+            wb.save(path)
+            call_command("set_prices_from_sheet", path, "--category", "materials",
+                         "--lock-markup", "--apply", stdout=io.StringIO())
+        finally:
+            os.remove(path)
+        bag.refresh_from_db(); dish.refresh_from_db()
+        self.assertEqual(bag.sale_price, Decimal("172"))
+        self.assertLess(bag.custom_markup_pct, 0)             # 172 < 172.44
+        self.assertFalse(bag.reprice())                       # пересчёт даёт ту же цену
+        self.assertEqual(dish.sale_price, Decimal("501"))     # не материал — не тронут
+        self.assertIsNone(dish.custom_markup_pct)
 
     def test_reprice_keeps_manual_price(self):
         p = Product.objects.create(name="Вода", cost=Decimal("100"),
@@ -621,7 +688,8 @@ class OerpSyncTests(TestCase):
         if resource == "groups":
             return self.GROUPS
         if resource == "products":
-            return {"dish": [self.DISH, self.FMD_DISH], "goods": [self.DRINK]}[params["kind"]]
+            return {"dish": [self.DISH, self.FMD_DISH],
+                    "goods": [self.DRINK] + getattr(self, "extra_goods", [])}[params["kind"]]
         if resource == "tech-cards":
             return self.TECH_CARDS
         if resource == "dish-costs":
@@ -633,6 +701,25 @@ class OerpSyncTests(TestCase):
         from .oerp_sync import OerpClient, sync_products_from_oerp
         with patch.object(OerpClient, "fetch_all", self._fetch):
             return sync_products_from_oerp("erpk_test")
+
+    def test_materials_from_materials_tab(self):
+        # термопакет лежит в O·ERP вне «ЗДОРОВОЕ ПИТАНИЕ» — берём по артикулу вкладки «Материалы»
+        MealCategory.objects.get_or_create(key="materials")
+        Material.objects.create(article="27602", name="У* Термопакет серый 28*28*20")
+        self.extra_goods = [{
+            "id": "m-1", "code": "27602", "name": "У* Термопакет серый 28*28*20", "kind": "goods",
+            "groupId": "g-packaging", "deleted": False, "baseUomName": "шт",
+            "unitWeightKg": None, "description": None, "nutrition": None,
+        }, dict(self.DRINK, id="x-1", code="55555", groupId="g-other", name="Чужой товар")]
+        self.goods_costs = self.goods_costs + [
+            {"id": "m-1", "code": "27602", "ssnCurrent": None, "ssnpp": None,
+             "spp": "152.8", "ssn": None, "ssc": "152.8", "kind": "goods"}]
+        self._sync()
+        p = Product.objects.get(article="27602")
+        self.assertEqual(list(p.meal_categories.values_list("key", flat=True)), ["materials"])
+        self.assertEqual(p.iiko_category, "Материалы")
+        self.assertEqual(p.cost, Decimal("152.80"))
+        self.assertFalse(Product.objects.filter(article="55555").exists())
 
     def test_cost_order_ssn_current_first(self):
         from .oerp_sync import _pick_cost

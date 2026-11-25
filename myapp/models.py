@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_CEILING
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 
 from django.conf import settings
 from django.db import models
@@ -35,6 +35,9 @@ SLOT_TYPES = [
     # Диетическая линейка ФМД — папка «ФМД (диета)» в O·ERP (17.11.2026).
     ('fmd',       'ФМД'),
     ('extra',     'Доп. товары'),
+    # Упаковка, вода и т.п. со вкладки «Материалы» — в каталоге с себестоимостью
+    # из O·ERP и своей наценкой (Product.custom_markup_pct), 25.11.2026.
+    ('materials', 'Материалы'),
 ]
 
 SLOT_ORDER = {k: i for i, (k, _) in enumerate(SLOT_TYPES)}
@@ -43,7 +46,7 @@ SLOT_LABELS = dict(SLOT_TYPES)
 # Категории только для каталога — НЕ участвуют в сборке рационов.
 # «Доп. товары» синхронизируются и фильтруются в каталоге, но не предлагаются
 # как слот при составлении рациона.
-CATALOG_ONLY_KEYS = {'extra'}
+CATALOG_ONLY_KEYS = {'extra', 'materials'}
 
 # Категории, доступные в конструкторе рационов (обычный и Claude).
 RATION_SLOT_TYPES = [(k, v) for k, v in SLOT_TYPES if k not in CATALOG_ONLY_KEYS]
@@ -72,6 +75,14 @@ class Product(models.Model):
     # трогает и пересчёт.
     sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Цена продажи с ФЗ")
     sale_price_manual = models.BooleanField(default=False, verbose_name="Цена задана вручную")
+    # Своя наценка позиции вместо общей (67% / напитки 15%) — у материалов она
+    # посчитана из цены прайса и себестоимости. «Пересчитать цены» держит её:
+    # себестоимость выросла — цена растёт с тем же процентом.
+    custom_markup_pct = models.DecimalField(
+        max_digits=12, decimal_places=6, null=True, blank=True,
+        verbose_name="Своя наценка, %",
+        help_text="Пусто — общая наценка: 67% блюда, 15% напитки.",
+    )
     net_weight = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True, verbose_name="Масса нетто (г)")
     packing = models.CharField(max_length=100, null=True, blank=True, verbose_name="Кратность / Фасовка")
     # composition — как пришло из техкарты iiko, храним нетронутым для сверки.
@@ -168,11 +179,26 @@ class Product(models.Model):
 
     @property
     def target_markup_pct(self):
+        if self.custom_markup_pct is not None:
+            return self.custom_markup_pct
         return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_TARGET_PCT
 
     @property
     def min_markup_pct(self):
+        # своя наценка — она же порог: ниже неё цена «отстала» от себестоимости
+        if self.custom_markup_pct is not None:
+            return self.custom_markup_pct
         return self.MARKUP_DRINKS_PCT if self.is_drink else self.MARKUP_MIN_PCT
+
+    def lock_markup_from_price(self):
+        """Своя наценка из текущих цены и себестоимости: «Пересчитать цены» при
+        той же себестоимости даст ровно эту цену. Процент режем ВНИЗ до 6 знаков —
+        иначе округление цены вверх (ROUND_CEILING) дало бы лишний тенге."""
+        if self.sale_price is None or not self.cost:
+            return False
+        pct = (self._decimal(self.sale_price) / self._decimal(self.cost) - 1) * 100
+        self.custom_markup_pct = pct.quantize(Decimal("0.000001"), rounding=ROUND_FLOOR)
+        return True
 
     @property
     def auto_sale_price(self):

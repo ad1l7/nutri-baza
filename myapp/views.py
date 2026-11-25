@@ -328,7 +328,7 @@ def products_reprice_preview(request):
             "cost": num(p.cost),
             "price": num(p.sale_price),
             "new_price": num(p.auto_sale_price),
-            "target_pct": p.target_markup_pct,
+            "target_pct": round(float(p.target_markup_pct), 2),
             "markup_pct": round(pct, 1) if pct is not None else None,
             "low": p.markup_is_low,
             "manual": p.sale_price_manual,
@@ -370,7 +370,7 @@ def product_set_sale_price(request, pk):
         "markup":      float(product.markup) if product.markup is not None else None,
         "markup_pct":  round(product.markup_pct, 1) if product.markup_pct is not None else None,
         "markup_low":  product.markup_is_low,
-        "target_pct":  product.target_markup_pct,
+        "target_pct":  round(float(product.target_markup_pct), 2),
         "manual":      product.sale_price_manual,
     })
 
@@ -1666,8 +1666,16 @@ def _build_order_sheet_xlsx(products, with_price=False):
         )
         row += 1
 
+    # Цена материала — из его позиции в каталоге (категория «Материалы», тот же
+    # артикул): её ставит синхронизация с O·ERP и «Пересчитать цены»
+    material_price = {
+        (p.article or "").strip(): p.sale_price
+        for p in Product.objects.filter(meal_categories__key="materials").exclude(article="")
+    } if PRICE_COL else {}
     for m in Material.objects.all():
-        item_row(row, m.article, m.name, m.unit)
+        price = material_price.get((m.article or "").strip())
+        item_row(row, m.article, m.name, m.unit,
+                 float(price) if price is not None else None)
         row += 1
 
     for index, width in enumerate(widths):

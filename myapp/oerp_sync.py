@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 OERP_DEFAULT_URL = "https://new.erp-system-fz.kz/api/v1/export"
 ROOT_FOLDER = "ЗДОРОВОЕ ПИТАНИЕ"
+MATERIALS_KEY, MATERIALS_LABEL = "materials", "Материалы"
 
 # Наибольшие страницы, которые принимает O·ERP (export.dto.ts / use-cases)
 PAGE_PRODUCTS = 1000
@@ -222,10 +223,23 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
     if not folders:
         raise OerpError(f"В O·ERP не найдена папка «{ROOT_FOLDER}» с известными подпапками")
 
-    rows = []
+    # Материалы (упаковка, вода) лежат в O·ERP вне «ЗДОРОВОЕ ПИТАНИЕ» — берём
+    # их по артикулам со вкладки «Материалы» сайта, в категорию «Материалы»
+    from .models import Material
+    material_codes = {a.strip() for a in Material.objects.values_list("article", flat=True) if a.strip()}
+
+    rows, category_of = [], {}
     for kind in ("dish", "goods"):          # «ПП* ДОП.ТОВАРЫ» — товары, не блюда
-        rows += [r for r in client.fetch_all("products", PAGE_PRODUCTS, kind=kind)
-                 if r.get("groupId") in folders and not r.get("deleted")]
+        for r in client.fetch_all("products", PAGE_PRODUCTS, kind=kind):
+            if r.get("deleted"):
+                continue
+            if r.get("groupId") in folders:
+                category_of[r["id"]] = folders[r["groupId"]]
+            elif str(r.get("code") or "").strip() in material_codes:
+                category_of[r["id"]] = (MATERIALS_LABEL, MATERIALS_KEY)
+            else:
+                continue
+            rows.append(r)
 
     # Себестоимость: блюда/заготовки и отдельно товары
     cost_by_id, cost_by_code = {}, {}
@@ -260,7 +274,7 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
     for r in rows:
         pid = r["id"]
         code = str(r.get("code") or "").strip()
-        display, slot_key = folders[r["groupId"]]
+        display, slot_key = category_of[r["id"]]
         fields = {
             "name": (r.get("name") or "").strip(),
             "article": code,

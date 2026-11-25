@@ -76,6 +76,9 @@ class ProductAdmin(admin.ModelAdmin):
             "fields": ["name", "article", "photo", "cost", "packing", "net_weight",
                        "composition", "composition_clean", "meal_categories"]
         }),
+        ("Цена", {
+            "fields": ["sale_price", "sale_price_manual", "custom_markup_pct"],
+        }),
         ("На 100 г", {
             "fields": ["protein", "fat", "carbs", "kcal_per_100", "kj_per_100"]
         }),
