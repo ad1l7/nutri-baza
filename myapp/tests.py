@@ -719,7 +719,7 @@ class OerpSyncTests(TestCase):
         self.assertEqual(list(p.meal_categories.values_list("key", flat=True)), ["materials"])
         self.assertEqual(p.iiko_category, "Материалы")
         self.assertEqual(p.cost, Decimal("152.80"))
-        self.assertEqual(p.sale_price, Decimal("153"))         # материал — по себестоимости, 0%
+        self.assertEqual(p.sale_price, Decimal("176"))         # материал — 15%: 152.8 × 1.15 = 175.72
         self.assertFalse(Product.objects.filter(article="55555").exists())
 
     def test_cost_order_ssn_current_first(self):

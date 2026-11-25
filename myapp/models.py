@@ -124,10 +124,10 @@ class Product(models.Model):
     # она же и нижняя граница подсветки. Смузи сюда не входят — они блюда, 67%.
     DRINKS_CATEGORY_KEYS = {"extra"}
     MARKUP_DRINKS_PCT = 15
-    # Материалы (упаковка, вода со вкладки «Материалы») отпускаются по
-    # себестоимости — наценка 0%, она же порог подсветки (25.11.2026).
+    # Материалы (упаковка, вода со вкладки «Материалы») — наценка 15%, она же
+    # порог подсветки (25.11.2026).
     MATERIALS_CATEGORY_KEY = "materials"
-    MARKUP_MATERIALS_PCT = 0
+    MARKUP_MATERIALS_PCT = 15
 
     class Meta:
         verbose_name = "Продукт"
