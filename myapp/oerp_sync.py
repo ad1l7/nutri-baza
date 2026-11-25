@@ -6,7 +6,8 @@ oerp_sync.py — загрузка блюд Olive из O·ERP вместо iiko.
     категории сайта (export/groups + export/products);
   - состав — export/tech-cards на сегодня, раскрываем до сырья тем же
     алгоритмом, что и техкарты iiko (iiko_sync._composition_from_tree);
-  - себестоимость — export/dish-costs, поле ССС (ssc).
+  - себестоимость — export/dish-costs: ССН (ssn), а где её нет — ССС (ssc),
+    см. _pick_cost.
 
 Фото в O·ERP нет: уже скачанные остаются, новые грузят в админке. Блюда,
 пропавшие из папок, не удаляем — только пишем в лог, как и синхронизация iiko.
@@ -158,6 +159,24 @@ def _dish_folders(groups: list, label_to_key: dict) -> dict:
     return result
 
 
+def _pick_cost(row: dict) -> tuple:
+    """Себестоимость строки export/dish-costs → (значение, "ssn"|"ssc") или (None, None).
+
+    Основная — ССН (по нормативу техкарты, ночной расчёт O·ERP): она не
+    скачет от каждого прихода, как средневзвешенная ССС. ССС берём, когда ССН
+    нет (у товаров — напитков «Доп. товаров» — O·ERP её не считает) или когда
+    в ССН вошли ингредиенты без цены (ingredientsWithoutPrice > 0): такая ССН
+    занижена, и цена по наценке вышла бы ниже реальной."""
+    ssn = _num(row.get("ssn"))
+    if ssn is not None and not row.get("ingredientsWithoutPrice"):
+        return ssn, "ssn"
+    # в документе O·ERP поле названо sss, в коде API — ssc
+    ssc = _num(row.get("ssc", row.get("sss")))
+    if ssc is not None:
+        return ssc, "ssc"
+    return None, None
+
+
 def _cards_as_iiko_charts(cards: list) -> tuple:
     """export/tech-cards → вход iiko_sync._composition_from_tree:
     ([{assembledProductId, dateFrom, dateTo, items:[{productId, amount*}]}],
@@ -216,9 +235,8 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
         costs = client.fetch_all("dish-costs", PAGE_DISH_COSTS, date=on_date)
         costs += client.fetch_all("dish-costs", PAGE_DISH_COSTS, date=on_date, kind="goods")
         for c in costs:
-            # ССС; в документе O·ERP поле названо sss, в коде API — ssc
-            val = _num(c.get("ssc", c.get("sss")))
-            if val is None:
+            val = _pick_cost(c)
+            if val[0] is None:
                 continue
             if c.get("id"):
                 cost_by_id[c["id"]] = val
@@ -240,7 +258,7 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
 
     items = {}
     stats = {"products": len(rows), "with_card": 0, "from_description": 0,
-             "with_cost": 0, "no_cost": []}
+             "with_cost": 0, "cost_ssn": 0, "cost_ssc": [], "no_cost": []}
     for r in rows:
         pid = r["id"]
         code = str(r.get("code") or "").strip()
@@ -295,8 +313,13 @@ def collect_from_oerp(client: OerpClient, on_date: str = None) -> dict:
             cost = cost_by_code.get(code)
         if cost is not None:
             # «не посчитано» (null) не пишем вовсе — старое значение остаётся
+            cost, source = cost
             fields["cost"] = Decimal(str(round(cost, 2)))
             stats["with_cost"] += 1
+            if source == "ssn":
+                stats["cost_ssn"] += 1
+            else:
+                stats["cost_ssc"].append(fields["name"])
         else:
             stats["no_cost"].append(fields["name"])
 

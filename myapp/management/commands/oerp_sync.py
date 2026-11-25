@@ -44,7 +44,11 @@ class Command(BaseCommand):
         out(f"Блюд в O·ERP: {report['feed']}, нашлось в базе: {report['matched']} "
             f"(тот же iiko_id: {report['same_id']})")
         out(f"Состав: из техкарт {st['with_card']}, из описания {st['from_description']}; "
-            f"себестоимость есть у {st['with_cost']}")
+            f"себестоимость есть у {st['with_cost']} (ССН — {st['cost_ssn']}, "
+            f"ССС — {len(st['cost_ssc'])})")
+        if st["cost_ssc"]:
+            out(f"По ССС (нет ССН или в ней ингредиенты без цены): "
+                f"{', '.join(st['cost_ssc'][:opts['examples']])}")
         for err in collected["errors"]:
             out(self.style.ERROR(f"Ошибка: {err}"))
 

@@ -562,9 +562,12 @@ class OerpSyncTests(TestCase):
         for key in ("breakfast", "extra", "fmd"):
             MealCategory.objects.get_or_create(key=key)
         self.costs = [
-            {"id": "d-1", "code": "00516", "ssc": "396.004", "kind": "dish"},
+            {"id": "d-1", "code": "00516", "ssc": "410.5", "ssn": "396.004",
+             "ingredientsWithoutPrice": 0, "kind": "dish"},
         ]
-        self.goods_costs = [{"id": "w-1", "code": "00900", "ssc": "452", "kind": "goods"}]
+        # у товаров O·ERP ССН не считает — себестоимость из ССС
+        self.goods_costs = [{"id": "w-1", "code": "00900", "ssc": "452", "ssn": None,
+                             "ingredientsWithoutPrice": None, "kind": "goods"}]
 
     def _fetch(self, resource, page_size, **params):
         if resource == "groups":
@@ -582,6 +585,16 @@ class OerpSyncTests(TestCase):
         from .oerp_sync import OerpClient, sync_products_from_oerp
         with patch.object(OerpClient, "fetch_all", self._fetch):
             return sync_products_from_oerp("erpk_test")
+
+    def test_cost_prefers_ssn(self):
+        from .oerp_sync import _pick_cost
+        self.assertEqual(_pick_cost({"ssn": "300", "ssc": "350", "ingredientsWithoutPrice": 0}),
+                         (300.0, "ssn"))
+        # в ССН вошли ингредиенты без цены — она занижена, берём ССС
+        self.assertEqual(_pick_cost({"ssn": "200", "ssc": "350", "ingredientsWithoutPrice": 2}),
+                         (350.0, "ssc"))
+        self.assertEqual(_pick_cost({"ssn": None, "ssc": "452"}), (452.0, "ssc"))
+        self.assertEqual(_pick_cost({"ssn": None, "ssc": None}), (None, None))
 
     def test_folder_names_match_iiko_menu_categories(self):
         from .oerp_sync import _category_map, _folder_key
@@ -605,7 +618,7 @@ class OerpSyncTests(TestCase):
         self.assertEqual(p.net_weight, Decimal("0.320"))
         self.assertEqual(float(p.kcal_per_serving), 480.0)     # 150 × 320 / 100
         self.assertEqual(p.composition, "Молоко 3,2%, Хлопья овсяные")
-        self.assertEqual(p.cost, Decimal("396.00"))
+        self.assertEqual(p.cost, Decimal("396.00"))            # ССН, не ССС 410.5
         self.assertEqual(p.sale_price, Decimal("662"))         # 67%
 
         drink = Product.objects.get(iiko_id="w-1")
@@ -615,7 +628,7 @@ class OerpSyncTests(TestCase):
     def test_resync_updates_by_article_and_keeps_cost_when_not_calculated(self):
         Product.objects.create(name="Старое имя", article="00516", iiko_id="old-guid",
                                cost=Decimal("380"))
-        self.costs = [{"id": "d-1", "code": "00516", "ssc": None, "kind": "dish"}]
+        self.costs = [{"id": "d-1", "code": "00516", "ssc": None, "ssn": None, "kind": "dish"}]
         result = self._sync()
         self.assertEqual(result["updated"], 1)
         p = Product.objects.get(article="00516")
@@ -624,7 +637,8 @@ class OerpSyncTests(TestCase):
 
     def test_resync_new_cost_keeps_fixed_price(self):
         self._sync()
-        self.costs = [{"id": "d-1", "code": "00516", "ssc": "500", "kind": "dish"}]
+        self.costs = [{"id": "d-1", "code": "00516", "ssn": "500", "ingredientsWithoutPrice": 0,
+                       "kind": "dish"}]
         self._sync()
         p = Product.objects.get(iiko_id="d-1")
         self.assertEqual(p.cost, Decimal("500.00"))
